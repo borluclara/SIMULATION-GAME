@@ -75,6 +75,7 @@ export default function UploadCSV({ setHasError }) {
   return (
     <div className="upload-container">
       <h3>Upload Blast Scenario CSV</h3>
+      <p>Need a sample? <a href="/blast_scenario_sample.csv" download>📥 Download Sample CSV</a></p>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
     </div>
   );
