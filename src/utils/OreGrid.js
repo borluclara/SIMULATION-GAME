@@ -1,9 +1,7 @@
 /**
- * Ore Grid Utilities
- * Handles CSV parsing and grid data structure creation
+ * Ore Grid Data Structure and Utilities
+ * Handles ore block data, color mapping, and grid operations
  */
-
-import Papa from 'papaparse';
 
 // Define ore type to color mapping
 export const ORE_COLORS = {
@@ -221,32 +219,50 @@ export class OreGrid {
  */
 export function parseCSVToGrid(csvContent) {
   return new Promise((resolve, reject) => {
-    Papa.parse(csvContent, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.toLowerCase().trim(),
-      complete: (results) => {
-        try {
-          if (results.errors.length > 0) {
-            console.warn('CSV parsing warnings:', results.errors);
-          }
+    try {
+      const lines = csvContent.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      // Find required columns
+      const xIndex = headers.findIndex(h => h.includes('x'));
+      const yIndex = headers.findIndex(h => h.includes('y'));
+      const oreIndex = headers.findIndex(h => h.includes('ore') || h.includes('type'));
+      const hardnessIndex = headers.findIndex(h => h.includes('hardness'));
+      const valueIndex = headers.findIndex(h => h.includes('value'));
 
-          const grid = OreGrid.fromCSVData(results.data);
-          
-          // Debug output
-          console.log('CSV parsed successfully!');
-          console.log(`Found ${results.data.length} ore blocks`);
-          grid.printToConsole();
-          
-          resolve(grid);
-        } catch (error) {
-          reject(new Error(`Failed to create grid: ${error.message}`));
-        }
-      },
-      error: (error) => {
-        reject(new Error(`CSV parsing failed: ${error.message}`));
+      if (xIndex === -1 || yIndex === -1 || oreIndex === -1) {
+        throw new Error('CSV must contain x, y, and ore_type columns');
       }
-    });
+
+      const data = [];
+      
+      // Parse data rows
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',').map(cell => cell.trim());
+        if (row.length < 3) continue;
+
+        const x = parseInt(row[xIndex]);
+        const y = parseInt(row[yIndex]);
+        const ore_type = row[oreIndex];
+        const hardness = hardnessIndex !== -1 ? parseInt(row[hardnessIndex]) || null : null;
+        const value = valueIndex !== -1 ? parseInt(row[valueIndex]) || null : null;
+
+        if (!isNaN(x) && !isNaN(y) && ore_type) {
+          data.push({ x, y, ore_type, hardness, value });
+        }
+      }
+
+      const grid = OreGrid.fromCSVData(data);
+      
+      // Debug output
+      console.log('CSV parsed successfully!');
+      console.log(`Found ${data.length} ore blocks`);
+      grid.printToConsole();
+      
+      resolve(grid);
+    } catch (error) {
+      reject(new Error(`Failed to create grid: ${error.message}`));
+    }
   });
 }
 
