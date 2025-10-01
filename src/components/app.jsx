@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import UploadCSV from "./uploadcsv.jsx";
+import UploadCSV from "./UploadCSV.jsx";
 import CSVErrorUI from "./csvErrorUI.jsx";
 import "./App.css";
 import "./csvErrorUI.css";
