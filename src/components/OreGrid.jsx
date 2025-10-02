@@ -32,7 +32,7 @@ function OreGrid({ data }) {
                 'bg-slate-800 text-white border border-accent-green/20'
               }`}
             >
-              {ore[0]}
+              {ore?.[0] || ''}
             </div>
           ))}
         </div>
