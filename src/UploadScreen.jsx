@@ -10,7 +10,6 @@ const UploadScreen = ({ onDataParsed }) => {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        console.log("Parsed CSV:", results.data);
         onDataParsed(results.data);
       },
       error: (err) => {
