@@ -10,7 +10,6 @@ const UploadCSV = ({ onDataParsed }) => {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        console.log("Parsed CSV:", results.data);
         onDataParsed(results.data); // Send to grid generator
       },
       error: (err) => {
