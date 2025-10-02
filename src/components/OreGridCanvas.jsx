@@ -260,18 +260,18 @@ const OreGridCanvas = ({
     return null;
   };
 
-  const handleMouseMove = (event) => {
-    const result = getBlockFromMouseEvent(event);
-    if (result && result.block) {
-      setHoveredBlock({
-        ...result.block,
-        canvasX: result.mouseX,
-        canvasY: result.mouseY
-      });
-    } else {
-      setHoveredBlock(null);
-    }
-  };
+const handleMouseMove = (event) => {
+  const result = getBlockFromMouseEvent(event);
+  if (result && result.block) {
+    setHoveredBlock({
+      ...result.block,
+      canvasX: result.mouseX,
+      canvasY: result.mouseY
+    });
+  } else {
+    setHoveredBlock(null);
+  }
+};
 
   const handleMouseLeave = () => {
     setHoveredBlock(null);
@@ -292,70 +292,70 @@ const OreGridCanvas = ({
       className={`ore-grid-canvas-container ${className} ${!isCanvasReady ? 'loading' : ''}`}
     >
       {/* Canvas element with enhanced attributes */}
-      <canvas
-        ref={canvasRef}
-        className="ore-grid-canvas"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
+    <canvas
+      ref={canvasRef}
+      className="ore-grid-canvas"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
+      style={{
+        width: canvasDimensions.width,
+        height: canvasDimensions.height,
+        maxWidth: '100%',
+        maxHeight: '100%',
+        display: canvasDimensions.width > 0 ? 'block' : 'none'
+      }}
+      aria-label="Interactive ore grid - click on blocks to apply blast effects"
+      role="img"
+    />
+    
+    {/* Loading indicator for canvas initialization */}
+    {!isCanvasReady && canvasDimensions.width === 0 && (
+      <div className="canvas-loading">
+        <div className="loading-spinner"></div>
+        <span>Initializing canvas...</span>
+      </div>
+    )}
+    
+    {/* Grid info overlay */}
+    {isCanvasReady && grid && (
+      <div className="canvas-info">
+        <span className="grid-size">{grid.width} × {grid.height}</span>
+        <span className="zoom-level">Zoom: {Math.round(scaleFactor * 100)}%</span>
+      </div>
+    )}
+    
+    {/* Hover tooltip */}
+    {hoveredBlock && (
+      <div 
+        className="block-tooltip"
         style={{
-          width: canvasDimensions.width,
-          height: canvasDimensions.height,
-          maxWidth: '100%',
-          maxHeight: '100%',
-          display: canvasDimensions.width > 0 ? 'block' : 'none'
+          position: 'absolute',
+          left: `${hoveredBlock.canvasX + 10}px`,
+          top: `${hoveredBlock.canvasY - 10}px`,
+          pointerEvents: 'none',
+          zIndex: 1000
         }}
-        aria-label="Interactive ore grid - click on blocks to apply blast effects"
-        role="img"
-      />
-      
-      {/* Loading indicator for canvas initialization */}
-      {!isCanvasReady && canvasDimensions.width === 0 && (
-        <div className="canvas-loading">
-          <div className="loading-spinner"></div>
-          <span>Initializing canvas...</span>
-        </div>
-      )}
-      
-      {/* Grid info overlay */}
-      {isCanvasReady && grid && (
-        <div className="canvas-info">
-          <span className="grid-size">{grid.width} × {grid.height}</span>
-          <span className="zoom-level">Zoom: {Math.round(scaleFactor * 100)}%</span>
-        </div>
-      )}
-      
-      {/* Hover tooltip */}
-      {hoveredBlock && (
-        <div 
-          className="block-tooltip"
-          style={{
-            position: 'absolute',
-            left: `${hoveredBlock.canvasX + 10}px`,
-            top: `${hoveredBlock.canvasY - 10}px`,
-            pointerEvents: 'none',
-            zIndex: 1000
-          }}
-        >
-          <div className="tooltip-content">
-            <div className="tooltip-title">{hoveredBlock.oreType}</div>
-            <div className="tooltip-info">
-              Position: ({hoveredBlock.x}, {hoveredBlock.y})
-            </div>
-            <div className="tooltip-info">
-              Health: {hoveredBlock.health}/{hoveredBlock.maxHealth} | Value: {hoveredBlock.value}
-            </div>
-            {hoveredBlock.isDestroyed && (
-              <div className="tooltip-status destroyed">DESTROYED</div>
-            )}
-            {hoveredBlock.damage > 0 && !hoveredBlock.isDestroyed && (
-              <div className="tooltip-damage">Damage: {hoveredBlock.damage}</div>
-            )}
+      >
+        <div className="tooltip-content">
+          <div className="tooltip-title">{hoveredBlock.oreType}</div>
+          <div className="tooltip-info">
+            Position: ({hoveredBlock.x}, {hoveredBlock.y})
           </div>
+          <div className="tooltip-info">
+            Health: {hoveredBlock.health}/{hoveredBlock.maxHealth} | Value: {hoveredBlock.value}
+          </div>
+          {hoveredBlock.isDestroyed && (
+            <div className="tooltip-status destroyed">DESTROYED</div>
+          )}
+          {hoveredBlock.damage > 0 && !hoveredBlock.isDestroyed && (
+            <div className="tooltip-damage">Damage: {hoveredBlock.damage}</div>
+          )}
         </div>
-      )}
-    </div>
-  );
-};
+      </div>
+    )}
+  </div>
+  )
+}
 
 export default OreGridCanvas;

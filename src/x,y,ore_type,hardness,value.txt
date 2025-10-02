@@ -1,0 +1,4 @@
+x,y,ore_type,hardness,value
+0,0,iron,3,10
+1,0,coal,2,5
+...

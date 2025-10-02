@@ -6,11 +6,103 @@
   margin: 0 auto;
 }
 
+/* GridManager.css */
+
+.grid-manager {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #0f0f0f;
+  color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+}
+
+.grid-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #333;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.grid-manager-header h2 {
+  color: #ff6b35;
+  margin: 0;
+  font-size: 1.8em;
+  font-weight: 700;
+}
+
+.grid-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.csv-upload-input {
+  display: none;
+}
+
+.csv-upload-btn,
+.sample-btn,
+.reset-btn {
+  padding: 8px 16px;
+  border: 2px solid #ff6b35;
+  background: transparent;
+  color: #ff6b35;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s ease;
+  font-size: 0.9em;
+}
+
+.csv-upload-btn:hover,
+.sample-btn:hover,
+.reset-btn:hover {
+  background: #ff6b35;
+  color: #000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.reset-btn {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.reset-btn:hover {
+  background: #ff4444;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+}
+
+/* Loading and Error States */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 20px;
+  background: rgba(255, 107, 53, 0.05);
+  border: 2px dashed rgba(255, 107, 53, 0.3);
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
 .loading-spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #38e07b;
-  border-top: 2px solid transparent;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 107, 53, 0.3);
+  border-top: 4px solid #ff6b35;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -67,5 +159,161 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 768px) {
   .grid-manager {
     padding: 0;
+  }
+}
+.error-state {
+  border-color: rgba(255, 68, 68, 0.3);
+  background: rgba(255, 68, 68, 0.05);
+  color: #ff4444;
+}
+
+.error-state button {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.error-state button:hover {
+  background: #ff4444;
+  color: #fff;
+}
+
+/* Grid Canvas Container */
+.grid-canvas-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 25px 0;
+}
+
+.grid-instructions {
+  margin-bottom: 15px;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  font-size: 0.95em;
+}
+
+/* Ore Distribution */
+.ore-distribution {
+  margin-top: 25px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.ore-distribution h3 {
+  color: #ff6b35;
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  text-align: center;
+}
+
+.ore-legend-count {
+  color: #888;
+  font-size: 0.85em;
+  margin-left: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .grid-manager {
+    padding: 15px;
+    margin: 10px;
+  }
+
+  .grid-manager-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .grid-manager-header h2 {
+    font-size: 1.5em;
+  }
+
+  .grid-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .csv-upload-btn,
+  .sample-btn,
+  .reset-btn {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .grid-controls {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .control-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .control-group label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .control-group input[type="range"] {
+    width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-manager {
+    padding: 10px;
+    margin: 5px;
+  }
+
+  .grid-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid-manager-header h2 {
+    font-size: 1.3em;
+  }
+
+  .csv-upload-btn,
+  .sample-btn,
+  .reset-btn {
+    font-size: 0.8em;
+    padding: 6px 12px;
+  }
+}
+
+/* Animation Effects */
+.grid-manager {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-item {
+  animation: slideIn 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.stat-item:nth-child(1) { animation-delay: 0.1s; }
+.stat-item:nth-child(2) { animation-delay: 0.2s; }
+.stat-item:nth-child(3) { animation-delay: 0.3s; }
+.stat-item:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

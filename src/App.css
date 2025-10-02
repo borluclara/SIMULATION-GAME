@@ -260,3 +260,33 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Custom loading spinner animation */
+.read-the-docs {
+  color: #888;
+}
+
+/* Custom loading spinner animation */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #38e07b;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Override default styles */
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
