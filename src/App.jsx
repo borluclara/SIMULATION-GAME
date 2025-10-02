@@ -15,7 +15,6 @@ function App() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        console.log("Parsed CSV:", results.data);
         setCsvData(results.data);
       },
       error: (err) => {
