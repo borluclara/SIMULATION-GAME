@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import Papa from 'papaparse';
 import './App.css';
-import OreGrid from './OreGrid'; // ✅ Import the grid renderer
+import OreGrid from './OreGrid';
 
 function App() {
   const [csvData, setCsvData] = useState(null);
@@ -25,7 +25,6 @@ function App() {
 
   return (
     <div className="blast-sim-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* Header */}
       <header className="blast-header">
         <div style={{ width: '24px' }}></div>
         <h1 className="blast-title">BlastSim</h1>
@@ -34,9 +33,7 @@ function App() {
         </span>
       </header>
 
-      {/* Main Content */}
       <main className="blast-main">
-        {/* Name Input */}
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <input
             className="name-input"
@@ -45,7 +42,6 @@ function App() {
           />
         </div>
 
-        {/* Buttons */}
         <div className="button-container">
           <button className="blast-button start-button">
             Start Simulation
@@ -65,7 +61,6 @@ function App() {
           </button>
         </div>
 
-        {/* CSV Grid Display */}
         {csvData && (
           <div style={{ width: '100%', maxWidth: '1200px', marginTop: '2rem' }}>
             <OreGrid data={csvData} />
@@ -73,7 +68,6 @@ function App() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
       <nav className="bottom-nav" style={{ position: 'sticky', bottom: 0 }}>
         <div className="nav-container">
           <a href="#" className="nav-item active">
