@@ -24,66 +24,73 @@ function App() {
   };
 
   return (
-    <div className="bg-background-light dark:bg-background-dark font-display text-white min-h-screen flex flex-col">
-      <header className="flex items-center justify-between p-4 bg-gradient-custom shadow-lg">
-        <div className="w-10"></div>
-        <h1 className="text-2xl font-bold text-center flex-1 text-white">BlastSim</h1>
-        <button className="w-10 flex items-center justify-center text-white hover:text-accent-green transition-colors">
-          <span className="material-symbols-outlined text-3xl">settings</span>
-        </button>
+    <div className="blast-sim-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* Header */}
+      <header className="blast-header">
+        <div style={{ width: '24px' }}></div>
+        <h1 className="blast-title">BlastSim</h1>
+        <span className="material-symbols-outlined settings-icon">
+          settings
+        </span>
       </header>
 
-      <main className="flex-grow flex flex-col items-center justify-center p-4 space-y-8">
-        <div className="w-full max-w-sm">
+      {/* Main Content */}
+      <main className="blast-main">
+        {/* Name Input */}
+        <div style={{ width: '100%', maxWidth: '400px' }}>
           <input
-            className="form-input w-full rounded-lg bg-background-dark/50 dark:bg-background-light/10 border-2 border-primary/50 focus:border-primary focus:ring-primary placeholder-white/50 text-white p-4 text-base"
+            className="name-input"
             placeholder="Enter your name"
+            type="text"
           />
         </div>
 
-        <div className="w-full max-w-sm flex flex-col space-y-4">
-          <button className="w-full rounded-lg h-14 bg-primary hover:bg-primary-dark text-white text-lg font-bold transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+        {/* Buttons */}
+        <div className="button-container">
+          <button className="blast-button start-button">
             Start Simulation
           </button>
 
-          <label className="w-full rounded-lg h-14 bg-lime/20 hover:bg-lime/30 text-white text-lg font-bold flex items-center justify-center cursor-pointer transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+          <label className="blast-button secondary-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             Load CSV Scenario
-            <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+            <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
           </label>
 
-          <button className="w-full rounded-lg h-14 bg-accent-green/20 hover:bg-accent-green/30 text-white text-lg font-bold transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+          <button className="blast-button secondary-button">
             Leaderboard
           </button>
-          <button className="w-full rounded-lg h-14 bg-primary/20 hover:bg-primary/30 text-white text-lg font-bold transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+
+          <button className="blast-button secondary-button">
             Help
           </button>
         </div>
 
-        {/* ✅ Render Ore Grid if CSV is loaded */}
+        {/* CSV Grid Display */}
         {csvData && (
-          <div className="w-full max-w-5xl mx-auto">
+          <div style={{ width: '100%', maxWidth: '1200px', marginTop: '2rem' }}>
             <OreGrid data={csvData} />
           </div>
         )}
       </main>
 
-      <nav className="border-t border-accent-green/20 bg-background-light/5 dark:bg-background-dark/20 backdrop-blur-sm sticky bottom-0">
-        <div className="flex justify-around p-2">
-          <a className="flex flex-col items-center gap-1 p-2 rounded-lg text-accent-green" href="#">
-            <span className="material-symbols-outlined">home</span>
-            <span className="text-xs font-medium">Home</span>
+      {/* Bottom Navigation */}
+      <nav className="bottom-nav" style={{ position: 'sticky', bottom: 0 }}>
+        <div className="nav-container">
+          <a href="#" className="nav-item active">
+            <span className="material-symbols-outlined nav-icon">home</span>
+            <span className="nav-text">Home</span>
           </a>
-          <a className="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-accent-green transition-colors" href="#">
-            <span className="material-symbols-outlined">gamepad</span>
-            <span className="text-xs font-medium">Game</span>
+          <a href="#" className="nav-item">
+            <span className="material-symbols-outlined nav-icon">gamepad</span>
+            <span className="nav-text">Game</span>
           </a>
-          <a className="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-accent-green transition-colors" href="#">
-            <span className="material-symbols-outlined">leaderboard</span>
-            <span className="text-xs font-medium">Leaderboard</span>
+          <a href="#" className="nav-item">
+            <span className="material-symbols-outlined nav-icon">leaderboard</span>
+            <span className="nav-text">Leaderboard</span>
           </a>
-          <a className="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-accent-green transition-colors" href="#">
-            <span className="material-symbols-outlined">help</span>
-            <span className="text-xs font-medium">Help</span>
+          <a href="#" className="nav-item">
+            <span className="material-symbols-outlined nav-icon">help</span>
+            <span className="nav-text">Help</span>
           </a>
         </div>
       </nav>

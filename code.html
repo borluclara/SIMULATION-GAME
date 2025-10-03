@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Space+Grotesk:wght@400;500;700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<title>BlastSim</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#38e07b",
+              "background-light": "#f6f8f7",
+              "background-dark": "#122017",
+            },
+            fontFamily: {
+              "display": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white">
+<div class="flex flex-col min-h-screen">
+<header class="flex items-center justify-between p-4">
+<div class="w-10"></div>
+<h1 class="text-2xl font-bold text-center flex-1">BlastSim</h1>
+<button class="w-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl">
+                settings
+            </span>
+</button>
+</header>
+<main class="flex-grow flex flex-col items-center justify-center p-4 space-y-8">
+<div class="w-full max-w-sm">
+<input class="form-input w-full rounded-lg bg-background-dark/50 dark:bg-background-light/10 border-2 border-primary/50 focus:border-primary focus:ring-primary placeholder-white/50 text-white p-4 text-base" placeholder="Enter your name" value=""/>
+</div>
+<div class="w-full max-w-sm flex flex-col space-y-4">
+<button class="w-full rounded-lg h-14 bg-primary text-background-dark text-lg font-bold">
+            Start Simulation
+          </button>
+<button class="w-full rounded-lg h-14 bg-primary/20 dark:bg-primary/30 text-white text-lg font-bold">
+            Load CSV Scenario
+          </button>
+<button class="w-full rounded-lg h-14 bg-primary/20 dark:bg-primary/30 text-white text-lg font-bold">
+            Leaderboard
+          </button>
+<button class="w-full rounded-lg h-14 bg-primary/20 dark:bg-primary/30 text-white text-lg font-bold">
+            Help
+          </button>
+</div>
+</main>
+<nav class="border-t border-primary/20 bg-background-light/5 dark:bg-background-dark/20 backdrop-blur-sm sticky bottom-0">
+<div class="flex justify-around p-2">
+<a class="flex flex-col items-center gap-1 p-2 rounded-lg text-primary" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-xs font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">gamepad</span>
+<span class="text-xs font-medium">Game</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="text-xs font-medium">Leaderboard</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 rounded-lg text-white/70 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-xs font-medium">Help</span>
+</a>
+</div>
+</nav>
+</div>
+
+</body></html>
