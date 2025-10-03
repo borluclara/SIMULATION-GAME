@@ -1,5 +1,6 @@
 /**
  * Grid Manager Component
+ * Handles loading, displaying, and managing the ore grid with canvas rendering
  * Handles loading, displaying, and managing the ore grid
  */
 
@@ -28,6 +29,9 @@ const GridManager = () => {
   const [blastRadius, setBlastRadius] = useState(2);
   const [blastPower, setBlastPower] = useState(50);
   const [blastDirection, setBlastDirection] = useState(90);
+  const [canvasRefreshKey, setCanvasRefreshKey] = useState(0); // For forcing canvas refresh
+
+  // Handle file upload with canvas refresh
 
   // Handle file upload
   const handleFileUpload = (event) => {
@@ -37,6 +41,8 @@ const GridManager = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       loadGridFromContent(e.target.result);
+      // Force canvas refresh when new CSV is uploaded
+      setCanvasRefreshKey(prev => prev + 1);
     };
     reader.readAsText(file);
   };
@@ -53,13 +59,30 @@ const GridManager = () => {
     });
   };
 
-  // Load sample data
+  // Load sample data with canvas refresh
   const loadSampleData = () => {
     loadGrid('/sample_ore_data.csv');
+    setCanvasRefreshKey(prev => prev + 1);
+  };
+
+  // Simulate blast at random location
+  const runSimulation = () => {
+    if (!grid || !isReady) return;
+    
+    const randomX = Math.floor(Math.random() * grid.width);
+    const randomY = Math.floor(Math.random() * grid.height);
+    
+    applyBlast(randomX, randomY, blastRadius, blastPower);
   };
 
   return (
     <>
+      {loading && (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Loading grid data...</p>
+        </div>
+      )}
       {/* Score and Status Cards */}
       <div className="grid grid-cols-2 gap-4 px-4">
         <div className="rounded-lg border border-white/20 dark:border-white/20 bg-primary/10 dark:bg-primary/20 p-4">
@@ -100,8 +123,13 @@ const GridManager = () => {
                 cellSize={cellSize}
                 showGrid={showGrid}
                 showLabels={showLabels}
+                forceRefresh={canvasRefreshKey}
+                className="w-full h-full"
               />
             </div>
+            <p className="canvas-helper-text">
+              Click on any ore block to apply a blast effect
+            </p>
           </div>
 
           {/* Blast Tool Panel */}
@@ -124,12 +152,8 @@ const GridManager = () => {
                     max="200"
                     value={blastPower}
                     onChange={(e) => setBlastPower(parseInt(e.target.value))}
-                    className="absolute inset-0 w-full h-2 opacity-0 cursor-pointer"
+                    className="slider-input"
                   />
-                  <div 
-                    className="absolute -top-1 size-4 rounded-full bg-white border-2 border-primary cursor-pointer"
-                    style={{ left: `calc(${(blastPower / 200) * 100}% - 8px)` }}
-                  ></div>
                 </div>
               </div>
               <div>
@@ -148,12 +172,8 @@ const GridManager = () => {
                     max="360"
                     value={blastDirection}
                     onChange={(e) => setBlastDirection(parseInt(e.target.value))}
-                    className="absolute inset-0 w-full h-2 opacity-0 cursor-pointer"
+                    className="slider-input"
                   />
-                  <div 
-                    className="absolute -top-1 size-4 rounded-full bg-white border-2 border-primary cursor-pointer"
-                    style={{ left: `calc(${(blastDirection / 360) * 100}% - 8px)` }}
-                  ></div>
                 </div>
               </div>
             </div>
@@ -161,7 +181,10 @@ const GridManager = () => {
 
           {/* Action Buttons */}
           <div className="px-4 mt-6 grid grid-cols-2 gap-3">
-            <button className="col-span-2 w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide">
+            <button 
+              onClick={runSimulation}
+              className="col-span-2 w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide"
+            >
               Run Simulation
             </button>
             <button 
@@ -201,7 +224,7 @@ const GridManager = () => {
             accept=".csv"
             onChange={handleFileUpload}
             id="csv-upload"
-            className="hidden"
+            className="sr-only hidden"
           />
         </>
       )}

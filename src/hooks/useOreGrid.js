@@ -1,154 +1,123 @@
 /**
- * Custom React Hook for Ore Grid Management
+ * useOreGrid Hook
+ * Manages ore grid state, loading, and interactions
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { loadCSVFile, parseCSVToGrid } from '../utils/OreGrid.js';
+import { OreGrid } from '../utils/OreGrid';
 
-export function useOreGrid(initialCSVPath = null) {
+export const useOreGrid = (initialDataPath = null) => {
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [gridStats, setGridStats] = useState({
-    totalBlocks: 0,
-    destroyedBlocks: 0,
-    oreDistribution: {}
-  });
+  const [isReady, setIsReady] = useState(false);
 
-  // Load grid from CSV file
-  const loadGrid = useCallback(async (csvPath) => {
-    setLoading(true);
-    setError(null);
-    
+  // Load grid from CSV content
+  const loadGridFromContent = useCallback((csvContent) => {
     try {
-      const newGrid = await loadCSVFile(csvPath);
+      setLoading(true);
+      setError(null);
+      
+      const newGrid = OreGrid.fromCSVData(csvContent);
       setGrid(newGrid);
-      updateGridStats(newGrid);
+      setIsReady(true);
+      
+      console.log('Grid loaded successfully:', {
+        width: newGrid.width,
+        height: newGrid.height,
+        totalBlocks: newGrid.getAllBlocks().length
+      });
     } catch (err) {
+      console.error('Error loading grid:', err);
       setError(err.message);
-      console.error('Failed to load ore grid:', err);
+      setIsReady(false);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Load grid from CSV content (for file upload)
-  const loadGridFromContent = useCallback(async (csvContent) => {
-    setLoading(true);
-    setError(null);
-    
+  // Load grid from file path
+  const loadGrid = useCallback(async (filePath) => {
     try {
-      const newGrid = await parseCSVToGrid(csvContent);
-      setGrid(newGrid);
-      updateGridStats(newGrid);
-    } catch (err) {
-      setError(err.message);
-      console.error('Failed to parse CSV content:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Update grid statistics
-  const updateGridStats = useCallback((currentGrid) => {
-    if (!currentGrid) return;
-
-    const totalBlocks = currentGrid.blocks.size;
-    let destroyedBlocks = 0;
-    
-    currentGrid.blocks.forEach(block => {
-      if (block.isDestroyed) destroyedBlocks++;
-    });
-
-    const oreDistribution = currentGrid.getOreDistribution();
-
-    setGridStats({
-      totalBlocks,
-      destroyedBlocks,
-      oreDistribution,
-      survivalRate: ((totalBlocks - destroyedBlocks) / totalBlocks * 100).toFixed(1)
-    });
-  }, []);
-
-  // Apply blast effect to grid
-  const applyBlast = useCallback((centerX, centerY, blastRadius, blastPower) => {
-    if (!grid) return;
-
-    const affectedBlocks = grid.getBlocksInRadius(centerX, centerY, blastRadius);
-    let blocksDestroyed = 0;
-
-    affectedBlocks.forEach(({ block, distance }) => {
-      if (block.isDestroyed) return;
-
-      // Calculate damage based on distance and blast power
-      const damageMultiplier = Math.max(0, 1 - (distance / blastRadius));
-      const damage = blastPower * damageMultiplier * (1 - block.blastResistance);
-
-      if (block.takeDamage(damage)) {
-        blocksDestroyed++;
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(filePath);
+      if (!response.ok) {
+        throw new Error(`Failed to load file: ${response.statusText}`);
       }
+      
+      const csvContent = await response.text();
+      loadGridFromContent(csvContent);
+    } catch (err) {
+      console.error('Error loading grid from file:', err);
+      setError(err.message);
+      setIsReady(false);
+      setLoading(false);
+    }
+  }, [loadGridFromContent]);
+
+  // Apply blast to grid
+  const applyBlast = useCallback((x, y, radius = 2, power = 50) => {
+    if (!grid || !isReady) {
+      console.warn('Grid not ready for blast');
+      return null;
+    }
+
+    const result = grid.applyBlast(x, y, radius, power);
+    
+    // Trigger re-render by creating new grid reference
+    setGrid(new OreGrid(grid.width, grid.height));
+    setGrid(grid); // This will trigger component updates
+    
+    console.log('Blast applied:', {
+      center: [x, y],
+      radius,
+      power,
+      affected: result.affectedBlocks.length,
+      destroyed: result.destroyedBlocks.length,
+      totalDamage: result.totalDamage
     });
-
-    // Force re-render by creating new grid reference
-    setGrid({ ...grid });
-    updateGridStats(grid);
-
-    return {
-      blocksAffected: affectedBlocks.length,
-      blocksDestroyed,
-      totalDamage: blastPower
-    };
-  }, [grid, updateGridStats]);
+    
+    return result;
+  }, [grid, isReady]);
 
   // Reset grid to original state
   const resetGrid = useCallback(() => {
     if (!grid) return;
-
-    grid.blocks.forEach(block => {
-      block.isDestroyed = false;
-      block.health = block.maxHealth;
-    });
-
-    setGrid({ ...grid });
-    updateGridStats(grid);
-  }, [grid, updateGridStats]);
-
-  // Get block at specific coordinates
-  const getBlock = useCallback((x, y) => {
-    return grid ? grid.getBlock(x, y) : null;
+    
+    grid.reset();
+    // Trigger re-render
+    setGrid(new OreGrid(grid.width, grid.height));
+    setGrid(grid);
+    
+    console.log('Grid reset to original state');
   }, [grid]);
 
-  // Get block at grid position
-  const getBlockAtGridPos = useCallback((gridX, gridY) => {
-    return grid ? grid.getBlockAtGridPos(gridX, gridY) : null;
-  }, [grid]);
+  // Get grid statistics
+  const gridStats = grid ? grid.getStats() : {
+    totalBlocks: 0,
+    destroyedBlocks: 0,
+    survivalRate: 0,
+    oreDistribution: {}
+  };
 
-  // Load initial CSV on mount
+  // Load initial data on mount
   useEffect(() => {
-    if (initialCSVPath) {
-      loadGrid(initialCSVPath);
+    if (initialDataPath) {
+      loadGrid(initialDataPath);
     }
-  }, [initialCSVPath, loadGrid]);
+  }, [initialDataPath, loadGrid]);
 
   return {
-    // State
     grid,
     loading,
     error,
+    isReady,
     gridStats,
-    
-    // Actions
     loadGrid,
     loadGridFromContent,
     applyBlast,
-    resetGrid,
-    
-    // Getters
-    getBlock,
-    getBlockAtGridPos,
-    
-    // Computed values
-    isReady: !loading && !error && grid !== null,
-    gridDimensions: grid ? { width: grid.width, height: grid.height } : null
+    resetGrid
   };
-}
+};
