@@ -10,6 +10,8 @@ function App() {
   const [csvData, setCsvData] = useState(null);
   const [oreGrid, setOreGrid] = useState(null); // Enhanced grid for 2D visualization
   const [hasError, setHasError] = useState(false); // State for error handling
+  const [showFeatures, setShowFeatures] = useState(false); // Show all integrated features
+  const [currentView, setCurrentView] = useState('home'); // Track current view
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -123,29 +125,127 @@ function App() {
           </button>
 
           <label className="blast-button secondary-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            Load CSV Scenario
+            📁 Load CSV Scenario
             <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
           </label>
 
-          <button className="blast-button secondary-button">
-            Leaderboard
+          <button 
+            className="blast-button secondary-button"
+            onClick={() => setShowFeatures(!showFeatures)}
+          >
+            🔧 Show Features ({showFeatures ? 'Hide' : 'Show'})
           </button>
 
-          <button className="blast-button secondary-button">
-            Help
+          <button 
+            className="blast-button secondary-button"
+            onClick={() => {
+              // Trigger error demo
+              setHasError({
+                type: 'DEMO_ERROR',
+                message: 'Demo: This shows the error handling from err_handling-new branch!',
+                details: { demo: true }
+              });
+            }}
+          >
+            ⚠️ Demo Error Handling
           </button>
         </div>
+
+        {/* Feature Showcase Section */}
+        {showFeatures && (
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '600px', 
+            marginTop: '1rem',
+            padding: '1.5rem',
+            background: 'rgba(56, 224, 123, 0.1)',
+            borderRadius: '0.5rem',
+            border: '1px solid rgba(56, 224, 123, 0.3)'
+          }}>
+            <h3 style={{ color: '#38e07b', textAlign: 'center', marginBottom: '1rem' }}>
+              🚀 Integrated Branch Features
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
+              <div style={{ 
+                padding: '1rem', 
+                background: 'rgba(56, 224, 123, 0.05)', 
+                borderRadius: '0.25rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📤</div>
+                <strong style={{ color: '#38e07b' }}>UPLOAD-CSV</strong>
+                <p style={{ color: '#aaa', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+                  • Clean Interface<br/>
+                  • CSV Upload<br/>
+                  • Data Processing
+                </p>
+              </div>
+              
+              <div style={{ 
+                padding: '1rem', 
+                background: 'rgba(244, 67, 54, 0.1)', 
+                borderRadius: '0.25rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚠️</div>
+                <strong style={{ color: '#f44336' }}>err_handling-new</strong>
+                <p style={{ color: '#aaa', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+                  • Error Validation<br/>
+                  • User Feedback<br/>
+                  • Retry Functionality
+                </p>
+              </div>
+              
+              <div style={{ 
+                padding: '1rem', 
+                background: 'rgba(33, 150, 243, 0.1)', 
+                borderRadius: '0.25rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🎮</div>
+                <strong style={{ color: '#2196f3' }}>2D-grid-of-ore</strong>
+                <p style={{ color: '#aaa', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+                  • Canvas Rendering<br/>
+                  • Interactive Grid<br/>
+                  • Visual Effects
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <p style={{ color: '#aaa', fontSize: '0.85rem' }}>
+                💡 <strong>Try these actions:</strong><br/>
+                1. Upload a valid CSV → See 2D grid visualization<br/>
+                2. Upload invalid file → See error handling<br/>
+                3. Click "Demo Error" → Experience error UI
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Enhanced 2D Grid Visualization */}
         {csvData && (
           <div style={{ width: '100%', maxWidth: '1200px', marginTop: '2rem' }}>
-            <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-              <h3 style={{ color: '#38e07b', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-                Ore Grid Visualization
+            <div style={{ 
+              marginBottom: '1rem', 
+              textAlign: 'center',
+              padding: '1rem',
+              background: 'rgba(56, 224, 123, 0.1)',
+              borderRadius: '0.5rem',
+              border: '1px solid rgba(56, 224, 123, 0.3)'
+            }}>
+              <h3 style={{ color: '#38e07b', fontSize: '1.4rem', marginBottom: '0.5rem' }}>
+                🎮 Interactive Ore Grid Visualization
               </h3>
-              <p style={{ color: '#aaa', fontSize: '0.9rem' }}>
-                {csvData.length} blocks loaded • Interactive 2D Grid
+              <p style={{ color: '#aaa', fontSize: '1rem', marginBottom: '0.5rem' }}>
+                <strong>{csvData.length} blocks loaded</strong> • Enhanced 2D Grid from merged branches
               </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.85rem' }}>
+                <span style={{ color: '#38e07b' }}>✅ CSV Processing (UPLOAD-CSV)</span>
+                <span style={{ color: '#2196f3' }}>✅ 2D Rendering (2D-grid)</span>
+                <span style={{ color: '#f44336' }}>✅ Error Handling (err_handling)</span>
+              </div>
             </div>
             
             {/* Use enhanced canvas grid if available, fallback to simple grid */}
@@ -153,19 +253,33 @@ function App() {
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'center', 
-                padding: '1rem',
+                padding: '2rem',
                 background: 'rgba(56, 224, 123, 0.05)',
                 borderRadius: '0.5rem',
-                border: '1px solid rgba(56, 224, 123, 0.2)'
+                border: '2px solid rgba(56, 224, 123, 0.2)',
+                position: 'relative'
               }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '0.5rem',
+                  right: '0.5rem',
+                  background: 'rgba(33, 150, 243, 0.8)',
+                  color: 'white',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold'
+                }}>
+                  Enhanced Canvas Grid
+                </div>
                 <OreGridCanvas 
                   grid={oreGrid}
-                  cellSize={25}
+                  cellSize={30}
                   showGrid={true}
                   showLabels={false}
                   onBlockClick={(block) => {
                     console.log("Block clicked:", block);
-                    // Future: Add block interaction functionality
+                    alert(`Block clicked!\nMaterial: ${block.material || 'Unknown'}\nPosition: (${block.x}, ${block.y})`);
                   }}
                 />
               </div>
@@ -173,14 +287,46 @@ function App() {
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'center', 
-                padding: '1rem',
+                padding: '2rem',
                 background: 'rgba(56, 224, 123, 0.05)',
                 borderRadius: '0.5rem',
-                border: '1px solid rgba(56, 224, 123, 0.2)'
+                border: '2px solid rgba(56, 224, 123, 0.2)',
+                position: 'relative'
               }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '0.5rem',
+                  right: '0.5rem',
+                  background: 'rgba(56, 224, 123, 0.8)',
+                  color: 'white',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold'
+                }}>
+                  Simple Grid (Fallback)
+                </div>
                 <OreGrid data={csvData} />
               </div>
             )}
+            
+            {/* Grid Controls */}
+            <div style={{ 
+              marginTop: '1rem', 
+              textAlign: 'center',
+              padding: '1rem',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '0.5rem'
+            }}>
+              <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                🖱️ <strong>Interactive Features:</strong>
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', fontSize: '0.8rem' }}>
+                <span style={{ color: '#38e07b' }}>Click blocks for details</span>
+                <span style={{ color: '#38e07b' }}>Hover for effects</span>
+                <span style={{ color: '#38e07b' }}>Real-time rendering</span>
+              </div>
+            </div>
           </div>
         )}
       </main>

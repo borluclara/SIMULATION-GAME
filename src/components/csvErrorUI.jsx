@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
+import Papa from 'papaparse';
 import "./csvErrorU.css";
 
-export default function CSVErrorUI({ onRetry, setHasError, error }) {
+export default function CSVErrorUI({ onRetry, error, onFileUpload }) {
   const fileInputRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -28,6 +29,10 @@ export default function CSVErrorUI({ onRetry, setHasError, error }) {
         return "WRONG FORMAT";
       case 'PARSE_ERROR':
         return "PARSE ERROR";
+      case 'validation':
+        return "WRONG FORMAT";
+      case 'parse':
+        return "PARSE ERROR";
       default:
         return "ERROR";
     }
@@ -36,23 +41,57 @@ export default function CSVErrorUI({ onRetry, setHasError, error }) {
   // Handle file selection for retry
   const handleFileChange = (event) => {
     const file = event.target.files[0];
-    if (file) {
-      console.log("📂 Retrying with file:", file.name);
-      // Close error screen first
-      setHasError(false);
-      
-      // Trigger file processing in main app
-      setTimeout(() => {
-        const mainFileInput = document.querySelector('input[type="file"][accept=".csv"]');
-        if (mainFileInput) {
-          const dataTransfer = new DataTransfer();
-          dataTransfer.items.add(file);
-          mainFileInput.files = dataTransfer.files;
-          const event = new Event('change', { bubbles: true });
-          mainFileInput.dispatchEvent(event);
+    if (!file) return;
+
+    setIsProcessing(true);
+    console.log("📂 Processing retry file:", file.name);
+
+    // Parse the CSV file
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        console.log("Parsed retry CSV:", results.data);
+        
+        // Validate required columns
+        const headers = results.meta.fields || [];
+        const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+        
+        if (missingColumns.length > 0) {
+          console.error("Still missing columns:", missingColumns);
+          setIsProcessing(false);
+          // The error will still be displayed, user can try again
+          return;
         }
-      }, 100);
-    }
+        
+        // Success! Pass the data back to the main app
+        console.log("✅ CSV validation successful!");
+        setIsProcessing(false);
+        
+        // Create a simulated event to pass back to the main app
+        const simulatedEvent = {
+          target: {
+            files: [file]
+          }
+        };
+        
+        // Call the parent's file upload handler
+        if (onFileUpload) {
+          onFileUpload(simulatedEvent);
+        } else {
+          // Fallback: call onRetry to clear the error
+          onRetry();
+        }
+      },
+      error: (err) => {
+        console.error("CSV Parse Error on retry:", err);
+        setIsProcessing(false);
+        // The error will still be displayed, user can try again
+      }
+    });
+
+    // Clear the input for next use
+    event.target.value = '';
   };
 
   // Trigger file input
@@ -62,7 +101,7 @@ export default function CSVErrorUI({ onRetry, setHasError, error }) {
 
   // Close error modal
   const handleClose = () => {
-    setHasError(false);
+    onRetry();
   };
 
   return (
@@ -82,13 +121,10 @@ export default function CSVErrorUI({ onRetry, setHasError, error }) {
       </p>
 
       {/* Show additional details if available */}
-      {error && error.details && error.details.missing && (
+      {error && error.details && (
         <div style={{ marginBottom: '20px', textAlign: 'center' }}>
           <p style={{ color: '#f44336', fontSize: '14px' }}>
-            Missing: {error.details.missing.join(', ')}
-          </p>
-          <p style={{ color: '#666', fontSize: '12px' }}>
-            Required: {error.details.required.join(', ')}
+            {error.details}
           </p>
         </div>
       )}
