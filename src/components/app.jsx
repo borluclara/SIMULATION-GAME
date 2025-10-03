@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import './App.css';
 import OreGrid from './OreGrid';
-import CSVErrorUI from './csvErrorUI'; // Import error handling component
+import OreGridCanvas from './OreGridCanvas'; // Enhanced 2D grid from merged branch
+import CSVErrorUI from './csvErrorUI'; // Error handling from err_handling branch
+import { parseCSVToGrid } from '../utils/OreGrid'; // Grid utility from 2D-grid branch
 
 function App() {
   const [csvData, setCsvData] = useState(null);
+  const [oreGrid, setOreGrid] = useState(null); // Enhanced grid for 2D visualization
   const [hasError, setHasError] = useState(false); // State for error handling
 
   const handleFileUpload = (event) => {
@@ -55,6 +58,22 @@ function App() {
 
         // If validation passes, set the data
         setCsvData(results.data);
+        
+        // Create enhanced 2D grid for canvas visualization
+        try {
+          // Convert Papa Parse results back to CSV format for parseCSVToGrid
+          const csvHeaders = Object.keys(results.data[0]).join(',');
+          const csvRows = results.data.map(row => Object.values(row).join(','));
+          const csvContent = [csvHeaders, ...csvRows].join('\n');
+          
+          const enhancedGrid = parseCSVToGrid(csvContent);
+          setOreGrid(enhancedGrid);
+          console.log("Enhanced 2D grid created successfully!", enhancedGrid);
+        } catch (gridError) {
+          console.warn("Could not create enhanced grid, using simple grid:", gridError);
+          setOreGrid(null);
+        }
+        
         setHasError(false); // Clear any previous errors
       },
       error: (err) => {
@@ -117,9 +136,51 @@ function App() {
           </button>
         </div>
 
+        {/* Enhanced 2D Grid Visualization */}
         {csvData && (
           <div style={{ width: '100%', maxWidth: '1200px', marginTop: '2rem' }}>
-            <OreGrid data={csvData} />
+            <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+              <h3 style={{ color: '#38e07b', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                Ore Grid Visualization
+              </h3>
+              <p style={{ color: '#aaa', fontSize: '0.9rem' }}>
+                {csvData.length} blocks loaded • Interactive 2D Grid
+              </p>
+            </div>
+            
+            {/* Use enhanced canvas grid if available, fallback to simple grid */}
+            {oreGrid ? (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                padding: '1rem',
+                background: 'rgba(56, 224, 123, 0.05)',
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(56, 224, 123, 0.2)'
+              }}>
+                <OreGridCanvas 
+                  grid={oreGrid}
+                  cellSize={25}
+                  showGrid={true}
+                  showLabels={false}
+                  onBlockClick={(block) => {
+                    console.log("Block clicked:", block);
+                    // Future: Add block interaction functionality
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                padding: '1rem',
+                background: 'rgba(56, 224, 123, 0.05)',
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(56, 224, 123, 0.2)'
+              }}>
+                <OreGrid data={csvData} />
+              </div>
+            )}
           </div>
         )}
       </main>
