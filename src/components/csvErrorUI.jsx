@@ -159,13 +159,6 @@ export default function CSVErrorUI({ onRetry, error, onFileUpload }) {
         )}
       </button>
 
-      {/* Bottom Navigation */}
-      <div className="bottom-nav">
-        <span>🏠 Home</span>
-        <span>🎮 Game</span>
-        <span>🏆 Leaderboard</span>
-        <span>❓ Help</span>
-      </div>
     </div>
   );
 }

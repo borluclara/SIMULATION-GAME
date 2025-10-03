@@ -1,46 +1,77 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Papa from 'papaparse'
 import './components/app.css'
 import GridManager from './components/GridManager'
 import OreGrid from './components/OreGrid'
 import OreGridCanvas from './components/OreGridCanvas'
 import CSVErrorUI from './components/csvErrorUI'
-import { parseCSVToGrid } from './utils/OreGrid'
+import BlastToolPanel from './components/BlastToolPanel'
+import ScoreFeedback from './components/ScoreFeedback'
+import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 
 function App() {
   const [currentView, setCurrentView] = useState('home') // 'home', 'game', 'leaderboard', 'help'
   const [csvData, setCsvData] = useState(null)
   const [csvError, setCsvError] = useState(null)
   const [playerName, setPlayerName] = useState('')
+  const [oreGrid, setOreGrid] = useState(null) // Add grid state for canvas
+  const [isLoadingGrid, setIsLoadingGrid] = useState(false)
+  
+  // Blast simulation state
+  const [blastPower, setBlastPower] = useState(500)
+  const [blastDirection, setBlastDirection] = useState(180)
+  const [mineralRecovery, setMineralRecovery] = useState(100)
+  const [dilution, setDilution] = useState(0)
+  const [simulationResults, setSimulationResults] = useState(null)
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
     if (!file) return
 
     setCsvError(null)
+    setIsLoadingGrid(true)
     
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         console.log("Parsed CSV:", results.data)
         
-        // Validate required columns
-        const requiredColumns = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
-        const headers = results.meta.fields || []
-        const missingColumns = requiredColumns.filter(col => !headers.includes(col))
+        // Flexible column validation - require only basic x, y, and ore/material columns
+        const headers = (results.meta.fields || []).map(h => h.toLowerCase())
+        const hasX = headers.some(h => h.includes('x'))
+        const hasY = headers.some(h => h.includes('y'))
+        const hasOre = headers.some(h => h.includes('ore') || h.includes('material') || h.includes('type'))
         
-        if (missingColumns.length > 0) {
+        if (!hasX || !hasY || !hasOre) {
           setCsvError({
             type: 'validation',
-            message: `Missing required columns: ${missingColumns.join(', ')}`,
-            details: `Expected columns: ${requiredColumns.join(', ')}`
+            message: 'Missing required columns: need x, y, and ore/material/type columns',
+            details: `Found columns: ${results.meta.fields.join(', ')}`
           })
+          setIsLoadingGrid(false)
           return
         }
         
-        setCsvData(results.data)
-        setCurrentView('game') // Switch to game view after successful upload
+        try {
+          // Convert Papa Parse data to CSV string for grid creation
+          const csvString = Papa.unparse(results.data)
+          const grid = await parseCSVToGrid(csvString)
+          
+          console.log('Grid created successfully, switching to game view')
+          setCsvData(results.data)
+          setOreGrid(grid)
+          setCurrentView('game') // Switch to game view after successful upload
+          setIsLoadingGrid(false)
+        } catch (error) {
+          console.error("Grid creation error:", error)
+          setCsvError({
+            type: 'grid_creation',
+            message: 'Failed to create grid from CSV data',
+            details: error.message
+          })
+          setIsLoadingGrid(false)
+        }
       },
       error: (err) => {
         console.error("CSV Parse Error:", err)
@@ -49,6 +80,7 @@ function App() {
           message: 'Failed to parse CSV file',
           details: err.message
         })
+        setIsLoadingGrid(false)
       }
     })
   }
@@ -56,7 +88,56 @@ function App() {
   const handleRetry = () => {
     setCsvError(null)
     setCsvData(null)
+    setOreGrid(null)
+    setIsLoadingGrid(false)
     setCurrentView('home')
+  }
+
+  // Blast simulation handlers
+  const handlePowerChange = (power) => {
+    setBlastPower(power)
+  }
+
+  const handleDirectionChange = (direction) => {
+    setBlastDirection(direction)
+  }
+
+  const handleRunSimulation = () => {
+    if (!oreGrid) return
+    
+    // Simple blast simulation logic
+    const recovery = Math.max(60, 100 - (blastPower / 20) + Math.random() * 20)
+    const newDilution = Math.max(0, (blastPower / 50) - 10 + Math.random() * 10)
+    
+    setMineralRecovery(Math.round(recovery))
+    setDilution(Math.round(newDilution))
+    
+    console.log(`Blast simulation: Power=${blastPower}, Direction=${blastDirection}°`)
+    console.log(`Results: Recovery=${Math.round(recovery)}%, Dilution=${Math.round(newDilution)}%`)
+  }
+
+  const handleReset = () => {
+    setMineralRecovery(100)
+    setDilution(0)
+    setBlastPower(500)
+    setBlastDirection(180)
+  }
+
+  const handleSave = () => {
+    const results = {
+      power: blastPower,
+      direction: blastDirection,
+      recovery: mineralRecovery,
+      dilution: dilution,
+      timestamp: new Date().toISOString()
+    }
+    console.log('Saving simulation results:', results)
+    // Add save functionality here
+  }
+
+  const handleReplay = () => {
+    console.log('Replaying last simulation...')
+    handleRunSimulation()
   }
 
   // Home View (UPLOAD-CSV Interface)
@@ -116,7 +197,7 @@ function App() {
 
   // Game View (2D Grid Interface)
   const renderGameView = () => (
-    <div className="relative flex h-auto min-h-screen w-full flex-col justify-between overflow-x-hidden">
+    <div className="relative flex h-auto min-h-screen w-full flex-col justify-between overflow-x-hidden blast-game-view">
       <div className="flex-grow">
         <header className="p-4">
           <div className="flex items-center justify-between">
@@ -135,12 +216,48 @@ function App() {
           <p className="text-lg font-medium text-white dark:text-white mt-4">Player: {playerName || 'Alex'}</p>
         </header>
         
-        <main>
-          {csvData ? (
-            <div style={{ padding: '1rem' }}>
-              <OreGridCanvas data={csvData} />
-              <div style={{ marginTop: '1rem' }}>
-                <OreGrid data={csvData} />
+        <main className="blast-simulation-main">
+          {isLoadingGrid ? (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '2rem',
+              color: 'white'
+            }}>
+              <div className="loading-spinner" style={{ marginBottom: '1rem' }}></div>
+              <p>Processing CSV data and creating grid...</p>
+            </div>
+          ) : csvData && oreGrid ? (
+            <div className="blast-simulation-container">
+              {/* Canvas Grid Section */}
+              <div className="canvas-section">
+                <div className="canvas-container">
+                  <OreGridCanvas grid={oreGrid} />
+                  <p className="canvas-instruction">Click on any ore block to apply a blast effect</p>
+                </div>
+              </div>
+              
+              {/* Controls Section - Side by Side Layout */}
+              <div className="controls-section">
+                <div className="controls-row">
+                  <BlastToolPanel
+                    onPowerChange={handlePowerChange}
+                    onDirectionChange={handleDirectionChange}
+                    onRunSimulation={handleRunSimulation}
+                    onReset={handleReset}
+                    onSave={handleSave}
+                    onReplay={handleReplay}
+                    initialPower={blastPower}
+                    initialDirection={blastDirection}
+                  />
+                  
+                  <ScoreFeedback
+                    mineralRecovery={mineralRecovery}
+                    dilution={dilution}
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -151,57 +268,14 @@ function App() {
     </div>
   )
 
-  // Navigation Bar
-  const renderNavigation = () => (
-    <nav className="sticky bottom-0 mt-8 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm border-t border-white/10 dark:border-white/10">
-      <div className="flex justify-around items-center h-20">
-        <button 
-          className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'home' ? 'text-white dark:text-white' : 'text-white/60 dark:text-white/60 hover:text-white dark:hover:text-white'}`}
-          onClick={() => setCurrentView('home')}
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-          </svg>
-          <span className="text-xs font-medium">Home</span>
-        </button>
-        <button 
-          className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'game' ? 'p-2 rounded-full bg-primary text-background-dark dark:text-background-dark' : 'text-white/60 dark:text-white/60 hover:text-white dark:hover:text-white'}`}
-          onClick={() => setCurrentView('game')}
-        >
-          <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-            <path clipRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 5a1 1 0 00-1 1v1.586l-1.707 1.707A1 1 0 005.586 11H8v4a1 1 0 102 0v-4h2.414a1 1 0 00.707-1.707L11.414 7.586V6a1 1 0 10-2 0v1.586l-1.707-1.707A1 1 0 007 5z" fillRule="evenodd"></path>
-          </svg>
-          <span className="text-xs font-bold -mt-1">Game</span>
-        </button>
-        <button 
-          className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'leaderboard' ? 'text-white dark:text-white' : 'text-white/60 dark:text-white/60 hover:text-white dark:hover:text-white'}`}
-          onClick={() => setCurrentView('leaderboard')}
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0h6m-3-6v6m0-6V5a2 2 0 012-2h2a2 2 0 012 2v2m-6 0h6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-          </svg>
-          <span className="text-xs font-medium">Leaderboard</span>
-        </button>
-        <button 
-          className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'help' ? 'text-white dark:text-white' : 'text-white/60 dark:text-white/60 hover:text-white dark:hover:text-white'}`}
-          onClick={() => setCurrentView('help')}
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-          </svg>
-          <span className="text-xs font-medium">Help</span>
-        </button>
-      </div>
-      <div className="h-safe-area-bottom bg-background-light/80 dark:bg-background-dark/80"></div>
-    </nav>
-  )
+
 
   return (
     <div>
       {currentView === 'home' && renderHomeView()}
       {currentView === 'game' && renderGameView()}
       {currentView === 'leaderboard' && (
-        <div className="flex items-center justify-center min-h-screen text-white">
+        <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Leaderboard</h2>
             <p>Coming soon...</p>
@@ -209,14 +283,13 @@ function App() {
         </div>
       )}
       {currentView === 'help' && (
-        <div className="flex items-center justify-center min-h-screen text-white">
+        <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Help</h2>
             <p>Game instructions coming soon...</p>
           </div>
         </div>
       )}
-      {renderNavigation()}
     </div>
   )
 }
