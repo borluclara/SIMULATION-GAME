@@ -1,9 +1,12 @@
+/* App.css - Main application styling */
+
 .app {
   min-height: 100vh;
-  background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   font-family: 'Arial', sans-serif;
   color: #fff;
 }
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -12,26 +15,30 @@
   display: flex;
   flex-direction: column;
 }
+
 /* Header Styles */
 .header {
   text-align: center;
   margin-bottom: 40px;
   padding: 20px 0;
 }
+
 .logo {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 15px;
 }
+
 .blast-icon {
   font-size: 4rem;
   animation: pulse 2s infinite;
 }
+
 .header h1 {
   font-size: 2.5rem;
   margin: 0;
-  background: linear-gradient(45deg, #FF6B35, #F7931E, #FFCD3C);
+  background: linear-gradient(45deg, #ff6b35, #f7931e, #ffcd3c);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -39,12 +46,14 @@
   font-weight: bold;
   letter-spacing: 2px;
 }
+
 .subtitle {
   font-size: 1.2rem;
-  color: #A0A0A0;
+  color: #a0a0a0;
   margin-top: 10px;
   font-style: italic;
 }
+
 /* Main Content */
 .main-content {
   flex: 1;
@@ -53,17 +62,19 @@
   align-items: center;
   gap: 30px;
 }
+
 .simulation-area {
   width: 100%;
   max-width: 800px;
   height: 400px;
   position: relative;
-  background: linear-gradient(180deg, #2C3E50 0%, #34495E 50%, #3E4A59 100%);
+  background: linear-gradient(180deg, #2c3e50 0%, #34495e 50%, #3e4a59 100%);
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   overflow: hidden;
-  border: 2px solid #4A5568;
+  border: 2px solid #4a5568;
 }
+
 .blast-zone {
   width: 100%;
   height: 100%;
@@ -71,23 +82,28 @@
   display: flex;
   flex-direction: column;
 }
+
 .rock-layer {
   height: 33.33%;
   position: relative;
-  border-bottom: 1px solid #2D3748;
+  border-bottom: 1px solid #2d3748;
 }
+
 .layer-1 {
-  background: linear-gradient(90deg, #8B4513, #A0522D, #8B4513);
+  background: linear-gradient(90deg, #8b4513, #a0522d, #8b4513);
   background-size: 50px 50px;
 }
+
 .layer-2 {
-  background: linear-gradient(90deg, #654321, #8B4513, #654321);
+  background: linear-gradient(90deg, #654321, #8b4513, #654321);
   background-size: 60px 60px;
 }
+
 .layer-3 {
-  background: linear-gradient(90deg, #4A4A4A, #696969, #4A4A4A);
+  background: linear-gradient(90deg, #4a4a4a, #696969, #4a4a4a);
   background-size: 70px 70px;
 }
+
 .explosion-point {
   position: absolute;
   top: 50%;
@@ -95,17 +111,20 @@
   transform: translate(-50%, -50%);
   z-index: 10;
 }
+
 .explosion {
   font-size: 3rem;
   animation: explode 3s infinite;
-  filter: drop-shadow(0 0 10px #FF6B35);
+  filter: drop-shadow(0 0 10px #ff6b35);
 }
+
 /* Controls */
 .controls {
   display: flex;
   gap: 20px;
   justify-content: center;
 }
+
 .start-btn,
 .reset-btn {
   padding: 15px 30px;
@@ -119,35 +138,42 @@
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
+
 .start-btn {
-  background: linear-gradient(45deg, #FF6B35, #F7931E);
+  background: linear-gradient(45deg, #ff6b35, #f7931e);
   color: white;
 }
+
 .start-btn:hover {
-  background: linear-gradient(45deg, #E55A2B, #E8821A);
+  background: linear-gradient(45deg, #e55a2b, #e8821a);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
 }
+
 .reset-btn {
-  background: linear-gradient(45deg, #667EEA, #764BA2);
+  background: linear-gradient(45deg, #667eea, #764ba2);
   color: white;
 }
+
 .reset-btn:hover {
-  background: linear-gradient(45deg, #5A67D8, #6B46C1);
+  background: linear-gradient(45deg, #5a67d8, #6b46c1);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
+
 /* Footer */
 .footer {
   text-align: center;
   margin-top: 40px;
   padding: 20px 0;
-  border-top: 1px solid #4A5568;
+  border-top: 1px solid #4a5568;
 }
+
 .footer p {
-  color: #A0AEC0;
+  color: #a0aec0;
   font-size: 0.9rem;
 }
+
 /* Animations */
 @keyframes pulse {
   0%, 100% {
@@ -157,6 +183,7 @@
     transform: scale(1.1);
   }
 }
+
 @keyframes explode {
   0% {
     transform: scale(1);
@@ -171,21 +198,26 @@
     opacity: 1;
   }
 }
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header h1 {
     font-size: 1.8rem;
   }
+  
   .blast-icon {
     font-size: 3rem;
   }
+  
   .simulation-area {
     height: 300px;
   }
+  
   .controls {
     flex-direction: column;
     align-items: center;
   }
+  
   .start-btn,
   .reset-btn {
     width: 200px;
