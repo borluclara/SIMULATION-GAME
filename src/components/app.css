@@ -101,6 +101,56 @@
   opacity: 0.9;
 }
 
+.blast-button.disabled {
+  background-color: rgba(56, 224, 123, 0.3);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.blast-button.disabled:hover {
+  transform: none;
+  opacity: 0.6;
+}
+
+/* CSV Success Message */
+.csv-success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: rgba(56, 224, 123, 0.2);
+  border: 2px solid #38e07b;
+  border-radius: 0.5rem;
+  color: #38e07b;
+  max-width: 400px;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: #38e07b;
+  color: #122017;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Bottom Navigation */
 .bottom-nav {
   border-top: 1px solid rgba(56, 224, 123, 0.2);

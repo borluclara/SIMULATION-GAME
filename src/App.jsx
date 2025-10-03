@@ -16,6 +16,7 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [oreGrid, setOreGrid] = useState(null) // Add grid state for canvas
   const [isLoadingGrid, setIsLoadingGrid] = useState(false)
+  const [csvReady, setCsvReady] = useState(false) // Track if CSV is loaded and ready
   
   // Blast simulation state
   const [blastPower, setBlastPower] = useState(500)
@@ -58,10 +59,10 @@ function App() {
           const csvString = Papa.unparse(results.data)
           const grid = await parseCSVToGrid(csvString)
           
-          console.log('Grid created successfully, switching to game view')
+          console.log('Grid created successfully, ready for simulation')
           setCsvData(results.data)
           setOreGrid(grid)
-          setCurrentView('game') // Switch to game view after successful upload
+          setCsvReady(true) // Mark CSV as ready for simulation
           setIsLoadingGrid(false)
         } catch (error) {
           console.error("Grid creation error:", error)
@@ -90,6 +91,7 @@ function App() {
     setCsvData(null)
     setOreGrid(null)
     setIsLoadingGrid(false)
+    setCsvReady(false)
     setCurrentView('home')
   }
 
@@ -164,10 +166,12 @@ function App() {
 
         <div className="button-container">
           <button 
-            className="blast-button start-button"
-            onClick={() => setCurrentView('game')}
+            className={`blast-button start-button ${!csvReady ? 'disabled' : ''}`}
+            onClick={() => csvReady && setCurrentView('game')}
+            disabled={!csvReady}
+            title={!csvReady ? 'Please upload a valid CSV file first' : 'Start the blast simulation'}
           >
-            Start Simulation
+            {csvReady ? 'Start Simulation' : 'Upload CSV First'}
           </button>
 
           <label className="blast-button secondary-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -189,6 +193,13 @@ function App() {
             Help
           </button>
         </div>
+
+        {csvReady && (
+          <div className="csv-success-message">
+            <div className="success-icon">✓</div>
+            <p>CSV file loaded successfully! Ready to start simulation.</p>
+          </div>
+        )}
 
         {csvError && <CSVErrorUI error={csvError} onRetry={handleRetry} onFileUpload={handleFileUpload} />}
       </main>
