@@ -236,12 +236,11 @@ export default function CSVErrorUI({ onRetry, setHasError }) {
       <div className="error-icon">!</div>
 
       {/* Title */}
-      <h2>Invalid CSV Format</h2>
+      <h2>WRONG FORMAT</h2>
 
       {/* Description */}
       <p className="error-text">
-        The CSV file you uploaded does not match the required format. Please
-        review the sample CSV format below and try again.
+        Missing required columns
       </p>
 
       {/* Sample CSV Download Button (kept as download) */}
