@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import './App.css';
-import OreGrid from './components/OreGrid'; // ✅ Import the grid renderer
+import OreGrid from './OreGrid'; // ✅ Import the grid renderer
 
 function App() {
   const [csvData, setCsvData] = useState(null);
