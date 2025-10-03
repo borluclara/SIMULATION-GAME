@@ -1,20 +1,21 @@
 import React, { useRef } from "react";
 import "./csvErrorUI.css";
 
-export default function CSVErrorUI({ onRetry }) {
+export default function CSVErrorUI({ onRetry, onFileUpload }) {
   const fileInputRef = useRef(null);
 
-  // Trigger hidden file input when "Quick Re-upload" is clicked
-  const handleQuickReupload = () => {
-    fileInputRef.current.click();
+  // Trigger hidden file input when Quick Re-upload is clicked
+  const handleQuickUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
-  // Handle when a file is selected
+  // Handle file change (when user selects a new CSV)
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-      console.log("📂 Player selected file:", file.name);
-      onRetry(); // Reset error screen so UploadCSV can handle parsing
+      onFileUpload(file); // send file back to parent (App.jsx)
     }
   };
 
@@ -35,12 +36,17 @@ export default function CSVErrorUI({ onRetry }) {
         review the sample CSV format below and try again.
       </p>
 
-      {/* Sample CSV Download Button (kept as download) */}
+      {/* Sample CSV Button */}
       <a href="/blast_scenario_sample.csv" download className="sample-btn">
-        📥 Sample CSV Format
+        Sample CSV Format
       </a>
 
-      {/* Hidden input for file selection (used by Quick Re-upload) */}
+      {/* Quick Re-upload Button */}
+      <button className="retry-btn" onClick={handleQuickUpload}>
+        Quick Re-upload
+      </button>
+
+      {/* Hidden File Input */}
       <input
         type="file"
         accept=".csv"
@@ -48,11 +54,6 @@ export default function CSVErrorUI({ onRetry }) {
         ref={fileInputRef}
         onChange={handleFileChange}
       />
-
-      {/* Quick Re-upload → open file picker */}
-      <button className="retry-btn" onClick={handleQuickReupload}>
-        🔄 Quick Re-upload
-      </button>
 
       {/* Bottom Navigation */}
       <div className="bottom-nav">
