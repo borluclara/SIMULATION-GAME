@@ -165,33 +165,20 @@ function App() {
         </div>
 
         <div className="button-container">
-          <button 
-            className={`blast-button start-button ${!csvReady ? 'disabled' : ''}`}
-            onClick={() => csvReady && setCurrentView('game')}
-            disabled={!csvReady}
-            title={!csvReady ? 'Please upload a valid CSV file first' : 'Start the blast simulation'}
-          >
-            {csvReady ? 'Start Simulation' : 'Upload CSV First'}
-          </button>
-
           <label className="blast-button secondary-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            Load CSV Scenario
+            Upload CSV File
             <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
           </label>
 
-          <button 
-            className="blast-button secondary-button"
-            onClick={() => setCurrentView('leaderboard')}
-          >
-            Leaderboard
-          </button>
-
-          <button 
-            className="blast-button secondary-button"
-            onClick={() => setCurrentView('help')}
-          >
-            Help
-          </button>
+          {csvReady && (
+            <button 
+              className="blast-button start-button"
+              onClick={() => setCurrentView('game')}
+              title="Start the blast simulation"
+            >
+              Start Simulation
+            </button>
+          )}
         </div>
 
         {csvReady && (
