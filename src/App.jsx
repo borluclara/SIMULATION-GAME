@@ -38,17 +38,24 @@ function App() {
       complete: async (results) => {
         console.log("Parsed CSV:", results.data)
         
-        // Flexible column validation - require only basic x, y, and ore/material columns
-        const headers = (results.meta.fields || []).map(h => h.toLowerCase())
-        const hasX = headers.some(h => h.includes('x'))
-        const hasY = headers.some(h => h.includes('y'))
-        const hasOre = headers.some(h => h.includes('ore') || h.includes('material') || h.includes('type'))
+        // Compare against exact columns from blast_scenario_sample.csv
+        const requiredColumns = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
+        const playerColumns = (results.meta.fields || []).map(h => h.toLowerCase().trim())
         
-        if (!hasX || !hasY || !hasOre) {
+        // Find missing columns by comparing player's columns with required columns
+        const missingColumns = requiredColumns.filter(reqCol => {
+          return !playerColumns.some(playerCol => 
+            playerCol === reqCol || 
+            playerCol.replace(/[_\s]/g, '') === reqCol.replace(/[_\s]/g, '')
+          )
+        })
+        
+        if (missingColumns.length > 0) {
+          const errorMessage = `Missing required columns: ${missingColumns.join(', ')}`
+          
           setCsvError({
             type: 'validation',
-            message: 'Missing required columns: need x, y, and ore/material/type columns',
-            details: `Found columns: ${results.meta.fields.join(', ')}`
+            message: errorMessage
           })
           setIsLoadingGrid(false)
           return
