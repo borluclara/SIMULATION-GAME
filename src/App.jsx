@@ -8,12 +8,25 @@ import CSVErrorUI from './components/csvErrorUI'
 import BlastToolPanel from './components/BlastToolPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
+import { useGameState } from './hooks/useGameState'
 
 function App() {
+  // Use global game state instead of individual state variables
+  const {
+    playerName,
+    score,
+    currentScenario,
+    setPlayerName,
+    setScore,
+    addScore,
+    setCurrentScenario,
+    hasPlayerName,
+    reset: resetGameState
+  } = useGameState();
+
   const [currentView, setCurrentView] = useState('home') // 'home', 'game', 'leaderboard', 'help'
   const [csvData, setCsvData] = useState(null)
   const [csvError, setCsvError] = useState(null)
-  const [playerName, setPlayerName] = useState('')
   const [oreGrid, setOreGrid] = useState(null) // Add grid state for canvas
   const [isLoadingGrid, setIsLoadingGrid] = useState(false)
   const [csvReady, setCsvReady] = useState(false) // Track if CSV is loaded and ready
@@ -71,6 +84,14 @@ function App() {
           setOreGrid(grid)
           setCsvReady(true) // Mark CSV as ready for simulation
           setIsLoadingGrid(false)
+          
+          // Store the scenario in global state
+          setCurrentScenario({
+            data: results.data,
+            grid: grid,
+            fileName: file.name,
+            uploadedAt: new Date().toISOString()
+          })
         } catch (error) {
           console.error("Grid creation error:", error)
           setCsvError({
@@ -100,6 +121,9 @@ function App() {
     setIsLoadingGrid(false)
     setCsvReady(false)
     setCurrentView('home')
+    
+    // Reset global state scenario but keep player name
+    setCurrentScenario(null)
   }
 
   // Blast simulation handlers
@@ -121,8 +145,13 @@ function App() {
     setMineralRecovery(Math.round(recovery))
     setDilution(Math.round(newDilution))
     
+    // Calculate and update score in global state
+    const blastScore = Math.round(recovery * 10 - newDilution * 5)
+    addScore(Math.max(0, blastScore))
+    
     console.log(`Blast simulation: Power=${blastPower}, Direction=${blastDirection}°`)
     console.log(`Results: Recovery=${Math.round(recovery)}%, Dilution=${Math.round(newDilution)}%`)
+    console.log(`Score added: ${Math.max(0, blastScore)}, Total score: ${score + Math.max(0, blastScore)}`)
   }
 
   const handleReset = () => {
@@ -130,6 +159,9 @@ function App() {
     setDilution(0)
     setBlastPower(500)
     setBlastDirection(180)
+    
+    // Reset score in global state but keep player name
+    resetGameState(true)
   }
 
   const handleSave = () => {
@@ -169,6 +201,11 @@ function App() {
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
           />
+          {csvReady && !hasPlayerName() && (
+            <p className="name-required-message">
+              ⚠️ Name is required to start the simulation
+            </p>
+          )}
         </div>
 
         <div className="button-container">
@@ -179,9 +216,10 @@ function App() {
 
           {csvReady && (
             <button 
-              className="blast-button start-button"
-              onClick={() => setCurrentView('game')}
-              title="Start the blast simulation"
+              className={`blast-button start-button ${!hasPlayerName() ? 'disabled' : ''}`}
+              onClick={() => hasPlayerName() && setCurrentView('game')}
+              disabled={!hasPlayerName()}
+              title={!hasPlayerName() ? "Please enter your name to start" : "Start the blast simulation"}
             >
               Start Simulation
             </button>
@@ -218,7 +256,9 @@ function App() {
             <h1 className="text-xl font-bold text-white dark:text-white text-center">Blast Simulation</h1>
             <div className="size-10"></div>
           </div>
-          <p className="text-lg font-medium text-white dark:text-white mt-4">Player: {playerName || 'Alex'}</p>
+          <p className="text-lg font-medium text-white dark:text-white mt-4">
+            Welcome, {playerName}! | Score: {score}
+          </p>
         </header>
         
         <main className="blast-simulation-main">
@@ -236,6 +276,15 @@ function App() {
             </div>
           ) : csvData && oreGrid ? (
             <div className="blast-simulation-container">
+              {/* Welcome Message */}
+              <div className="welcome-section">
+                <h2 className="welcome-message">
+                  Welcome, {playerName}! 👋
+                </h2>
+                <p className="welcome-subtitle">
+                </p>
+              </div>
+              
               {/* Canvas Grid Section */}
               <div className="canvas-section">
                 <div className="canvas-container">

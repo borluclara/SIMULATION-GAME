@@ -65,6 +65,15 @@
   box-shadow: 0 0 0 3px rgba(56, 224, 123, 0.1);
 }
 
+/* Name Required Message */
+.name-required-message {
+  color: #ff6b6b;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
 /* Button Container */
 .button-container {
   width: 100%;
@@ -89,6 +98,26 @@
 .start-button {
   background-color: #38e07b;
   color: #122017;
+}
+
+.start-button.disabled {
+  background-color: #666666;
+  color: #999999;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.start-button:disabled {
+  background-color: #666666;
+  color: #999999;
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.start-button:disabled:hover {
+  transform: none;
+  opacity: 0.5;
 }
 
 .secondary-button {
@@ -230,5 +259,47 @@
   .controls-row > * {
     flex: 1;
     max-width: 400px;
+  }
+}
+
+/* Welcome Section Styles */
+.welcome-section {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(56, 224, 123, 0.1) 0%, rgba(56, 224, 123, 0.05) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(56, 224, 123, 0.2);
+  margin: 0 1rem 2rem 1rem;
+}
+
+.welcome-message {
+  font-size: 1.75rem;
+  font-weight: bold;
+  color: #38e07b;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(56, 224, 123, 0.3);
+}
+
+.welcome-subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Mobile responsive for welcome section */
+@media (max-width: 768px) {
+  .welcome-section {
+    margin: 0 0.5rem 1.5rem 0.5rem;
+    padding: 1rem;
+  }
+  
+  .welcome-message {
+    font-size: 1.5rem;
+  }
+  
+  .welcome-subtitle {
+    font-size: 0.9rem;
   }
 }
