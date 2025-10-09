@@ -3,18 +3,25 @@
  * Handles ore block data, color mapping, and grid operations
  */
 
-// Define ore type to color mapping
+// Define ore type to color mapping - Updated to match vibrant design
 export const ORE_COLORS = {
-  stone: '#8B7355',     // Brown-gray
-  coal: '#2C2C2C',      // Dark gray
-  iron: '#CD853F',      // Peru/bronze
-  copper: '#B87333',    // Copper brown
-  gold: '#FFD700',      // Gold
-  diamond: '#B9F2FF',   // Light blue
+  stone: '#8B4513',     // Saddle brown (rich brown)
+  coal: '#2F2F2F',      // Very dark gray (almost black)
+  iron: '#CD853F',      // Peru/bronze (sandy brown)
+  copper: '#D2691E',    // Chocolate orange
+  gold: '#FFD700',      // Bright gold yellow
+  diamond: '#87CEEB',   // Sky blue
   silver: '#C0C0C0',    // Silver
-  emerald: '#50C878',   // Emerald green
-  ruby: '#E0115F',      // Ruby red
-  default: '#696969'    // Dim gray for unknown types
+  emerald: '#228B22',   // Forest green
+  ruby: '#DC143C',      // Crimson red
+  platinum: '#E5E4E2',  // Platinum
+  obsidian: '#1C1C1C',  // Very dark (black)
+  sandstone: '#F4A460', // Sandy brown
+  limestone: '#F5F5DC', // Beige
+  granite: '#708090',   // Slate gray
+  basalt: '#36454F',    // Charcoal
+  quartz: '#FFFACD',    // Lemon chiffon
+  default: '#8B7355'    // Default brown-gray
 };
 
 // Ore properties for game mechanics
@@ -351,7 +358,7 @@ export class OreGrid {
 } // <-- This closes the OreGrid class definition
 
 /**
- * Parse CSV file and create grid
+ * Parse CSV file and create grid - Enhanced for flexible column mapping
  */
 export function parseCSVToGrid(csvContent) {
   return new Promise((resolve, reject) => {
@@ -359,51 +366,63 @@ export function parseCSVToGrid(csvContent) {
       const lines = csvContent.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
       
-      // Find required columns
-      const xIndex = headers.findIndex(h => h.includes('x'));
-      const yIndex = headers.findIndex(h => h.includes('y'));
-      const oreIndex = headers.findIndex(h => h.includes('ore') || h.includes('type'));
-      const hardnessIndex = headers.findIndex(h => h.includes('hardness'));
-      const valueIndex = headers.findIndex(h => h.includes('value'));
+      // Enhanced column mapping to handle different CSV formats
+      const findColumn = (patterns) => {
+        return headers.findIndex(h => 
+          patterns.some(pattern => h.includes(pattern))
+        );
+      };
+      
+      const xIndex = findColumn(['x']);
+      const yIndex = findColumn(['y']);
+      const oreIndex = findColumn(['ore', 'type', 'material']);
+      const hardnessIndex = findColumn(['hardness', 'hardness_mohs']);
+      const valueIndex = findColumn(['value', 'game_value']);
 
       if (xIndex === -1 || yIndex === -1 || oreIndex === -1) {
-        throw new Error('CSV must contain x, y, and ore_type columns');
+        throw new Error('CSV must contain x, y, and ore/material/type columns');
       }
 
       const data = [];
       
-      // Parse data rows
+      // Parse data rows with improved error handling
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(',').map(cell => cell.trim());
         if (row.length < 3) continue;
 
         const x = parseInt(row[xIndex]);
         const y = parseInt(row[yIndex]);
-        const ore_type = row[oreIndex];
-        const hardness = hardnessIndex !== -1 ? parseInt(row[hardnessIndex]) || null : null;
-        const value = valueIndex !== -1 ? parseInt(row[valueIndex]) || null : null;
+        const ore_type = row[oreIndex] || 'stone'; // Default to stone if empty
+        const hardness = hardnessIndex !== -1 ? parseInt(row[hardnessIndex]) || 100 : 100;
+        const value = valueIndex !== -1 ? parseInt(row[valueIndex]) || 10 : 10;
 
         if (!isNaN(x) && !isNaN(y) && ore_type) {
           data.push({ x, y, ore_type, hardness, value });
         }
       }
 
-      // Convert data to CSV string for OreGrid.fromCSVData
+      if (data.length === 0) {
+        throw new Error('No valid data rows found in CSV');
+      }
+
+      // Convert data to CSV string for OreGrid.fromCSVData with improved format
       const csvRows = [
         'x,y,ore_type,hardness,value',
         ...data.map(d =>
-          [d.x, d.y, d.ore_type, d.hardness ?? '', d.value ?? ''].join(',')
+          [d.x, d.y, d.ore_type, d.hardness, d.value].join(',')
         )
       ];
       const csvString = csvRows.join('\n');
 
+      // Create grid with immediate resolution
       const grid = OreGrid.fromCSVData(csvString);
       
       // Debug output
       console.log('CSV parsed successfully!');
       console.log(`Found ${data.length} ore blocks`);
-      grid.printToConsole();
+      console.log(`Grid dimensions: ${grid.width}x${grid.height}`);
       
+      // Resolve immediately since OreGrid.fromCSVData is synchronous
       resolve(grid);
     } catch (error) {
       reject(new Error(`Failed to create grid: ${error.message}`));

@@ -1,0 +1,195 @@
+/**
+ * Blast Tool Panel Styles
+ * Green-themed styling matching the design
+ */
+
+.blast-tool-panel {
+  background: rgba(34, 139, 34, 0.15);
+  border: 2px solid #228B22;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 0;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  flex: 1;
+}
+
+.panel-title {
+  color: #00FF00;
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 0 0 20px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+}
+
+.slider-container {
+  margin-bottom: 20px;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #FFFFFF;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.slider-value {
+  color: #00FF00;
+  font-weight: bold;
+  min-width: 50px;
+  text-align: right;
+}
+
+.slider {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right, #1a5d1a, #228B22);
+  outline: none;
+  border: 2px solid #00FF00;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #00FF00, #32CD32);
+  cursor: pointer;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 255, 0, 0.5);
+}
+
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #00FF00, #32CD32);
+  cursor: pointer;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.control-buttons {
+  margin-top: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+
+.blast-button {
+  padding: 12px 20px;
+  border: 2px solid #00FF00;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #228B22, #32CD32);
+  color: #FFFFFF;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.blast-button:hover {
+  background: linear-gradient(135deg, #32CD32, #7FFF00);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 255, 0, 0.4);
+}
+
+.blast-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.run-simulation {
+  background: linear-gradient(135deg, #00AA00, #00FF00);
+  font-size: 1.1rem;
+  padding: 15px 25px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 5px 15px rgba(0, 255, 0, 0.6); }
+  100% { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
+}
+
+.reset {
+  flex: 1;
+  background: linear-gradient(135deg, #8B0000, #DC143C);
+  border-color: #FF4444;
+}
+
+.reset:hover {
+  background: linear-gradient(135deg, #DC143C, #FF6B6B);
+  box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+}
+
+.save {
+  flex: 1;
+  background: linear-gradient(135deg, #4169E1, #6495ED);
+  border-color: #87CEEB;
+}
+
+.save:hover {
+  background: linear-gradient(135deg, #6495ED, #87CEEB);
+  box-shadow: 0 5px 15px rgba(100, 149, 237, 0.4);
+}
+
+.replay {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  border-color: #FFFF00;
+  color: #000000;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.replay:hover {
+  background: linear-gradient(135deg, #FFA500, #FFFF00);
+  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .blast-tool-panel {
+    padding: 15px;
+    margin: 15px 0;
+  }
+  
+  .panel-title {
+    font-size: 1.2rem;
+  }
+  
+  .blast-button {
+    padding: 10px 15px;
+    font-size: 0.9rem;
+  }
+  
+  .run-simulation {
+    padding: 12px 20px;
+    font-size: 1rem;
+  }
+}
