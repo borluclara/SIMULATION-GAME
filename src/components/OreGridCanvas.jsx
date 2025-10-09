@@ -14,7 +14,10 @@ const OreGridCanvas = ({
   showGrid = true,
   showLabels = false,
   className = '',
-  forceRefresh = 0 // Prop to force canvas refresh when CSV is uploaded
+  forceRefresh = 0, // Prop to force canvas refresh when CSV is uploaded
+  placementMode = false,
+  blastMarkers = [],
+  explosionAnimations = []
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -224,9 +227,74 @@ const OreGridCanvas = ({
         }
       }
       
+      // Draw blast markers
+      if (blastMarkers && blastMarkers.length > 0) {
+        blastMarkers.forEach(blast => {
+          const blastX = Math.floor(blast.x * scaledCellSize);
+          const blastY = Math.floor(blast.y * scaledCellSize);
+          const markerSize = scaledCellSize * 0.8;
+          
+          // Draw blast marker background
+          ctx.fillStyle = 'rgba(255, 69, 0, 0.8)';
+          ctx.beginPath();
+          ctx.arc(
+            blastX + scaledCellSize / 2, 
+            blastY + scaledCellSize / 2, 
+            markerSize / 2, 
+            0, 
+            2 * Math.PI
+          );
+          ctx.fill();
+          
+          // Draw blast marker border
+          ctx.strokeStyle = '#ff0000';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw explosion icon
+          if (scaledCellSize > 16) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${scaledCellSize * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('💣', blastX + scaledCellSize / 2, blastY + scaledCellSize / 2);
+          }
+        });
+      }
+      
+      // Draw explosion animations
+      if (explosionAnimations && explosionAnimations.length > 0) {
+        explosionAnimations.forEach(explosion => {
+          const expX = Math.floor(explosion.x * scaledCellSize);
+          const expY = Math.floor(explosion.y * scaledCellSize);
+          const progress = explosion.frame / explosion.maxFrames;
+          const radius = scaledCellSize * (1 + progress * 2);
+          
+          // Create explosion effect
+          const gradient = ctx.createRadialGradient(
+            expX + scaledCellSize / 2, expY + scaledCellSize / 2, 0,
+            expX + scaledCellSize / 2, expY + scaledCellSize / 2, radius
+          );
+          gradient.addColorStop(0, `rgba(255, 255, 0, ${1 - progress})`);
+          gradient.addColorStop(0.5, `rgba(255, 69, 0, ${0.8 - progress})`);
+          gradient.addColorStop(1, `rgba(255, 0, 0, ${0.3 - progress})`);
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(
+            expX + scaledCellSize / 2, 
+            expY + scaledCellSize / 2, 
+            radius, 
+            0, 
+            2 * Math.PI
+          );
+          ctx.fill();
+        });
+      }
+      
       setIsCanvasReady(true);
     });
-  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, forceRefresh]);
+  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, forceRefresh, blastMarkers, explosionAnimations]);
 
   // Render grid when dependencies change
   useEffect(() => {
@@ -303,7 +371,8 @@ const handleMouseMove = (event) => {
         height: canvasDimensions.height,
         maxWidth: '100%',
         maxHeight: '100%',
-        display: canvasDimensions.width > 0 ? 'block' : 'none'
+        display: canvasDimensions.width > 0 ? 'block' : 'none',
+        cursor: placementMode ? 'crosshair' : 'pointer'
       }}
       aria-label="Interactive ore grid - click on blocks to apply blast effects"
       role="img"
