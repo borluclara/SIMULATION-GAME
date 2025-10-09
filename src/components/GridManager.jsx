@@ -4,10 +4,11 @@
  * Handles loading, displaying, and managing the ore grid
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOreGrid } from '../hooks/useOreGrid';
 import OreGridCanvas from './OreGridCanvas';
 import { ORE_COLORS } from '../utils/OreGrid';
+import { gameState } from '../utils/GameState';
 import './GridManager.css';
 
 const GridManager = () => {
@@ -30,6 +31,23 @@ const GridManager = () => {
   const [blastPower, setBlastPower] = useState(50);
   const [blastDirection, setBlastDirection] = useState(90);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0); // For forcing canvas refresh
+  
+  // Blast placement state
+  const [isPlacementMode, setIsPlacementMode] = useState(true); // Start in placement mode
+  const [placedBlasts, setPlacedBlasts] = useState([]);
+  const [hoveredCell, setHoveredCell] = useState(null);
+
+  // Subscribe to gameState changes
+  useEffect(() => {
+    const unsubscribe = gameState.subscribe((state) => {
+      setPlacedBlasts(state.blasts);
+    });
+
+    // Initialize with current state
+    setPlacedBlasts(gameState.getBlasts());
+
+    return unsubscribe;
+  }, []);
 
   // Handle file upload with canvas refresh
 
@@ -47,22 +65,76 @@ const GridManager = () => {
     reader.readAsText(file);
   };
 
-  // Handle block click for blasting
+  // Handle cell click for blast placement or execution
   const handleBlockClick = (block, position) => {
-    if (!block || block.isDestroyed) return;
+    if (!block) return;
 
-    const blastResult = applyBlast(block.x, block.y, blastRadius, blastPower);
-    
-    console.log('Blast applied!', {
-      target: `${block.oreType} at (${block.x}, ${block.y})`,
-      result: blastResult
-    });
+    if (isPlacementMode) {
+      // Placement mode: place blast markers
+      const result = gameState.addBlast(position.y, position.x);
+      
+      if (result.success) {
+        console.log('Blast placed at:', position);
+        setCanvasRefreshKey(prev => prev + 1); // Force canvas refresh to show blast marker
+      } else {
+        console.log('Failed to place blast:', result.reason);
+        // Could show a notification here
+      }
+    } else {
+      // Execution mode: apply blast immediately (original behavior)
+      if (block.isDestroyed) return;
+      
+      const blastResult = applyBlast(block.x, block.y, blastRadius, blastPower);
+      
+      console.log('Blast applied!', {
+        target: `${block.oreType} at (${block.x}, ${block.y})`,
+        result: blastResult
+      });
+    }
   };
 
   // Load sample data with canvas refresh
   const loadSampleData = () => {
     loadGrid('/sample_ore_data.csv');
     setCanvasRefreshKey(prev => prev + 1);
+  };
+
+  // Toggle between placement and execution modes
+  const togglePlacementMode = () => {
+    setIsPlacementMode(!isPlacementMode);
+  };
+
+  // Clear all placed blasts
+  const clearAllBlasts = () => {
+    gameState.clearBlasts();
+    setCanvasRefreshKey(prev => prev + 1);
+  };
+
+  // Execute all placed blasts
+  const executeAllBlasts = () => {
+    if (!grid || !isReady) return;
+    
+    const blasts = gameState.getBlasts();
+    if (blasts.length === 0) {
+      console.log('No blasts to execute');
+      return;
+    }
+
+    console.log(`Executing ${blasts.length} blasts...`);
+    
+    // Execute each blast
+    blasts.forEach((blast, index) => {
+      setTimeout(() => {
+        applyBlast(blast.col, blast.row, blastRadius, blastPower);
+        console.log(`Executed blast ${index + 1}/${blasts.length} at (${blast.col}, ${blast.row})`);
+      }, index * 200); // Stagger blast execution for visual effect
+    });
+
+    // Clear blasts after execution
+    setTimeout(() => {
+      gameState.clearBlasts();
+      setCanvasRefreshKey(prev => prev + 1);
+    }, blasts.length * 200 + 500);
   };
 
   // Simulate blast at random location
@@ -125,11 +197,39 @@ const GridManager = () => {
                 showLabels={showLabels}
                 forceRefresh={canvasRefreshKey}
                 className="w-full h-full"
+                placedBlasts={placedBlasts}
+                isPlacementMode={isPlacementMode}
+                maxBlasts={gameState.getMaxBlasts()}
               />
             </div>
-            <p className="canvas-helper-text">
-              Click on any ore block to apply a blast effect
-            </p>
+            <div className="mt-2 space-y-2">
+              <p className="canvas-helper-text">
+                {isPlacementMode 
+                  ? `Click cells to place explosives (${placedBlasts.length}/${gameState.getMaxBlasts()} placed)`
+                  : 'Click on any ore block to apply a blast effect'
+                }
+              </p>
+              
+              {/* Blast placement controls */}
+              {isPlacementMode && (
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={clearAllBlasts}
+                    disabled={placedBlasts.length === 0}
+                    className="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Clear All ({placedBlasts.length})
+                  </button>
+                  <button
+                    onClick={executeAllBlasts}
+                    disabled={placedBlasts.length === 0}
+                    className="px-3 py-1 text-xs bg-orange-500/20 text-orange-400 rounded border border-orange-500/30 hover:bg-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Execute All
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Blast Tool Panel */}
@@ -182,19 +282,36 @@ const GridManager = () => {
           {/* Action Buttons */}
           <div className="px-4 mt-6 grid grid-cols-2 gap-3">
             <button 
-              onClick={runSimulation}
-              className="col-span-2 w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide"
+              onClick={togglePlacementMode}
+              className={`col-span-2 w-full h-12 flex items-center justify-center rounded-lg font-bold text-sm tracking-wide ${
+                isPlacementMode 
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+              }`}
             >
-              Run Simulation
+              {isPlacementMode ? '🎯 Placement Mode' : '💥 Execution Mode'}
             </button>
+            
+            <button 
+              onClick={isPlacementMode ? executeAllBlasts : runSimulation}
+              disabled={isPlacementMode && placedBlasts.length === 0}
+              className="col-span-2 w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPlacementMode ? `Execute ${placedBlasts.length} Blasts` : 'Run Simulation'}
+            </button>
+            
             <button 
               onClick={resetGrid}
               className="w-full h-12 flex items-center justify-center rounded-lg bg-primary/20 dark:bg-primary/30 text-white font-bold text-sm tracking-wide"
             >
               Reset
             </button>
-            <button className="w-full h-12 flex items-center justify-center rounded-lg bg-primary/20 dark:bg-primary/30 text-white font-bold text-sm tracking-wide">
-              Save
+            <button 
+              onClick={clearAllBlasts}
+              disabled={placedBlasts.length === 0}
+              className="w-full h-12 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 font-bold text-sm tracking-wide border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Clear Blasts
             </button>
             <button className="col-span-2 w-full h-12 flex items-center justify-center rounded-lg bg-primary/20 dark:bg-primary/30 text-white font-bold text-sm tracking-wide">
               Replay
