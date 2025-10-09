@@ -6,6 +6,7 @@ import OreGrid from './components/OreGrid'
 import OreGridCanvas from './components/OreGridCanvas'
 import CSVErrorUI from './components/csvErrorUI'
 import BlastToolPanel from './components/BlastToolPanel'
+import BlastPlacementPanel from './components/BlastPlacementPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
@@ -16,10 +17,14 @@ function App() {
     playerName,
     score,
     currentScenario,
+    blasts,
     setPlayerName,
     setScore,
     addScore,
     setCurrentScenario,
+    setGrid,
+    addBlast,
+    triggerBlasts,
     hasPlayerName,
     reset: resetGameState
   } = useGameState();
@@ -37,6 +42,11 @@ function App() {
   const [mineralRecovery, setMineralRecovery] = useState(100)
   const [dilution, setDilution] = useState(0)
   const [simulationResults, setSimulationResults] = useState(null)
+  
+  // Blast placement state
+  const [placementMode, setPlacementMode] = useState(false)
+  const [explosionAnimations, setExplosionAnimations] = useState([])
+  const canvasRef = React.useRef(null)
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
@@ -92,6 +102,9 @@ function App() {
             fileName: file.name,
             uploadedAt: new Date().toISOString()
           })
+          
+          // Set grid in game state for blast functionality
+          setGrid(grid.data || grid)
         } catch (error) {
           console.error("Grid creation error:", error)
           setCsvError({
@@ -159,9 +172,57 @@ function App() {
     setDilution(0)
     setBlastPower(500)
     setBlastDirection(180)
+    setPlacementMode(false)
+    setExplosionAnimations([])
     
     // Reset score in global state but keep player name
     resetGameState(true)
+  }
+
+  // Blast placement handlers
+  const handlePlacementModeChange = (mode) => {
+    setPlacementMode(mode)
+  }
+
+  const handleBlockClick = (block, position) => {
+    if (placementMode) {
+      // Place blast marker
+      const success = addBlast(position.x, position.y)
+      if (!success) {
+        alert('Maximum number of blasts reached!')
+      }
+    }
+  }
+
+  const handleTriggerBlasts = (result) => {
+    if (result.blasts.length > 0) {
+      // Create explosion animations
+      const newAnimations = result.blasts.map(blast => ({
+        x: blast.x,
+        y: blast.y,
+        id: blast.id,
+        frame: 0,
+        maxFrames: 30
+      }))
+      
+      setExplosionAnimations(newAnimations)
+      
+      // Update mineral recovery based on blast effects
+      const recoveryImpact = result.affectedCells.length * 2
+      const newRecovery = Math.max(20, mineralRecovery - recoveryImpact)
+      setMineralRecovery(Math.round(newRecovery))
+      
+      // Update dilution
+      const dilutionIncrease = result.affectedCells.length * 1.5
+      setDilution(Math.min(80, dilution + dilutionIncrease))
+      
+      // Clear animations after delay
+      setTimeout(() => {
+        setExplosionAnimations([])
+      }, 1500)
+      
+      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells`)
+    }
   }
 
   const handleSave = () => {
@@ -288,14 +349,32 @@ function App() {
               {/* Canvas Grid Section */}
               <div className="canvas-section">
                 <div className="canvas-container">
-                  <OreGridCanvas grid={oreGrid} />
-                  <p className="canvas-instruction">Click on any ore block to apply a blast effect</p>
+                  <OreGridCanvas 
+                    ref={canvasRef}
+                    grid={oreGrid} 
+                    onBlockClick={handleBlockClick}
+                    placementMode={placementMode}
+                    blastMarkers={blasts}
+                    explosionAnimations={explosionAnimations}
+                  />
+                  <p className="canvas-instruction">
+                    {placementMode 
+                      ? "Click on grid cells to place explosives" 
+                      : "Enable placement mode to add explosives"}
+                  </p>
                 </div>
               </div>
               
-              {/* Controls Section - Side by Side Layout */}
+              {/* Controls Section - Three Column Layout */}
               <div className="controls-section">
                 <div className="controls-row">
+                  <BlastPlacementPanel
+                    onPlacementModeChange={handlePlacementModeChange}
+                    onTriggerBlasts={handleTriggerBlasts}
+                    placementMode={placementMode}
+                    canvasRef={canvasRef}
+                  />
+                  
                   <BlastToolPanel
                     onPowerChange={handlePowerChange}
                     onDirectionChange={handleDirectionChange}

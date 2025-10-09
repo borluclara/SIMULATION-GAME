@@ -25,6 +25,10 @@ export const useGameState = () => {
     playerName: state.playerName,
     score: state.score,
     currentScenario: state.currentScenario,
+    blasts: state.blasts,
+    grid: state.grid,
+    maxBlasts: state.maxBlasts,
+    blastRadius: state.blastRadius,
     
     // Full state object
     gameState: state,
@@ -36,6 +40,16 @@ export const useGameState = () => {
     setCurrentScenario: (scenario) => gameState.setCurrentScenario(scenario),
     reset: (keepPlayerName = true) => gameState.reset(keepPlayerName),
     fullReset: () => gameState.fullReset(),
+    
+    // Blast actions
+    addBlast: (x, y) => gameState.addBlast(x, y),
+    removeBlast: (blastId) => gameState.removeBlast(blastId),
+    clearBlasts: () => gameState.clearBlasts(),
+    canPlaceBlast: () => gameState.canPlaceBlast(),
+    getBlasts: () => gameState.getBlasts(),
+    setGrid: (grid) => gameState.setGrid(grid),
+    getGrid: () => gameState.getGrid(),
+    triggerBlasts: () => gameState.triggerBlasts(),
     
     // Utility functions
     hasPlayerName: () => gameState.hasPlayerName(),

@@ -8,7 +8,11 @@ export class GameState {
     this.state = {
       playerName: "",
       score: 0,
-      currentScenario: null
+      currentScenario: null,
+      blasts: [], // Array to store placed blast positions
+      grid: null, // Grid state for tracking material states
+      maxBlasts: 5, // Maximum number of blasts allowed
+      blastRadius: 3 // Default blast radius
     };
     
     // Event listeners for state changes
@@ -58,7 +62,11 @@ export class GameState {
     this.state = {
       playerName: keepPlayerName ? currentPlayerName : "",
       score: 0,
-      currentScenario: null
+      currentScenario: null,
+      blasts: [],
+      grid: null,
+      maxBlasts: 5,
+      blastRadius: 3
     };
     this.notifyListeners();
   }
@@ -66,6 +74,101 @@ export class GameState {
   // Complete reset (including player name)
   fullReset() {
     this.reset(false);
+  }
+
+  // Blast management methods
+  addBlast(x, y) {
+    if (this.state.blasts.length < this.state.maxBlasts) {
+      this.state.blasts.push({ x, y, id: Date.now() });
+      this.notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  removeBlast(blastId) {
+    this.state.blasts = this.state.blasts.filter(blast => blast.id !== blastId);
+    this.notifyListeners();
+  }
+
+  getBlasts() {
+    return [...this.state.blasts];
+  }
+
+  clearBlasts() {
+    this.state.blasts = [];
+    this.notifyListeners();
+  }
+
+  canPlaceBlast() {
+    return this.state.blasts.length < this.state.maxBlasts;
+  }
+
+  setGrid(grid) {
+    this.state.grid = grid;
+    this.notifyListeners();
+  }
+
+  getGrid() {
+    return this.state.grid;
+  }
+
+  // Execute blast detonation with physics simulation
+  triggerBlasts() {
+    const blasts = [...this.state.blasts];
+    const grid = this.state.grid;
+    
+    if (!grid || blasts.length === 0) {
+      return { blasts: [], affectedCells: [] };
+    }
+
+    const affectedCells = [];
+    const radius = this.state.blastRadius;
+
+    // Calculate affected cells for each blast
+    blasts.forEach(blast => {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= radius) {
+            const x = blast.x + dx;
+            const y = blast.y + dy;
+            
+            // Check bounds for 2D array access
+            if (grid.length > 0 && y >= 0 && y < grid.length && 
+                x >= 0 && x < grid[0].length) {
+              affectedCells.push({ 
+                x, 
+                y, 
+                distance, 
+                blastId: blast.id,
+                originalMaterial: grid[y][x] || 'unknown'
+              });
+            }
+          }
+        }
+      }
+    });
+
+    // Update grid materials based on blast effects
+    affectedCells.forEach(cell => {
+      if (grid[cell.y] && grid[cell.y][cell.x]) {
+        const material = grid[cell.y][cell.x];
+        if (material && material !== 'air') {
+          // Apply destruction logic based on distance and material type
+          if (cell.distance <= radius * 0.5) {
+            grid[cell.y][cell.x] = 'destroyed';
+          } else if (cell.distance <= radius * 0.8) {
+            grid[cell.y][cell.x] = 'cracked';
+          }
+        }
+      }
+    });
+
+    // Clear blasts after detonation
+    this.clearBlasts();
+    
+    return { blasts, affectedCells };
   }
 
   // Subscribe to state changes
@@ -115,7 +218,11 @@ export class GameState {
       this.state = {
         playerName: importedState.playerName || "",
         score: importedState.score || 0,
-        currentScenario: importedState.currentScenario || null
+        currentScenario: importedState.currentScenario || null,
+        blasts: importedState.blasts || [],
+        grid: importedState.grid || null,
+        maxBlasts: importedState.maxBlasts || 5,
+        blastRadius: importedState.blastRadius || 3
       };
       this.notifyListeners();
       return true;
