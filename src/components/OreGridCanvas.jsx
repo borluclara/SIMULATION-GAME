@@ -4,10 +4,10 @@
  * Meets all acceptance criteria for canvas grid display
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef } from 'react';
 import './OreGridCanvas.css';
 
-const OreGridCanvas = ({ 
+const OreGridCanvas = forwardRef(({ 
   grid, 
   onBlockClick = null,
   cellSize = 30,
@@ -18,8 +18,8 @@ const OreGridCanvas = ({
   placedBlasts = [], // Array of placed blast markers
   isPlacementMode = false, // Whether in placement mode
   maxBlasts = 5 // Maximum number of blasts allowed
-}) => {
-  const canvasRef = useRef(null);
+}, ref) => {
+  const canvasRef = ref || useRef(null);
   const containerRef = useRef(null);
   const animationFrameRef = useRef(null);
   const [hoveredBlock, setHoveredBlock] = useState(null);
@@ -452,7 +452,9 @@ const handleMouseMove = (event) => {
       </div>
     )}
   </div>
-  )
-}
+  );
+});
+
+OreGridCanvas.displayName = 'OreGridCanvas';
 
 export default OreGridCanvas;

@@ -47,6 +47,8 @@ function App() {
   // Blast placement state
   const [isPlacementMode, setIsPlacementMode] = useState(true)
   const [placedBlasts, setPlacedBlasts] = useState([])
+  const [explosionAnimations, setExplosionAnimations] = useState([])
+  const canvasRef = React.useRef(null)
 
   // Subscribe to gameState changes
   useEffect(() => {
@@ -252,12 +254,12 @@ function App() {
 
     if (isPlacementMode) {
       // Placement mode: place blast markers
-      const result = gameState.addBlast(position.y, position.x);
+      const success = gameState.addBlast(position.x, position.y);
       
-      if (result.success) {
+      if (success) {
         console.log('Blast placed at:', position);
       } else {
-        console.log('Failed to place blast:', result.reason);
+        console.log('Failed to place blast: Maximum blasts reached');
       }
     }
   };
@@ -402,6 +404,7 @@ function App() {
               <div className="canvas-section">
                 <div className="canvas-container">
                   <OreGridCanvas 
+                    ref={canvasRef}
                     grid={oreGrid}
                     onBlockClick={handleBlockClick}
                     placedBlasts={placedBlasts}
@@ -442,27 +445,13 @@ function App() {
               {/* Controls Section - Side by Side Layout */}
               <div className="controls-section">
                 <div className="controls-row">
-                  {/* Mode Toggle */}
-                  <div className="mode-toggle-section">
-                    <button 
-                      onClick={togglePlacementMode}
-                      className={`w-full h-12 flex items-center justify-center rounded-lg font-bold text-sm tracking-wide mb-4 ${
-                        isPlacementMode 
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                          : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                      }`}
-                    >
-                      {isPlacementMode ? '🎯 Placement Mode' : '💥 Execution Mode'}
-                    </button>
-                    
-                    <button 
-                      onClick={isPlacementMode ? executeAllBlasts : handleRunSimulation}
-                      disabled={isPlacementMode && placedBlasts.length === 0}
-                      className="w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed mb-2"
-                    >
-                      {isPlacementMode ? `Execute ${placedBlasts.length} Blasts` : 'Run Simulation'}
-                    </button>
-                  </div>
+                  {/* Blast Placement Panel with Physics */}
+                  <BlastPlacementPanel
+                    onPlacementModeChange={setIsPlacementMode}
+                    onTriggerBlasts={handleTriggerBlasts}
+                    placementMode={isPlacementMode}
+                    canvasRef={canvasRef}
+                  />
 
                   <BlastToolPanel
                     onPowerChange={handlePowerChange}

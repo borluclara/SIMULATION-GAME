@@ -5,12 +5,14 @@
 
 import React, { useState } from 'react';
 import { useGameState } from '../hooks/useGameState';
+import physicsEngine from '../utils/PhysicsEngine';
 import './BlastPlacementPanel.css';
 
 const BlastPlacementPanel = ({ 
   onPlacementModeChange = () => {},
   onTriggerBlasts = () => {},
-  placementMode = false 
+  placementMode = false,
+  canvasRef = null
 }) => {
   const {
     blasts,
@@ -21,6 +23,7 @@ const BlastPlacementPanel = ({
   } = useGameState();
 
   const [isExploding, setIsExploding] = useState(false);
+  const [physicsActive, setPhysicsActive] = useState(false);
 
   const handleTogglePlacementMode = () => {
     const newMode = !placementMode;
@@ -38,17 +41,80 @@ const BlastPlacementPanel = ({
     }
 
     setIsExploding(true);
+    setPhysicsActive(true);
     
-    // Trigger the blast detonation
-    const result = triggerBlasts();
-    
-    // Call the parent handler for visual effects
-    onTriggerBlasts(result);
+    try {
+      // Trigger the blast detonation
+      const result = triggerBlasts();
+      
+      // Call the parent handler for visual effects
+      onTriggerBlasts(result);
 
-    // Reset explosion state after animation
-    setTimeout(() => {
-      setIsExploding(false);
-    }, 1500);
+      // Start physics simulation if canvas is available
+      if (canvasRef?.current && result.blasts.length > 0) {
+        await startPhysicsSimulation(result);
+      }
+
+      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells`);
+    } catch (error) {
+      console.error('Blast simulation error:', error);
+    } finally {
+      // Reset explosion state after animation
+      setTimeout(() => {
+        setIsExploding(false);
+        setPhysicsActive(false);
+      }, 1500);
+    }
+  };
+
+  const startPhysicsSimulation = async (blastResult) => {
+    try {
+      const mainCanvas = canvasRef.current;
+      if (!mainCanvas) {
+        console.error('❌ Main canvas not found');
+        return;
+      }
+
+      const rect = mainCanvas.getBoundingClientRect();
+      
+      console.log(`📐 Main canvas: ${mainCanvas.width}x${mainCanvas.height} (actual), ${rect.width}x${rect.height} (display)`);
+      
+      // Create physics canvas overlay - EXACTLY like reference
+      const physicsCanvas = document.createElement('canvas');
+      physicsCanvas.width = mainCanvas.width;   // Use actual canvas dimensions
+      physicsCanvas.height = mainCanvas.height;
+      physicsCanvas.style.position = 'absolute';
+      physicsCanvas.style.top = '0';
+      physicsCanvas.style.left = '0';
+      physicsCanvas.style.width = rect.width + 'px';     // Scale to display size
+      physicsCanvas.style.height = rect.height + 'px';
+      physicsCanvas.style.pointerEvents = 'none';
+      physicsCanvas.style.zIndex = '10';
+      
+      console.log(`🎨 Physics canvas created: ${physicsCanvas.width}x${physicsCanvas.height}`);
+      
+      // Add to container
+      const container = mainCanvas.parentElement;
+      container.style.position = 'relative';
+      container.appendChild(physicsCanvas);
+      
+      // Run Matter.js simulation
+      console.log('🚀 Starting Matter.js physics...');
+      await physicsEngine.simulateBlast(blastResult, physicsCanvas, 30);
+      
+      // Cleanup after simulation
+      setTimeout(() => {
+        if (physicsCanvas.parentElement) {
+          physicsCanvas.parentElement.removeChild(physicsCanvas);
+        }
+        physicsEngine.destroy();
+        console.log('✅ Physics simulation complete and cleaned up');
+      }, 5100);
+      
+    } catch (error) {
+      console.error('❌ Physics simulation error:', error);
+      setPhysicsActive(false);
+    }
   };
 
   return (
@@ -67,6 +133,12 @@ const BlastPlacementPanel = ({
             {placementMode ? 'Placement' : 'View'}
           </span>
         </div>
+        <div className="status-item">
+          <span className="status-label">Physics:</span>
+          <span className={`status-value ${physicsActive ? 'physics-active' : ''}`}>
+            {physicsActive ? 'Active' : 'Idle'}
+          </span>
+        </div>
       </div>
 
       {/* Blast Indicators */}
@@ -74,12 +146,15 @@ const BlastPlacementPanel = ({
         <div className="blast-indicators">
           <div className="indicators-title">Placed Explosives:</div>
           <div className="blast-list">
-            {blasts.map((blast, index) => (
-              <div key={blast.id} className="blast-indicator">
-                <span className="blast-icon">💣</span>
-                <span className="blast-position">({blast.x}, {blast.y})</span>
-              </div>
-            ))}
+            {blasts.map((blast, index) => {
+              console.log('Blast data:', blast); // Debug log
+              return (
+                <div key={blast.id} className="blast-indicator">
+                  <span className="blast-icon">💣</span>
+                  <span className="blast-position">({blast.x}, {blast.y})</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
