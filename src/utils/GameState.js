@@ -10,7 +10,9 @@ export class GameState {
       score: 0,
       currentScenario: null,
       blasts: [], // Array to store placed blast positions
-      maxBlasts: 5 // Maximum number of blasts allowed
+      grid: null, // Grid state for tracking material states
+      maxBlasts: 5, // Maximum number of blasts allowed
+      blastRadius: 3 // Default blast radius
     };
     
     // Event listeners for state changes
@@ -62,7 +64,9 @@ export class GameState {
       score: 0,
       currentScenario: null,
       blasts: [],
-      maxBlasts: 5
+      grid: null,
+      maxBlasts: 5,
+      blastRadius: 3
     };
     this.notifyListeners();
   }
@@ -70,6 +74,97 @@ export class GameState {
   // Complete reset (including player name)
   fullReset() {
     this.reset(false);
+  }
+
+  // Blast management methods
+  addBlast(x, y) {
+    if (this.state.blasts.length < this.state.maxBlasts) {
+      this.state.blasts.push({ x, y, id: Date.now() });
+      this.notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  removeBlast(blastId) {
+    this.state.blasts = this.state.blasts.filter(blast => blast.id !== blastId);
+    this.notifyListeners();
+  }
+
+  getBlasts() {
+    return [...this.state.blasts];
+  }
+
+  clearBlasts() {
+    this.state.blasts = [];
+    this.notifyListeners();
+  }
+
+  canPlaceBlast() {
+    return this.state.blasts.length < this.state.maxBlasts;
+  }
+
+  setGrid(grid) {
+    this.state.grid = grid;
+    this.notifyListeners();
+  }
+
+  getGrid() {
+    return this.state.grid;
+  }
+
+  // Execute blast detonation
+  triggerBlasts() {
+    const blasts = [...this.state.blasts];
+    const grid = this.state.grid;
+    
+    if (!grid || blasts.length === 0) {
+      return { blasts: [], affectedCells: [] };
+    }
+
+    const affectedCells = [];
+    const radius = this.state.blastRadius;
+
+    // Calculate affected cells for each blast
+    blasts.forEach(blast => {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= radius) {
+            const x = blast.x + dx;
+            const y = blast.y + dy;
+            
+            if (x >= 0 && x < grid[0].length && y >= 0 && y < grid.length) {
+              affectedCells.push({ 
+                x, 
+                y, 
+                distance, 
+                blastId: blast.id,
+                originalMaterial: grid[y][x]
+              });
+            }
+          }
+        }
+      }
+    });
+
+    // Update grid materials based on blast effects
+    affectedCells.forEach(cell => {
+      const material = grid[cell.y][cell.x];
+      if (material && material !== 'air') {
+        // Apply destruction logic based on distance and material type
+        if (cell.distance <= radius * 0.5) {
+          grid[cell.y][cell.x] = 'destroyed';
+        } else if (cell.distance <= radius * 0.8) {
+          grid[cell.y][cell.x] = 'cracked';
+        }
+      }
+    });
+
+    // Clear blasts after detonation
+    this.clearBlasts();
+    
+    return { blasts, affectedCells };
   }
 
   // Subscribe to state changes

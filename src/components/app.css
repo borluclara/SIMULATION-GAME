@@ -236,29 +236,35 @@
 
 /* Controls Row - Side by Side Layout */
 .controls-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: flex-start;
   justify-content: center;
-  flex-wrap: wrap;
   margin: 0 auto;
-  max-width: 900px;
+  max-width: 1200px;
   padding: 0 20px;
 }
 
 /* Responsive adjustments for side-by-side layout */
 @media (max-width: 768px) {
   .controls-row {
-    flex-direction: column;
-    align-items: center;
+    grid-template-columns: 1fr;
     gap: 15px;
   }
 }
 
-@media (min-width: 769px) {
-  .controls-row > * {
-    flex: 1;
-    max-width: 400px;
+@media (min-width: 769px) and (max-width: 1024px) {
+  .controls-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .controls-row {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
   }
 }
 
