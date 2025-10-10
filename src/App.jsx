@@ -196,15 +196,7 @@ function App() {
     setPlacementMode(mode)
   }
 
-  const handleBlockClick = (block, position) => {
-    if (placementMode) {
-      // Place blast marker
-      const success = addBlast(position.x, position.y)
-      if (!success) {
-        alert('Maximum number of blasts reached!')
-      }
-    }
-  }
+  // (Removed duplicate handleBlockClick here)
 
   const handleTriggerBlasts = (result) => {
     if (result.blasts.length > 0) {

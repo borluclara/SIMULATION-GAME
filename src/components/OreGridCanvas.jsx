@@ -14,13 +14,10 @@ const OreGridCanvas = ({
   showGrid = true,
   showLabels = false,
   className = '',
-  forceRefresh = 0,, // Prop to force canvas refresh when CSV is uploaded
+  forceRefresh = 0, // Prop to force canvas refresh when CSV is uploaded
   placedBlasts = [], // Array of placed blast markers
   isPlacementMode = false, // Whether in placement mode
   maxBlasts = 5 // Maximum number of blasts allowed
-  placementMode = false,
-  blastMarkers = [],
-  explosionAnimations = []
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -230,23 +227,21 @@ const OreGridCanvas = ({
         }
       }
       
-      // Draw blast markers
-      if (blastMarkers && blastMarkers.length > 0) {
-        blastMarkers.forEach(blast => {
-          const blastX = Math.floor(blast.x * scaledCellSize);
-          const blastY = Math.floor(blast.y * scaledCellSize);
-          const markerSize = scaledCellSize * 0.8;
+      // Draw blast markers on placed blast positions
+      if (placedBlasts && placedBlasts.length > 0) {
+        placedBlasts.forEach((blast, index) => {
+          const pixelX = Math.floor(blast.col * scaledCellSize);
+          const pixelY = Math.floor(blast.row * scaledCellSize);
+          const cellWidth = Math.ceil(scaledCellSize);
+          const cellHeight = Math.ceil(scaledCellSize);
+          const centerX = pixelX + cellWidth / 2;
+          const centerY = pixelY + cellHeight / 2;
           
-          // Draw blast marker background
-          ctx.fillStyle = 'rgba(255, 69, 0, 0.8)';
+          // Draw blast marker background circle
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 50, 50, 0.8)';
           ctx.beginPath();
-          ctx.arc(
-            blastX + scaledCellSize / 2, 
-            blastY + scaledCellSize / 2, 
-            markerSize / 2, 
-            0, 
-            2 * Math.PI
-          );
+          ctx.arc(centerX, centerY, Math.min(cellWidth, cellHeight) * 0.3, 0, 2 * Math.PI);
           ctx.fill();
           
           // Draw blast marker border
@@ -254,45 +249,73 @@ const OreGridCanvas = ({
           ctx.lineWidth = 2;
           ctx.stroke();
           
-          // Draw explosion icon
-          if (scaledCellSize > 16) {
+          // Draw explosion icon (stylized star/burst)
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.lineCap = 'round';
+          const iconSize = Math.min(cellWidth, cellHeight) * 0.15;
+          
+          // Draw 8-pointed star
+          for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4;
+            const startX = centerX + Math.cos(angle) * iconSize * 0.5;
+            const startY = centerY + Math.sin(angle) * iconSize * 0.5;
+            const endX = centerX + Math.cos(angle) * iconSize;
+            const endY = centerY + Math.sin(angle) * iconSize;
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+          }
+          
+          // Draw blast number
+          if (scaledCellSize > 20) {
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${scaledCellSize * 0.5}px Arial`;
+            ctx.font = `bold ${Math.max(8, scaledCellSize / 4)}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('💣', blastX + scaledCellSize / 2, blastY + scaledCellSize / 2);
+            ctx.fillText((index + 1).toString(), centerX, centerY + iconSize * 1.8);
           }
+          
+          ctx.restore();
         });
       }
       
-      // Draw explosion animations
-      if (explosionAnimations && explosionAnimations.length > 0) {
-        explosionAnimations.forEach(explosion => {
-          const expX = Math.floor(explosion.x * scaledCellSize);
-          const expY = Math.floor(explosion.y * scaledCellSize);
-          const progress = explosion.frame / explosion.maxFrames;
-          const radius = scaledCellSize * (1 + progress * 2);
+      // Draw hover effect for placement mode
+      if (isPlacementMode && hoveredBlock) {
+        const pixelX = Math.floor(hoveredBlock.x * scaledCellSize);
+        const pixelY = Math.floor(hoveredBlock.y * scaledCellSize);
+        const cellWidth = Math.ceil(scaledCellSize);
+        const cellHeight = Math.ceil(scaledCellSize);
+        
+        // Check if this cell already has a blast
+        const hasBlast = placedBlasts.some(blast => blast.col === hoveredBlock.x && blast.row === hoveredBlock.y);
+        
+        if (!hasBlast && placedBlasts.length < maxBlasts) {
+          // Draw placement preview
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
           
-          // Create explosion effect
-          const gradient = ctx.createRadialGradient(
-            expX + scaledCellSize / 2, expY + scaledCellSize / 2, 0,
-            expX + scaledCellSize / 2, expY + scaledCellSize / 2, radius
-          );
-          gradient.addColorStop(0, `rgba(255, 255, 0, ${1 - progress})`);
-          gradient.addColorStop(0.5, `rgba(255, 69, 0, ${0.8 - progress})`);
-          gradient.addColorStop(1, `rgba(255, 0, 0, ${0.3 - progress})`);
-          
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(
-            expX + scaledCellSize / 2, 
-            expY + scaledCellSize / 2, 
-            radius, 
-            0, 
-            2 * Math.PI
-          );
-          ctx.fill();
-        });
+          ctx.strokeStyle = '#ffff00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
+          ctx.restore();
+        } else if (hasBlast) {
+          // Draw red overlay for occupied cell
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+          ctx.restore();
+        } else {
+          // Draw orange overlay for max blasts reached
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 165, 0, 0.2)';
+          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+          ctx.restore();
+        }
       }
       
       setIsCanvasReady(true);
@@ -377,7 +400,7 @@ const handleMouseMove = (event) => {
         maxWidth: '100%',
         maxHeight: '100%',
         display: canvasDimensions.width > 0 ? 'block' : 'none',
-        cursor: placementMode ? 'crosshair' : 'pointer'
+        cursor: isPlacementMode ? 'crosshair' : 'pointer'
       }}
       aria-label={isPlacementMode ? "Interactive ore grid - click to place explosives" : "Interactive ore grid - click on blocks to apply blast effects"}
       role="img"
