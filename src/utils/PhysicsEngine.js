@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Physics Engine Integration with Matter.js
  * Handles debris simulation and particle effects for blast impacts
  */
@@ -10,7 +10,7 @@ export class PhysicsEngine {
     this.engine = null;
     this.world = null;
     this.render = null;
-    this.runner = null;
+    this.runner = null
     this.bodies = [];
     this.isRunning = false;
     this.cleanup = null;
