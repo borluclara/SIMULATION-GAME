@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Physics Engine Integration with Matter.js
  * FIXED VERSION - Manual rendering without Matter.Render conflicts
  */
