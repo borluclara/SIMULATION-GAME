@@ -1,6 +1,6 @@
 /**
- * Global Game State Management
- * Holds player information and game data across the session
+ * Global Game State Management - FIXED
+ * Properly handles OreGrid object structure
  */
 
 export class GameState {
@@ -9,17 +9,15 @@ export class GameState {
       playerName: "",
       score: 0,
       currentScenario: null,
-      blasts: [], // Array to store placed blast positions
-      grid: null, // Grid state for tracking material states
-      maxBlasts: 5, // Maximum number of blasts allowed
-      blastRadius: 3 // Default blast radius
+      blasts: [],
+      grid: null,
+      maxBlasts: 5,
+      blastRadius: 3
     };
     
-    // Event listeners for state changes
     this.listeners = [];
   }
 
-  // Initialize the game state
   static getInstance() {
     if (!GameState.instance) {
       GameState.instance = new GameState();
@@ -27,36 +25,30 @@ export class GameState {
     return GameState.instance;
   }
 
-  // Get current state
   getState() {
     return { ...this.state };
   }
 
-  // Update player name
   setPlayerName(playerName) {
     this.state.playerName = playerName;
     this.notifyListeners();
   }
 
-  // Update score
   setScore(score) {
     this.state.score = score;
     this.notifyListeners();
   }
 
-  // Add to score
   addScore(points) {
     this.state.score += points;
     this.notifyListeners();
   }
 
-  // Set current scenario
   setCurrentScenario(scenario) {
     this.state.currentScenario = scenario;
     this.notifyListeners();
   }
 
-  // Reset state (but keep player name unless specified)
   reset(keepPlayerName = true) {
     const currentPlayerName = this.state.playerName;
     this.state = {
@@ -71,7 +63,6 @@ export class GameState {
     this.notifyListeners();
   }
 
-  // Complete reset (including player name)
   fullReset() {
     this.reset(false);
   }
@@ -113,12 +104,13 @@ export class GameState {
     return this.state.grid;
   }
 
-  // Execute blast detonation
+  // FIXED: Execute blast detonation with proper grid handling
   triggerBlasts() {
     const blasts = [...this.state.blasts];
     const grid = this.state.grid;
     
     if (!grid || blasts.length === 0) {
+      console.warn('No grid or blasts available');
       return { blasts: [], affectedCells: [] };
     }
 
@@ -129,19 +121,98 @@ export class GameState {
     blasts.forEach(blast => {
       for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
+        }
+      }
+    });
+
+    const destroyedCells = []; // Track destroyed cells for physics
+
+    console.log('Processing blasts:', {
+      blastCount: blasts.length,
+      radius: radius,
+      gridType: typeof grid,
+      hasGetBlock: typeof grid.getBlockAtGridPos === 'function'
+    });
+
+    // Calculate affected cells for each blast
+    blasts.forEach(blast => {
+      // IMPORTANT: Include the blast epicenter itself (where explosive was placed)
+      // First, add the epicenter cell
+      const epicenterBlock = grid.getBlockAtGridPos(blast.x, blast.y);
+      if (epicenterBlock) {
+        const epicenterMaterial = epicenterBlock.oreType || epicenterBlock.material || 'unknown';
+        affectedCells.push({
+          x: blast.x,
+          y: blast.y,
+          distance: 0, // Distance 0 = epicenter
+          blastId: blast.id,
+          originalMaterial: epicenterMaterial
+        });
+        // Destroy epicenter completely
+        epicenterBlock.isDestroyed = true;
+        epicenterBlock.damage = epicenterBlock.maxHealth;
+        
+        // Add to destroyed cells for physics
+        destroyedCells.push({
+          x: blast.x,
+          y: blast.y,
+          material: epicenterMaterial
+        });
+      }
+
+      // Then process surrounding cells in radius
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          // Skip the epicenter since we already added it
+          if (dx === 0 && dy === 0) continue;
+          
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance <= radius) {
             const x = blast.x + dx;
             const y = blast.y + dy;
             
-            if (x >= 0 && x < grid[0].length && y >= 0 && y < grid.length) {
-              affectedCells.push({ 
-                x, 
-                y, 
-                distance, 
-                blastId: blast.id,
-                originalMaterial: grid[y][x]
-              });
+            // Check if coordinates are within grid bounds
+            if (x >= 0 && x < grid.width && y >= 0 && y < grid.height) {
+              // Get block using OreGrid's method
+              const block = grid.getBlockAtGridPos(x, y);
+              
+              if (block && !block.isDestroyed) {
+                // Determine material/ore type
+                const material = block.oreType || block.material || 'unknown';
+                
+                affectedCells.push({ 
+                  x, 
+                  y, 
+                  distance, 
+                  blastId: blast.id,
+                  originalMaterial: material
+                });
+
+                // Destroy blocks based on distance from epicenter
+                if (distance <= radius * 0.6) {
+                  block.isDestroyed = true;
+                  block.damage = block.maxHealth;
+                  
+                  // Add to destroyed cells for physics
+                  destroyedCells.push({
+                    x: x,
+                    y: y,
+                    material: material
+                  });
+                } else if (distance <= radius * 0.9) {
+                  block.damage = Math.min(block.maxHealth, block.damage + block.maxHealth * 0.7);
+                  if (block.damage >= block.maxHealth) {
+                    block.isDestroyed = true;
+                    
+                    // Add to destroyed cells for physics
+                    destroyedCells.push({
+                      x: x,
+                      y: y,
+                      material: material
+                    });
+                  }
+                }
+              }
             }
           }
         }
@@ -161,138 +232,27 @@ export class GameState {
       }
     });
 
+    console.log('Blast results:', {
+      blastsProcessed: blasts.length,
+      cellsAffected: affectedCells.length,
+      cellsDestroyed: destroyedCells.length
+    });
+
     // Clear blasts after detonation
     this.clearBlasts();
     
-    return { blasts, affectedCells };
+    return { blasts, affectedCells, destroyedCells };
   }
 
-  // Subscribe to state changes
   subscribe(listener) {
     this.listeners.push(listener);
-    
-    // Return unsubscribe function
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
-  // Notify all listeners of state changes
   notifyListeners() {
-    this.listeners.forEach(listener => {
-      listener(this.getState());
-    });
-  }
-
-  // Get specific state properties
-  getPlayerName() {
-    return this.state.playerName;
-  }
-
-  getScore() {
-    return this.state.score;
-  }
-
-  getCurrentScenario() {
-    return this.state.currentScenario;
-  }
-
-  // Check if player has entered name
-  hasPlayerName() {
-    return this.state.playerName.trim().length > 0;
-  }
-
-  // Blast placement methods
-  addBlast(row, col) {
-    // Check if blast limit reached
-    if (this.state.blasts.length >= this.state.maxBlasts) {
-      return { success: false, reason: 'Maximum blasts reached' };
-    }
-
-    // Check if position already has a blast
-    const existingBlast = this.state.blasts.find(blast => blast.row === row && blast.col === col);
-    if (existingBlast) {
-      return { success: false, reason: 'Position already has a blast' };
-    }
-
-    // Add new blast
-    const newBlast = {
-      id: `blast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      row: row,
-      col: col,
-      timestamp: new Date().toISOString()
-    };
-
-    this.state.blasts.push(newBlast);
-    this.notifyListeners();
-    return { success: true, blast: newBlast };
-  }
-
-  // Remove blast at specific position
-  removeBlast(row, col) {
-    const initialLength = this.state.blasts.length;
-    this.state.blasts = this.state.blasts.filter(blast => !(blast.row === row && blast.col === col));
-    
-    if (this.state.blasts.length < initialLength) {
-      this.notifyListeners();
-      return { success: true };
-    }
-    return { success: false, reason: 'No blast found at position' };
-  }
-
-  // Remove blast by ID
-  removeBlastById(blastId) {
-    const initialLength = this.state.blasts.length;
-    this.state.blasts = this.state.blasts.filter(blast => blast.id !== blastId);
-    
-    if (this.state.blasts.length < initialLength) {
-      this.notifyListeners();
-      return { success: true };
-    }
-    return { success: false, reason: 'Blast not found' };
-  }
-
-  // Clear all blasts
-  clearBlasts() {
-    this.state.blasts = [];
-    this.notifyListeners();
-  }
-
-  // Get all blasts
-  getBlasts() {
-    return [...this.state.blasts];
-  }
-
-  // Check if position has a blast
-  hasBlastAt(row, col) {
-    return this.state.blasts.some(blast => blast.row === row && blast.col === col);
-  }
-
-  // Get number of placed blasts
-  getBlastCount() {
-    return this.state.blasts.length;
-  }
-
-  // Get maximum blasts allowed
-  getMaxBlasts() {
-    return this.state.maxBlasts;
-  }
-
-  // Set maximum blasts allowed
-  setMaxBlasts(maxBlasts) {
-    this.state.maxBlasts = Math.max(1, maxBlasts);
-    
-    // Remove excess blasts if new limit is lower
-    if (this.state.blasts.length > this.state.maxBlasts) {
-      this.state.blasts = this.state.blasts.slice(0, this.state.maxBlasts);
-    }
-    
-    this.notifyListeners();
-  }
-
-  // Check if can place more blasts
-  canPlaceMoreBlasts() {
-    return this.state.blasts.length < this.state.maxBlasts;
+    this.listeners.forEach(listener => listener(this.getState()));
   }
 
   // Export state for debugging
@@ -300,7 +260,6 @@ export class GameState {
     return JSON.stringify(this.state, null, 2);
   }
 
-  // Import state (for testing or restoration)
   import(stateJson) {
     try {
       const importedState = JSON.parse(stateJson);
@@ -309,7 +268,9 @@ export class GameState {
         score: importedState.score || 0,
         currentScenario: importedState.currentScenario || null,
         blasts: importedState.blasts || [],
-        maxBlasts: importedState.maxBlasts || 5
+        grid: importedState.grid || null,
+        maxBlasts: importedState.maxBlasts || 5,
+        blastRadius: importedState.blastRadius || 3
       };
       this.notifyListeners();
       return true;
@@ -320,8 +281,5 @@ export class GameState {
   }
 }
 
-// Create global instance
 export const gameState = GameState.getInstance();
-
-// Export default for convenience
 export default gameState;

@@ -1,6 +1,6 @@
-/**
+﻿﻿/**
  * Physics Engine Integration with Matter.js
- * Handles debris simulation and particle effects for blast impacts
+ * FIXED VERSION - Manual rendering without Matter.Render conflicts
  */
 
 import Matter from 'matter-js';
@@ -24,6 +24,18 @@ export class PhysicsEngine {
       wireframes: false,
       background: 'transparent',
       gravity: { x: 0, y: 0.5, scale: 0.001 } // Match reference gravity
+    };
+    this.bodies = [];
+    this.debrisBodies = []; // Track debris separately
+    this.isRunning = false;
+    this.animationFrameId = null;
+    this.startTime = null;
+  }
+
+  // Initialize the physics engine (NO RENDERER - we'll draw manually)
+  initialize(options = {}) {
+    const defaultOptions = {
+      gravity: { x: 0, y: 1 }
     };
 
     const config = { ...defaultOptions, ...options };
@@ -54,6 +66,12 @@ export class PhysicsEngine {
     });
 
     console.log('✅ Physics engine initialized');
+    // Create engine with gravity
+    this.engine = Matter.Engine.create({
+      gravity: config.gravity
+    });
+    this.world = this.engine.world;
+
     return this;
   }
 
@@ -69,6 +87,12 @@ export class PhysicsEngine {
     Matter.Render.run(this.render);
     this.isRunning = true;
 
+    if (!this.engine) {
+      throw new Error('Physics engine not initialized');
+    }
+
+    this.isRunning = true;
+    this.startTime = Date.now();
     return this;
   }
 
@@ -85,6 +109,14 @@ export class PhysicsEngine {
     return this;
   }
 
+
+  // Manual update loop (call this from your render function)
+  update(deltaTime = 16.67) {
+    if (this.isRunning && this.engine) {
+      Matter.Engine.update(this.engine, deltaTime);
+    }
+  }
+
   // Create debris particles from blast affected cells
   createDebris(affectedCells, cellSize, blastCenter) {
     const debris = [];
@@ -96,88 +128,177 @@ export class PhysicsEngine {
       const cellCenterY = cell.y * cellSize + cellSize / 2;
       
       // Calculate distance from blast center
-      const dx = cellCenterX - blastCenter.x;
-      const dy = cellCenterY - blastCenter.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Create a SINGLE rectangle body per cell (not multiple particles)
-      const particle = this.createDebrisParticle(
-        cellCenterX, 
-        cellCenterY, 
-        cell.originalMaterial,
-        distance,
-        dx,
-        dy,
-        cellSize
+      const distance = Math.sqrt(
+        Math.pow(cellCenterX - blastCenter.x, 2) + 
+        Math.pow(cellCenterY - blastCenter.y, 2)
       );
+
+      // Create multiple small particles per cell
+      const particleCount = this.getParticleCount(cell.originalMaterial);
       
-      if (particle) {
-        debris.push(particle);
-        Matter.World.add(this.world, particle);
+      for (let i = 0; i < particleCount; i++) {
+        const particle = this.createDebrisParticle(
+          cellCenterX, 
+          cellCenterY, 
+          cell.originalMaterial,
+          distance,
+          blastCenter,
+          cellSize
+        );
+        
+        if (particle) {
+          debris.push(particle);
+          Matter.World.add(this.world, particle.body);
+        }
       }
     });
 
-    this.bodies.push(...debris);
-    console.log(`✨ Created ${debris.length} debris particles`);
+    this.debrisBodies.push(...debris);
     return debris;
   }
 
-  // Create individual debris particle - EXACTLY like the reference implementation
-  createDebrisParticle(x, y, material, distance, dx, dy, cellSize) {
-    // Create RECTANGLE body (square, like the reference)
-    const body = Matter.Bodies.rectangle(
-      x,
-      y,
-      cellSize - 1,
-      cellSize - 1,
+  // Create individual debris particle with render info
+  createDebrisParticle(x, y, material, distance, blastCenter, cellSize) {
+    // Particle size
+    const size = this.getParticleSize(material);
+    
+    // Random offset within cell
+    const offsetX = (Math.random() - 0.5) * cellSize * 0.6;
+    const offsetY = (Math.random() - 0.5) * cellSize * 0.6;
+    
+    // Calculate blast force
+    const blastForce = this.calculateBlastForce(x, y, blastCenter, distance);
+    
+    // Create Matter.js body
+    const body = Matter.Bodies.circle(
+      x + offsetX, 
+      y + offsetY, 
+      size, 
       {
-        restitution: 0.4,  // Bounce (matches reference)
-        friction: 0.01,    // Low friction (matches reference)
-        frictionAir: 0.01, // Air resistance (matches reference)
-        density: 0.001,    // Light weight (matches reference)
-        render: {
-          fillStyle: '#4B2E09',  // Dark brown
-          strokeStyle: '#2C1805',
-          lineWidth: 1
-        }
+        density: this.getMaterialDensity(material),
+        friction: 0.8,
+        frictionAir: 0.02,
+        restitution: 0.4
       }
     );
 
-    // Calculate explosion force - EXACTLY like reference
-    const blastRadius = 80; // Match reference blast radius concept
-    const forceMagnitude = (1 - distance / blastRadius) * 0.05;
-    const forceX = (dx / (distance || 1)) * forceMagnitude;
-    const forceY = (dy / (distance || 1)) * forceMagnitude;
+    // Apply blast force
+    Matter.Body.applyForce(body, body.position, blastForce);
     
-    // Apply initial VELOCITY (not force) - this is the key difference!
-    Matter.Body.setVelocity(body, {
-      x: forceX * 100,  // Multiply to get strong velocity
-      y: forceY * 100
-    });
-    
-    // Add random spin (matches reference)
+    // Add rotation
     Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
 
-    return body;
+    // Return particle with rendering info
+    return {
+      body: body,
+      color: this.getMaterialColor(material),
+      size: size,
+      material: material,
+      createdAt: Date.now()
+    };
   }
 
-  // Add boundaries to contain debris
+  // Calculate blast force
+  calculateBlastForce(x, y, blastCenter, distance) {
+    const maxDistance = 120;
+    const maxForce = 0.025; // Much stronger force for bigger debris pieces
+    
+    const dirX = x - blastCenter.x;
+    const dirY = y - blastCenter.y;
+    const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+    
+    const normalizedX = dirX / magnitude;
+    const normalizedY = dirY / magnitude;
+    
+    const forceMagnitude = Math.max(0, maxForce * (1 - distance / maxDistance));
+    
+    return {
+      x: normalizedX * forceMagnitude,
+      y: normalizedY * forceMagnitude
+    };
+  }
+
+  // Get particle count based on material - MORE BIG DEBRIS  
+  getParticleCount(material) {
+    const counts = {
+      'iron': 12,     // More big iron chunks
+      'gold': 10,     // More valuable gold pieces
+      'copper': 12,   // More copper debris
+      'silver': 9,    // More silver pieces
+      'coal': 18,     // Coal breaks into many big pieces
+      'stone': 15,    // Stone creates lots of big debris
+      'destroyed': 20, // Maximum big debris pieces
+      'cracked': 12   // More cracked pieces
+    };
+    return counts[material?.toLowerCase()] || 10;
+  }
+
+  // Get particle size - BIGGER DEBRIS for better visibility
+  getParticleSize(material) {
+    const sizes = {
+      'iron': 8,      // Much bigger iron chunks
+      'gold': 7,      // Bigger gold pieces  
+      'copper': 7,    // Bigger copper chunks
+      'silver': 6,    // Bigger silver pieces
+      'coal': 9,      // Largest coal chunks
+      'stone': 8,     // Big stone debris
+      'destroyed': 6, // Bigger destroyed pieces
+      'cracked': 7    // Bigger cracked pieces
+    };
+    const baseSize = sizes[material?.toLowerCase()] || 6;
+    // More size variation for dramatic effect
+    return baseSize + (Math.random() - 0.5) * 3;
+  }
+
+  // Get material density
+  getMaterialDensity(material) {
+    const densities = {
+      'iron': 0.006,
+      'gold': 0.01,
+      'copper': 0.005,
+      'silver': 0.007,
+      'coal': 0.002,
+      'stone': 0.004,
+      'destroyed': 0.002,
+      'cracked': 0.003
+    };
+    return densities[material?.toLowerCase()] || 0.004;
+  }
+
+  // Get material color
+  getMaterialColor(material) {
+    const colors = {
+      'iron': '#8C7853',
+      'gold': '#FFD700',
+      'copper': '#B87333',
+      'silver': '#C0C0C0',
+      'coal': '#36454F',
+      'stone': '#808080',
+      'destroyed': '#654321',
+      'cracked': '#A0A0A0'
+    };
+    return colors[material?.toLowerCase()] || '#808080';
+  }
+
+  // Add boundaries (ground and walls)
   addBoundaries(width, height) {
+    const thickness = 50;
     const boundaries = [
-      // Floor
-      Matter.Bodies.rectangle(width / 2, height + 25, width, 50, { 
+      // Ground
+      Matter.Bodies.rectangle(width / 2, height + thickness/2, width, thickness, { 
         isStatic: true,
-        render: { fillStyle: 'transparent' }
+        restitution: 0.3,
+        friction: 0.8
       }),
       // Left wall
-      Matter.Bodies.rectangle(-25, height / 2, 50, height, { 
+      Matter.Bodies.rectangle(-thickness/2, height / 2, thickness, height, { 
         isStatic: true,
-        render: { fillStyle: 'transparent' }
+        restitution: 0.2
       }),
       // Right wall
-      Matter.Bodies.rectangle(width + 25, height / 2, 50, height, { 
+      Matter.Bodies.rectangle(width + thickness/2, height / 2, thickness, height, { 
         isStatic: true,
-        render: { fillStyle: 'transparent' }
+        restitution: 0.2
       })
     ];
 
@@ -187,99 +308,44 @@ export class PhysicsEngine {
     return boundaries;
   }
 
-  // Simulate blast explosion with debris
-  simulateBlast(blastData, canvasElement, cellSize) {
-    if (!blastData.blasts || blastData.blasts.length === 0) {
-      console.warn('⚠️ No blasts to simulate');
-      return Promise.resolve();
-    }
+  // Get all debris for rendering
+  getDebris() {
+    return this.debrisBodies;
+  }
 
-    // Use actual canvas dimensions (not getBoundingClientRect)
-    const width = canvasElement.width;
-    const height = canvasElement.height;
-    
-    console.log(`🎯 Simulating blast: canvas ${width}x${height}, cellSize ${cellSize}`);
-    console.log(`📊 Blast data: ${blastData.blasts.length} blasts, ${blastData.affectedCells.length} affected cells`);
-    
-    // Initialize physics engine
-    this.initialize(canvasElement, {
-      width: width,
-      height: height,
-      gravity: { x: 0, y: 0.5, scale: 0.001 }
-    });
-
-    // Add boundaries
-    this.addBoundaries(width, height);
-
-    // Create debris for each blast
-    blastData.blasts.forEach(blast => {
-      const blastCenter = {
-        x: blast.x * cellSize + cellSize / 2,
-        y: blast.y * cellSize + cellSize / 2
-      };
-
-      console.log(`💣 Blast at grid (${blast.x}, ${blast.y}) → pixel (${blastCenter.x}, ${blastCenter.y})`);
-
-      // Filter affected cells for this blast
-      const blastAffectedCells = blastData.affectedCells.filter(
-        cell => cell.blastId === blast.id
-      );
-
-      this.createDebris(blastAffectedCells, cellSize, blastCenter);
-    });
-
-    // Start simulation
-    this.start();
-
-    console.log(`⏰ Physics simulation running for 5 seconds with ${this.bodies.length} total bodies`);
-
-    // Return promise that resolves when simulation completes
-    return new Promise((resolve) => {
-      this.cleanup = setTimeout(() => {
-        console.log('🧹 Cleaning up physics simulation...');
-        this.stop();
-        this.clearAllBodies();
-        resolve();
-      }, 5000); // Run for 5 seconds
-    });
+  // Check if simulation should continue
+  shouldContinue(maxDuration = 5000) {
+    if (!this.startTime) return false;
+    return (Date.now() - this.startTime) < maxDuration;
   }
 
   // Clear all physics bodies
   clearAllBodies() {
-    if (this.world && this.bodies.length > 0) {
-      Matter.World.remove(this.world, this.bodies);
-      this.bodies = [];
+    if (this.world) {
+      // Remove all bodies
+      const allBodies = Matter.Composite.allBodies(this.world);
+      Matter.World.clear(this.world, false);
     }
+    this.bodies = [];
+    this.debrisBodies = [];
   }
 
-  // Cleanup and destroy the physics engine
+  // Cleanup and destroy
   destroy() {
-    if (this.cleanup) {
-      clearTimeout(this.cleanup);
-    }
-    
     this.stop();
     this.clearAllBodies();
     
     if (this.engine) {
       Matter.Engine.clear(this.engine);
     }
-    
-    if (this.render) {
-      Matter.Render.stop(this.render);
-      if (this.render.canvas) {
-        this.render.canvas.remove();
-      }
-    }
 
     this.engine = null;
     this.world = null;
-    this.render = null;
-    this.runner = null;
     this.isRunning = false;
+    this.startTime = null;
   }
 }
 
-// Export singleton instance
+// Export singleton
 export const physicsEngine = new PhysicsEngine();
 export default physicsEngine;
