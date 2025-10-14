@@ -10,6 +10,7 @@ import BlastPlacementPanel from './components/BlastPlacementPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
+import { physicsEngine } from './utils/PhysicsEngine'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -46,6 +47,7 @@ function App() {
   // Blast placement state
   const [placementMode, setPlacementMode] = useState(false)
   const [explosionAnimations, setExplosionAnimations] = useState([])
+  const [physicsDebris, setPhysicsDebris] = useState([]) // Physics debris state
   const canvasRef = React.useRef(null)
 
   const handleFileUpload = (event) => {
@@ -194,7 +196,7 @@ function App() {
     }
   }
 
-  const handleTriggerBlasts = (result) => {
+  const handleTriggerBlasts = async (result) => {
     if (result.blasts.length > 0) {
       // Create explosion animations
       const newAnimations = result.blasts.map(blast => ({
@@ -206,6 +208,78 @@ function App() {
       }))
       
       setExplosionAnimations(newAnimations)
+      
+      // *** PHYSICS SIMULATION ***
+      console.log('Physics check:', { 
+        destroyedCells: result.destroyedCells?.length || 0,
+        hasCanvas: !!canvasRef.current 
+      });
+      
+      if (result.destroyedCells && result.destroyedCells.length > 0 && canvasRef.current) {
+        try {
+          console.log('Starting physics simulation with', result.destroyedCells.length, 'destroyed cells');
+          
+          // Initialize physics engine with canvas dimensions
+          const canvas = canvasRef.current;
+          console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
+          
+          physicsEngine.initialize({
+            width: canvas.width || 800,
+            height: canvas.height || 600,
+            gravity: { x: 0, y: 0.8 }
+          });
+
+          // Start physics simulation
+          physicsEngine.start();
+          console.log('Physics engine started');
+
+          // Create debris for destroyed cells
+          const blastCenter = result.blasts[0]; // Use first blast as center
+          const cellSize = 30; // Assuming 30px cell size
+          
+          // Convert destroyed cells to the format expected by createDebris
+          const debrisData = result.destroyedCells.map(cell => ({
+            x: cell.x,
+            y: cell.y,
+            originalMaterial: cell.material || 'stone'
+          }));
+          
+          console.log('Creating debris for cells:', debrisData);
+          
+          // Create debris using the physics engine
+          const debris = physicsEngine.createDebris(
+            debrisData,
+            cellSize,
+            { x: blastCenter.x * cellSize, y: blastCenter.y * cellSize }
+          );
+          
+          console.log('Created', debris.length, 'debris particles');
+
+          // Update debris state continuously
+          const updatePhysics = () => {
+            if (physicsEngine.isRunning && physicsEngine.shouldContinue()) {
+              physicsEngine.update();
+              const debris = physicsEngine.getDebris();
+              setPhysicsDebris([...debris]);
+              console.log('Physics update:', debris.length, 'debris particles');
+              
+              requestAnimationFrame(updatePhysics);
+            } else {
+              // Simulation ended
+              console.log('Physics simulation ended');
+              setTimeout(() => {
+                physicsEngine.destroy();
+                setPhysicsDebris([]);
+              }, 1000);
+            }
+          };
+          
+          requestAnimationFrame(updatePhysics);
+          
+        } catch (error) {
+          console.error('Physics simulation error:', error);
+        }
+      }
       
       // Update mineral recovery based on blast effects
       const recoveryImpact = result.affectedCells.length * 2
@@ -221,7 +295,7 @@ function App() {
         setExplosionAnimations([])
       }, 1500)
       
-      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells`)
+      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells, destroyed ${result.destroyedCells?.length || 0} cells`)
     }
   }
 
@@ -356,6 +430,7 @@ function App() {
                     placementMode={placementMode}
                     blastMarkers={blasts}
                     explosionAnimations={explosionAnimations}
+                    physicsDebris={physicsDebris}
                   />
                   <p className="canvas-instruction">
                     {placementMode 

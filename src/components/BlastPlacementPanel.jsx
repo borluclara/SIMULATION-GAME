@@ -1,9 +1,4 @@
-/**
- * Blast Placement Panel Component with Physics Integration
- * Handles blast placement, detonation, and Matter.js physics simulation
- */
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameState } from '../hooks/useGameState';
 import { physicsEngine } from '../utils/PhysicsEngine';
 import './BlastPlacementPanel.css';
@@ -11,6 +6,7 @@ import './BlastPlacementPanel.css';
 const BlastPlacementPanel = ({ 
   onPlacementModeChange = () => {},
   onTriggerBlasts = () => {},
+  onPhysicsUpdate = () => {}, // NEW: callback to update physics debris
   placementMode = false,
   canvasRef = null
 }) => {
@@ -19,12 +15,12 @@ const BlastPlacementPanel = ({
     maxBlasts,
     canPlaceBlast,
     clearBlasts,
-    triggerBlasts
+    triggerBlasts,
+    grid
   } = useGameState();
 
   const [isExploding, setIsExploding] = useState(false);
   const [physicsActive, setPhysicsActive] = useState(false);
-  const physicsCanvasRef = useRef(null);
 
   const handleTogglePlacementMode = () => {
     const newMode = !placementMode;
@@ -41,65 +37,115 @@ const BlastPlacementPanel = ({
       return;
     }
 
+    if (!canvasRef?.current || !grid) {
+      alert('Grid not ready for physics simulation!');
+      return;
+    }
+
     setIsExploding(true);
     setPhysicsActive(true);
     
     try {
-      // Trigger the blast detonation
+      // Get blast result with affected cells
       const result = triggerBlasts();
       
-      // Call the parent handler for visual effects
+      console.log('Blast triggered:', {
+        blasts: result.blasts.length,
+        affectedCells: result.affectedCells.length,
+        destroyedCells: result.destroyedCells?.length || 0
+      });
+
+      // Trigger visual explosion animation AND physics
       onTriggerBlasts(result);
 
-      // Start physics simulation if canvas is available
-      if (canvasRef?.current && result.blasts.length > 0) {
-        await startPhysicsSimulation(result);
-      }
+      // Physics is now handled in App.jsx
+      // await startPhysicsSimulation(result);
 
-      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells`);
     } catch (error) {
       console.error('Blast simulation error:', error);
+      setPhysicsActive(false);
     } finally {
-      // Reset states after animation completes
       setTimeout(() => {
         setIsExploding(false);
-        setPhysicsActive(false);
       }, 1500);
     }
   };
 
   const startPhysicsSimulation = async (blastResult) => {
     try {
-      // Create a temporary physics canvas overlay
-      const mainCanvas = canvasRef.current;
-      const rect = mainCanvas.getBoundingClientRect();
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
       
-      // Create physics canvas
-      const physicsCanvas = document.createElement('canvas');
-      physicsCanvas.width = rect.width;
-      physicsCanvas.height = rect.height;
-      physicsCanvas.style.position = 'absolute';
-      physicsCanvas.style.top = '0';
-      physicsCanvas.style.left = '0';
-      physicsCanvas.style.pointerEvents = 'none';
-      physicsCanvas.style.zIndex = '10';
+      console.log('Starting physics simulation...', {
+        canvasSize: { width: rect.width, height: rect.height },
+        blasts: blastResult.blasts.length,
+        affectedCells: blastResult.affectedCells.length
+      });
+
+      // Initialize physics engine
+      physicsEngine.initialize({
+        gravity: { x: 0, y: 1 }
+      });
+
+      // Add boundaries (ground and walls)
+      physicsEngine.addBoundaries(rect.width, rect.height);
+
+      // Create debris for each blast
+      blastResult.blasts.forEach(blast => {
+        const blastCenter = {
+          x: blast.x * 30 + 15, // cellSize = 30
+          y: blast.y * 30 + 15
+        };
+
+        // Filter cells affected by this specific blast
+        const blastCells = blastResult.affectedCells.filter(
+          cell => cell.blastId === blast.id
+        );
+
+        console.log(`Creating debris for blast at (${blast.x}, ${blast.y}):`, blastCells.length, 'cells');
+
+        // Create debris particles
+        physicsEngine.createDebris(blastCells, 30, blastCenter);
+      });
+
+      // Start physics engine
+      physicsEngine.start();
+
+      // Animation loop for physics
+      const duration = 5000; // 5 seconds
+      const startTime = Date.now();
       
-      // Add physics canvas to the container
-      const container = mainCanvas.parentElement;
-      container.style.position = 'relative';
-      container.appendChild(physicsCanvas);
-      
-      // Run physics simulation
-      await physicsEngine.simulateBlast(blastResult, physicsCanvas, 30);
-      
-      // Clean up physics canvas
-      setTimeout(() => {
-        if (physicsCanvas.parentElement) {
-          physicsCanvas.parentElement.removeChild(physicsCanvas);
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed < duration && physicsActive) {
+          // Update physics
+          physicsEngine.update(16.67);
+          
+          // Get debris and pass to parent for rendering
+          const debris = physicsEngine.getDebris();
+          if (onPhysicsUpdate) {
+            onPhysicsUpdate(debris);
+          }
+          
+          // Continue animation
+          requestAnimationFrame(animate);
+        } else {
+          // Cleanup after simulation
+          console.log('Physics simulation complete');
+          physicsEngine.stop();
+          physicsEngine.destroy();
+          setPhysicsActive(false);
+          
+          if (onPhysicsUpdate) {
+            onPhysicsUpdate([]); // Clear debris
+          }
         }
-        physicsEngine.destroy();
-      }, 5100); // Slightly longer than simulation time for cleanup
-      
+      };
+
+      // Start animation loop
+      animate();
+
     } catch (error) {
       console.error('Physics simulation error:', error);
       setPhysicsActive(false);
@@ -110,7 +156,6 @@ const BlastPlacementPanel = ({
     <div className="blast-placement-panel">
       <h3 className="panel-title">🧨 Blast Control Center</h3>
       
-      {/* Status Display */}
       <div className="blast-status">
         <div className="status-item">
           <span className="status-label">Explosives:</span>
@@ -130,7 +175,6 @@ const BlastPlacementPanel = ({
         </div>
       </div>
 
-      {/* Blast Indicators */}
       {blasts.length > 0 && (
         <div className="blast-indicators">
           <div className="indicators-title">📍 Placed Explosives:</div>
@@ -145,7 +189,6 @@ const BlastPlacementPanel = ({
         </div>
       )}
 
-      {/* Control Buttons */}
       <div className="blast-controls">
         <button
           className={`control-button placement-toggle ${placementMode ? 'active' : ''}`}
@@ -172,7 +215,6 @@ const BlastPlacementPanel = ({
         </button>
       </div>
 
-      {/* Physics Status */}
       {physicsActive && (
         <div className="physics-status">
           <div className="physics-indicator">
@@ -185,7 +227,6 @@ const BlastPlacementPanel = ({
         </div>
       )}
 
-      {/* Instructions */}
       <div className="blast-instructions">
         {placementMode ? (
           <p>🎯 Click on grid cells to place explosives (max {maxBlasts})</p>
