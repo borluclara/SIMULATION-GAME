@@ -32,6 +32,7 @@ function App() {
 
   const [currentView, setCurrentView] = useState('home') // 'home', 'game', 'leaderboard', 'help'
   const [csvData, setCsvData] = useState(null)
+  const [originalCsvData, setOriginalCsvData] = useState(null) // Store original CSV for reset
   const [csvError, setCsvError] = useState(null)
   const [oreGrid, setOreGrid] = useState(null) // Add grid state for canvas
   const [isLoadingGrid, setIsLoadingGrid] = useState(false)
@@ -48,7 +49,27 @@ function App() {
   const [placementMode, setPlacementMode] = useState(false)
   const [explosionAnimations, setExplosionAnimations] = useState([])
   const [physicsDebris, setPhysicsDebris] = useState([]) // Physics debris state
+  
+  // Reset feedback state
+  const [resetMessage, setResetMessage] = useState(null)
+  
   const canvasRef = React.useRef(null)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Ctrl+R or Cmd+R for reset (prevent default browser refresh)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        if (currentView === 'game' && originalCsvData && !isLoadingGrid) {
+          handleResetSimulation();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [currentView, originalCsvData, isLoadingGrid]);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
@@ -93,6 +114,7 @@ function App() {
           
           console.log('Grid created successfully, ready for simulation')
           setCsvData(results.data)
+          setOriginalCsvData(results.data) // Store original data for reset functionality
           setOreGrid(grid)
           setCsvReady(true) // Mark CSV as ready for simulation
           setIsLoadingGrid(false)
@@ -132,6 +154,7 @@ function App() {
   const handleRetry = () => {
     setCsvError(null)
     setCsvData(null)
+    setOriginalCsvData(null) // Clear original data
     setOreGrid(null)
     setIsLoadingGrid(false)
     setCsvReady(false)
@@ -139,6 +162,70 @@ function App() {
     
     // Reset global state scenario but keep player name
     setCurrentScenario(null)
+  }
+
+  const handleResetSimulation = async () => {
+    if (!originalCsvData) {
+      console.warn('No original CSV data available for reset');
+      return;
+    }
+
+    try {
+      setIsLoadingGrid(true);
+      
+      // Reset game state (keep player name, reset score and blasts)
+      resetGameState(true); // true = keep player name
+      
+      // Recreate grid from original CSV data
+      const csvString = originalCsvData.map(row => {
+        return Object.keys(row).map(key => row[key]).join(',');
+      }).join('\n');
+      
+      const headerString = Object.keys(originalCsvData[0]).join(',');
+      const fullCsvString = headerString + '\n' + csvString;
+      
+      const grid = await parseCSVToGrid(fullCsvString);
+      
+      // Reset all simulation state
+      setCsvData(originalCsvData);
+      setOreGrid(grid);
+      setGrid(grid.data || grid);
+      
+      // Reset blast simulation values
+      setBlastPower(500);
+      setBlastDirection(180);
+      setMineralRecovery(100);
+      setDilution(0);
+      setSimulationResults(null);
+      
+      // Reset UI state
+      setPlacementMode(false);
+      setExplosionAnimations([]);
+      setPhysicsDebris([]);
+      
+      // Update scenario with reset grid
+      setCurrentScenario({
+        data: originalCsvData,
+        grid: grid,
+        fileName: 'Reset Simulation',
+        uploadedAt: new Date().toISOString()
+      });
+      
+      setIsLoadingGrid(false);
+      console.log('Simulation reset successfully');
+      
+      // Show success message
+      setResetMessage('✅ Simulation reset successfully!');
+      setTimeout(() => setResetMessage(null), 3000); // Clear message after 3 seconds
+      
+    } catch (error) {
+      console.error('Error resetting simulation:', error);
+      setIsLoadingGrid(false);
+      
+      // Show error message
+      setResetMessage('❌ Failed to reset simulation. Please try again.');
+      setTimeout(() => setResetMessage(null), 5000);
+    }
   }
 
   // Blast simulation handlers
@@ -170,15 +257,8 @@ function App() {
   }
 
   const handleReset = () => {
-    setMineralRecovery(100)
-    setDilution(0)
-    setBlastPower(500)
-    setBlastDirection(180)
-    setPlacementMode(false)
-    setExplosionAnimations([])
-    
-    // Reset score in global state but keep player name
-    resetGameState(true)
+    // Use the comprehensive reset simulation functionality
+    handleResetSimulation();
   }
 
   // Blast placement handlers
@@ -395,6 +475,17 @@ function App() {
             Welcome, {playerName}! | Score: {score}
           </p>
         </header>
+
+        {/* Reset Message Display */}
+        {resetMessage && (
+          <div className="mx-4 mb-4 p-3 rounded-lg bg-opacity-90 backdrop-blur-sm transition-all duration-300" 
+               style={{
+                 backgroundColor: resetMessage.includes('✅') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                 border: `1px solid ${resetMessage.includes('✅') ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+               }}>
+            <p className="text-white text-center font-medium">{resetMessage}</p>
+          </div>
+        )}
         
         <main className="blast-simulation-main">
           {isLoadingGrid ? (
@@ -451,14 +542,12 @@ function App() {
                   />
                   
                   <BlastToolPanel
-                    onPowerChange={handlePowerChange}
-                    onDirectionChange={handleDirectionChange}
-                    onRunSimulation={handleRunSimulation}
+                    blastPower={blastPower}
+                    setBlastPower={setBlastPower}
+                    blastDirection={blastDirection}
+                    setBlastDirection={setBlastDirection}
+                    onSimulate={handleRunSimulation}
                     onReset={handleReset}
-                    onSave={handleSave}
-                    onReplay={handleReplay}
-                    initialPower={blastPower}
-                    initialDirection={blastDirection}
                   />
                   
                   <ScoreFeedback
