@@ -1,24 +1,18 @@
-/**
- * OreGrid Canvas Component
- * Renders the 2D ore grid on HTML5 Canvas with automatic resizing and refresh capabilities
- * Meets all acceptance criteria for canvas grid display
- */
-
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import './OreGridCanvas.css';
 
-const OreGridCanvas = ({ 
+const OreGridCanvas = forwardRef(({ 
   grid, 
   onBlockClick = null,
   cellSize = 30,
   showGrid = true,
   showLabels = false,
   className = '',
-  forceRefresh = 0, // Prop to force canvas refresh when CSV is uploaded
-  placedBlasts = [], // Array of placed blast markers
-  isPlacementMode = false, // Whether in placement mode
-  maxBlasts = 5 // Maximum number of blasts allowed
-}) => {
+  placementMode = false,
+  blastMarkers = [],
+  explosionAnimations = [],
+  physicsDebris = []  // NEW: debris particles from physics
+}, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const animationFrameRef = useRef(null);
@@ -27,7 +21,9 @@ const OreGridCanvas = ({
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
 
-  // Calculate optimal canvas size and scaling with enhanced responsiveness
+  // Expose canvas ref to parent
+  useImperativeHandle(ref, () => canvasRef.current);
+
   const calculateCanvasSize = useCallback(() => {
     if (!grid || !containerRef.current) return { width: 0, height: 0, scale: 1 };
 
@@ -36,77 +32,57 @@ const OreGridCanvas = ({
     const containerWidth = containerRect.width;
     const containerHeight = containerRect.height;
     
-    // Ensure minimum container size
     const minWidth = Math.max(containerWidth, 300);
     const minHeight = Math.max(containerHeight, 200);
     
-    // Calculate grid size in pixels
     const gridPixelWidth = grid.width * cellSize;
     const gridPixelHeight = grid.height * cellSize;
     
-    // Calculate scale to fit container while maintaining aspect ratio
     const scaleX = minWidth / gridPixelWidth;
     const scaleY = minHeight / gridPixelHeight;
-    const scale = Math.min(scaleX, scaleY, 2); // Allow scaling up to 2x for small grids
+    const scale = Math.min(scaleX, scaleY, 2);
     
-    // Ensure minimum cell size visibility
     const minCellSize = 8;
     const adjustedScale = Math.max(scale, minCellSize / cellSize);
     
     const finalWidth = Math.floor(gridPixelWidth * adjustedScale);
     const finalHeight = Math.floor(gridPixelHeight * adjustedScale);
     
-    return {
-      width: finalWidth,
-      height: finalHeight,
-      scale: adjustedScale
-    };
+    return { width: finalWidth, height: finalHeight, scale: adjustedScale };
   }, [grid, cellSize]);
 
-  // Update canvas dimensions when grid, container, or forceRefresh changes
   useEffect(() => {
     const updateDimensions = () => {
       if (!containerRef.current) return;
-      
       const dimensions = calculateCanvasSize();
       setCanvasDimensions({ width: dimensions.width, height: dimensions.height });
       setScaleFactor(dimensions.scale);
     };
 
-    // Initial dimension calculation
     updateDimensions();
     
-    // Enhanced resize listener with throttling
     let resizeTimeout;
     const handleResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(updateDimensions, 150); // Throttle resize events
+      resizeTimeout = setTimeout(updateDimensions, 150);
     };
     
-    // Add resize observer for better responsiveness
     let resizeObserver;
     if (window.ResizeObserver && containerRef.current) {
       resizeObserver = new ResizeObserver(handleResize);
       resizeObserver.observe(containerRef.current);
     }
     
-    // Fallback resize listener
     window.addEventListener('resize', handleResize);
     
-    // Cleanup
     return () => {
       clearTimeout(resizeTimeout);
       window.removeEventListener('resize', handleResize);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      if (resizeObserver) resizeObserver.disconnect();
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [calculateCanvasSize, forceRefresh]);
+  }, [calculateCanvasSize]);
 
-  // Enhanced grid rendering with improved canvas creation and refresh functionality
   const renderGrid = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -123,7 +99,6 @@ const OreGridCanvas = ({
       const { width, height } = canvasDimensions;
       const scaledCellSize = cellSize * scaleFactor;
 
-      // Set canvas size with proper DPI scaling
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
@@ -131,15 +106,14 @@ const OreGridCanvas = ({
       canvas.style.height = `${height}px`;
       ctx.scale(dpr, dpr);
 
-      // Clear canvas with dark background
+      // Clear canvas
       ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, width, height);
 
-      // Enable anti-aliasing for smoother rendering
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Draw grid cells with enhanced color coding
+      // Draw grid cells
       for (let y = 0; y < grid.height; y++) {
         for (let x = 0; x < grid.width; x++) {
           const block = grid.getBlockAtGridPos(x, y);
@@ -150,50 +124,34 @@ const OreGridCanvas = ({
           const cellHeight = Math.ceil(scaledCellSize);
           
           if (block) {
-            // Draw ore block with enhanced color coding
+            // Skip destroyed blocks (they're now debris!)
+            if (block.isDestroyed) {
+              ctx.fillStyle = '#0a0a0a'; // Empty space
+              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+              continue;
+            }
+
             ctx.fillStyle = block.getColor();
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             
-            // Add subtle gradient for depth
             const gradient = ctx.createLinearGradient(pixelX, pixelY, pixelX + cellWidth, pixelY + cellHeight);
             gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
             ctx.fillStyle = gradient;
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             
-            // Add damage overlay for damaged blocks
-            if (block.damage > 0 && !block.isDestroyed) {
+            if (block.damage > 0) {
               const damageIntensity = (block.damage / block.maxHealth) * 0.4;
               ctx.fillStyle = `rgba(255, 100, 100, ${damageIntensity})`;
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
             
-            // Add destroyed overlay with animation effect
-            if (block.isDestroyed) {
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-              
-              // Draw X for destroyed blocks with better visibility
-              ctx.strokeStyle = '#ff4444';
-              ctx.lineWidth = Math.max(1, scaledCellSize / 15);
-              ctx.lineCap = 'round';
-              ctx.beginPath();
-              const margin = cellWidth * 0.2;
-              ctx.moveTo(pixelX + margin, pixelY + margin);
-              ctx.lineTo(pixelX + cellWidth - margin, pixelY + cellHeight - margin);
-              ctx.moveTo(pixelX + cellWidth - margin, pixelY + margin);
-              ctx.lineTo(pixelX + margin, pixelY + cellHeight - margin);
-              ctx.stroke();
-            }
-            
-            // Draw ore type labels with better readability
             if (showLabels && scaledCellSize > 16) {
               const fontSize = Math.max(8, scaledCellSize / 3.5);
               ctx.font = `bold ${fontSize}px Arial`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               
-              // Add text shadow for better readability
               ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
               const textX = pixelX + cellWidth / 2;
               const textY = pixelY + cellHeight / 2;
@@ -204,21 +162,10 @@ const OreGridCanvas = ({
               ctx.fillText(text, textX, textY);
             }
           } else {
-            // Draw empty cell with subtle pattern
             ctx.fillStyle = '#2a2a2a';
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            
-            // Add subtle dot pattern for empty cells
-            if (scaledCellSize > 10) {
-              ctx.fillStyle = '#3a3a3a';
-              const dotSize = Math.max(1, scaledCellSize / 10);
-              const centerX = pixelX + cellWidth / 2;
-              const centerY = pixelY + cellHeight / 2;
-              ctx.fillRect(centerX - dotSize/2, centerY - dotSize/2, dotSize, dotSize);
-            }
           }
           
-          // Draw grid lines with enhanced visibility
           if (showGrid && scaledCellSize > 8) {
             ctx.strokeStyle = block ? '#666666' : '#444444';
             ctx.lineWidth = scaledCellSize > 20 ? 1 : 0.5;
@@ -227,107 +174,101 @@ const OreGridCanvas = ({
         }
       }
       
-      // Draw blast markers on placed blast positions
-      if (placedBlasts && placedBlasts.length > 0) {
-        placedBlasts.forEach((blast, index) => {
-          const pixelX = Math.floor(blast.col * scaledCellSize);
-          const pixelY = Math.floor(blast.row * scaledCellSize);
-          const cellWidth = Math.ceil(scaledCellSize);
-          const cellHeight = Math.ceil(scaledCellSize);
-          const centerX = pixelX + cellWidth / 2;
-          const centerY = pixelY + cellHeight / 2;
+      // Draw blast markers
+      if (blastMarkers && blastMarkers.length > 0) {
+        blastMarkers.forEach(blast => {
+          const blastX = Math.floor(blast.x * scaledCellSize);
+          const blastY = Math.floor(blast.y * scaledCellSize);
+          const markerSize = scaledCellSize * 0.8;
           
-          // Draw blast marker background circle
-          ctx.save();
-          ctx.fillStyle = 'rgba(255, 50, 50, 0.8)';
+          ctx.fillStyle = 'rgba(255, 69, 0, 0.8)';
           ctx.beginPath();
-          ctx.arc(centerX, centerY, Math.min(cellWidth, cellHeight) * 0.3, 0, 2 * Math.PI);
+          ctx.arc(
+            blastX + scaledCellSize / 2, 
+            blastY + scaledCellSize / 2, 
+            markerSize / 2, 
+            0, 
+            2 * Math.PI
+          );
           ctx.fill();
           
-          // Draw blast marker border
           ctx.strokeStyle = '#ff0000';
           ctx.lineWidth = 2;
           ctx.stroke();
           
-          // Draw explosion icon (stylized star/burst)
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.5;
-          ctx.lineCap = 'round';
-          const iconSize = Math.min(cellWidth, cellHeight) * 0.15;
-          
-          // Draw 8-pointed star
-          for (let i = 0; i < 8; i++) {
-            const angle = (i * Math.PI) / 4;
-            const startX = centerX + Math.cos(angle) * iconSize * 0.5;
-            const startY = centerY + Math.sin(angle) * iconSize * 0.5;
-            const endX = centerX + Math.cos(angle) * iconSize;
-            const endY = centerY + Math.sin(angle) * iconSize;
-            
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
-          }
-          
-          // Draw blast number
-          if (scaledCellSize > 20) {
+          if (scaledCellSize > 16) {
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.max(8, scaledCellSize / 4)}px Arial`;
+            ctx.font = `bold ${scaledCellSize * 0.5}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText((index + 1).toString(), centerX, centerY + iconSize * 1.8);
+            ctx.fillText('💣', blastX + scaledCellSize / 2, blastY + scaledCellSize / 2);
           }
+        });
+      }
+      
+      // Draw explosion animations
+      if (explosionAnimations && explosionAnimations.length > 0) {
+        explosionAnimations.forEach(explosion => {
+          const expX = Math.floor(explosion.x * scaledCellSize);
+          const expY = Math.floor(explosion.y * scaledCellSize);
+          const progress = explosion.frame / explosion.maxFrames;
+          const radius = scaledCellSize * (1 + progress * 2);
+          
+          const gradient = ctx.createRadialGradient(
+            expX + scaledCellSize / 2, expY + scaledCellSize / 2, 0,
+            expX + scaledCellSize / 2, expY + scaledCellSize / 2, radius
+          );
+          gradient.addColorStop(0, `rgba(255, 255, 0, ${1 - progress})`);
+          gradient.addColorStop(0.5, `rgba(255, 69, 0, ${0.8 - progress})`);
+          gradient.addColorStop(1, `rgba(255, 0, 0, ${0.3 - progress})`);
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(
+            expX + scaledCellSize / 2, 
+            expY + scaledCellSize / 2, 
+            radius, 
+            0, 
+            2 * Math.PI
+          );
+          ctx.fill();
+        });
+      }
+
+      // *** NEW: Draw physics debris particles ***
+      if (physicsDebris && physicsDebris.length > 0) {
+        physicsDebris.forEach(debris => {
+          const pos = debris.body.position;
+          
+          // Draw particle with glow effect
+          ctx.save();
+          ctx.fillStyle = debris.color;
+          ctx.shadowColor = debris.color;
+          ctx.shadowBlur = 4;
+          
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, debris.size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Add inner highlight
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.beginPath();
+          ctx.arc(pos.x - debris.size * 0.2, pos.y - debris.size * 0.2, debris.size * 0.4, 0, Math.PI * 2);
+          ctx.fill();
           
           ctx.restore();
         });
       }
       
-      // Draw hover effect for placement mode
-      if (isPlacementMode && hoveredBlock) {
-        const pixelX = Math.floor(hoveredBlock.x * scaledCellSize);
-        const pixelY = Math.floor(hoveredBlock.y * scaledCellSize);
-        const cellWidth = Math.ceil(scaledCellSize);
-        const cellHeight = Math.ceil(scaledCellSize);
-        
-        // Check if this cell already has a blast
-        const hasBlast = placedBlasts.some(blast => blast.col === hoveredBlock.x && blast.row === hoveredBlock.y);
-        
-        if (!hasBlast && placedBlasts.length < maxBlasts) {
-          // Draw placement preview
-          ctx.save();
-          ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-          
-          ctx.strokeStyle = '#ffff00';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([5, 5]);
-          ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
-          ctx.restore();
-        } else if (hasBlast) {
-          // Draw red overlay for occupied cell
-          ctx.save();
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
-          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-          ctx.restore();
-        } else {
-          // Draw orange overlay for max blasts reached
-          ctx.save();
-          ctx.fillStyle = 'rgba(255, 165, 0, 0.2)';
-          ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-          ctx.restore();
-        }
-      }
-      
       setIsCanvasReady(true);
     });
-  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, forceRefresh, placedBlasts, isPlacementMode, hoveredBlock, maxBlasts]);
+  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris]);
 
-  // Render grid when dependencies change
   useEffect(() => {
     renderGrid();
   }, [renderGrid]);
 
-  // Handle mouse interactions
   const getBlockFromMouseEvent = (event) => {
     const canvas = canvasRef.current;
     if (!canvas || !grid) return null;
@@ -342,32 +283,24 @@ const OreGridCanvas = ({
     
     if (gridX >= 0 && gridX < grid.width && gridY >= 0 && gridY < grid.height) {
       const block = grid.getBlockAtGridPos(gridX, gridY);
-      return {
-        block,
-        gridX,
-        gridY,
-        mouseX,
-        mouseY
-      };
+      return { block, gridX, gridY, mouseX, mouseY };
     }
     
     return null;
   };
 
-const handleMouseMove = (event) => {
-  const result = getBlockFromMouseEvent(event);
-  if (result && result.block) {
-    setHoveredBlock({
-      ...result.block,
-      canvasX: result.mouseX,
-      canvasY: result.mouseY,
-      x: result.gridX,
-      y: result.gridY
-    });
-  } else {
-    setHoveredBlock(null);
-  }
-};
+  const handleMouseMove = (event) => {
+    const result = getBlockFromMouseEvent(event);
+    if (result && result.block) {
+      setHoveredBlock({
+        ...result.block,
+        canvasX: result.mouseX,
+        canvasY: result.mouseY
+      });
+    } else {
+      setHoveredBlock(null);
+    }
+  };
 
   const handleMouseLeave = () => {
     setHoveredBlock(null);
@@ -375,9 +308,8 @@ const handleMouseMove = (event) => {
 
   const handleClick = (event) => {
     const result = getBlockFromMouseEvent(event);
-    if (result && result.block && onBlockClick) {
+    if (result && onBlockClick) {
       onBlockClick(result.block, { x: result.gridX, y: result.gridY });
-      // Re-render after click to show changes
       setTimeout(renderGrid, 50);
     }
   };
@@ -387,72 +319,67 @@ const handleMouseMove = (event) => {
       ref={containerRef}
       className={`ore-grid-canvas-container ${className} ${!isCanvasReady ? 'loading' : ''}`}
     >
-      {/* Canvas element with enhanced attributes */}
-    <canvas
-      ref={canvasRef}
-      className="ore-grid-canvas"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{
-        width: canvasDimensions.width,
-        height: canvasDimensions.height,
-        maxWidth: '100%',
-        maxHeight: '100%',
-        display: canvasDimensions.width > 0 ? 'block' : 'none',
-        cursor: isPlacementMode ? 'crosshair' : 'pointer'
-      }}
-      aria-label={isPlacementMode ? "Interactive ore grid - click to place explosives" : "Interactive ore grid - click on blocks to apply blast effects"}
-      role="img"
-    />
-    
-    {/* Loading indicator for canvas initialization */}
-    {!isCanvasReady && canvasDimensions.width === 0 && (
-      <div className="canvas-loading">
-        <div className="loading-spinner"></div>
-        <span>Initializing canvas...</span>
-      </div>
-    )}
-    
-    {/* Grid info overlay */}
-    {isCanvasReady && grid && (
-      <div className="canvas-info">
-        <span className="grid-size">{grid.width} × {grid.height}</span>
-        <span className="zoom-level">Zoom: {Math.round(scaleFactor * 100)}%</span>
-      </div>
-    )}
-    
-    {/* Hover tooltip */}
-    {hoveredBlock && (
-      <div 
-        className="block-tooltip"
+      <canvas
+        ref={canvasRef}
+        className="ore-grid-canvas"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         style={{
-          position: 'absolute',
-          left: `${hoveredBlock.canvasX + 10}px`,
-          top: `${hoveredBlock.canvasY - 10}px`,
-          pointerEvents: 'none',
-          zIndex: 1000
+          width: canvasDimensions.width,
+          height: canvasDimensions.height,
+          maxWidth: '100%',
+          maxHeight: '100%',
+          display: canvasDimensions.width > 0 ? 'block' : 'none',
+          cursor: placementMode ? 'crosshair' : 'pointer'
         }}
-      >
-        <div className="tooltip-content">
-          <div className="tooltip-title">{hoveredBlock.oreType}</div>
-          <div className="tooltip-info">
-            Position: ({hoveredBlock.x}, {hoveredBlock.y})
-          </div>
-          <div className="tooltip-info">
-            Health: {hoveredBlock.health}/{hoveredBlock.maxHealth} | Value: {hoveredBlock.value}
-          </div>
-          {hoveredBlock.isDestroyed && (
-            <div className="tooltip-status destroyed">DESTROYED</div>
-          )}
-          {hoveredBlock.damage > 0 && !hoveredBlock.isDestroyed && (
-            <div className="tooltip-damage">Damage: {hoveredBlock.damage}</div>
-          )}
+        aria-label="Interactive ore grid - click on blocks to apply blast effects"
+        role="img"
+      />
+      
+      {!isCanvasReady && canvasDimensions.width === 0 && (
+        <div className="canvas-loading">
+          <div className="loading-spinner"></div>
+          <span>Initializing canvas...</span>
         </div>
-      </div>
-    )}
-  </div>
-  )
-}
+      )}
+      
+      {isCanvasReady && grid && (
+        <div className="canvas-info">
+          <span className="grid-size">{grid.width} × {grid.height}</span>
+          <span className="zoom-level">Zoom: {Math.round(scaleFactor * 100)}%</span>
+        </div>
+      )}
+      
+      {hoveredBlock && !hoveredBlock.isDestroyed && (
+        <div 
+          className="block-tooltip"
+          style={{
+            position: 'absolute',
+            left: `${hoveredBlock.canvasX + 10}px`,
+            top: `${hoveredBlock.canvasY - 10}px`,
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}
+        >
+          <div className="tooltip-content">
+            <div className="tooltip-title">{hoveredBlock.oreType}</div>
+            <div className="tooltip-info">
+              Position: ({hoveredBlock.x}, {hoveredBlock.y})
+            </div>
+            <div className="tooltip-info">
+              Health: {hoveredBlock.health}/{hoveredBlock.maxHealth} | Value: {hoveredBlock.value}
+            </div>
+            {hoveredBlock.damage > 0 && (
+              <div className="tooltip-damage">Damage: {hoveredBlock.damage}</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+OreGridCanvas.displayName = 'OreGridCanvas';
 
 export default OreGridCanvas;

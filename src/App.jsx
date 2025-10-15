@@ -9,8 +9,8 @@ import BlastToolPanel from './components/BlastToolPanel'
 import BlastPlacementPanel from './components/BlastPlacementPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
-import { gameState } from './utils/GameState'
 import { useGameState } from './hooks/useGameState'
+import { physicsEngine } from './utils/PhysicsEngine'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -43,22 +43,12 @@ function App() {
   const [mineralRecovery, setMineralRecovery] = useState(100)
   const [dilution, setDilution] = useState(0)
   const [simulationResults, setSimulationResults] = useState(null)
-
+  
   // Blast placement state
-  const [isPlacementMode, setIsPlacementMode] = useState(true)
-  const [placedBlasts, setPlacedBlasts] = useState([])
-
-  // Subscribe to gameState changes
-  useEffect(() => {
-    const unsubscribe = gameState.subscribe((state) => {
-      setPlacedBlasts(state.blasts);
-    });
-
-    // Initialize with current state
-    setPlacedBlasts(gameState.getBlasts());
-
-    return unsubscribe;
-  }, []);
+  const [placementMode, setPlacementMode] = useState(false)
+  const [explosionAnimations, setExplosionAnimations] = useState([])
+  const [physicsDebris, setPhysicsDebris] = useState([]) // Physics debris state
+  const canvasRef = React.useRef(null)
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
@@ -196,9 +186,17 @@ function App() {
     setPlacementMode(mode)
   }
 
-  // (Removed duplicate handleBlockClick here)
+  const handleBlockClick = (block, position) => {
+    if (placementMode) {
+      // Place blast marker
+      const success = addBlast(position.x, position.y)
+      if (!success) {
+        alert('Maximum number of blasts reached!')
+      }
+    }
+  }
 
-  const handleTriggerBlasts = (result) => {
+  const handleTriggerBlasts = async (result) => {
     if (result.blasts.length > 0) {
       // Create explosion animations
       const newAnimations = result.blasts.map(blast => ({
@@ -210,6 +208,78 @@ function App() {
       }))
       
       setExplosionAnimations(newAnimations)
+      
+      // *** PHYSICS SIMULATION ***
+      console.log('Physics check:', { 
+        destroyedCells: result.destroyedCells?.length || 0,
+        hasCanvas: !!canvasRef.current 
+      });
+      
+      if (result.destroyedCells && result.destroyedCells.length > 0 && canvasRef.current) {
+        try {
+          console.log('Starting physics simulation with', result.destroyedCells.length, 'destroyed cells');
+          
+          // Initialize physics engine with canvas dimensions
+          const canvas = canvasRef.current;
+          console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
+          
+          physicsEngine.initialize({
+            width: canvas.width || 800,
+            height: canvas.height || 600,
+            gravity: { x: 0, y: 0.8 }
+          });
+
+          // Start physics simulation
+          physicsEngine.start();
+          console.log('Physics engine started');
+
+          // Create debris for destroyed cells
+          const blastCenter = result.blasts[0]; // Use first blast as center
+          const cellSize = 30; // Assuming 30px cell size
+          
+          // Convert destroyed cells to the format expected by createDebris
+          const debrisData = result.destroyedCells.map(cell => ({
+            x: cell.x,
+            y: cell.y,
+            originalMaterial: cell.material || 'stone'
+          }));
+          
+          console.log('Creating debris for cells:', debrisData);
+          
+          // Create debris using the physics engine
+          const debris = physicsEngine.createDebris(
+            debrisData,
+            cellSize,
+            { x: blastCenter.x * cellSize, y: blastCenter.y * cellSize }
+          );
+          
+          console.log('Created', debris.length, 'debris particles');
+
+          // Update debris state continuously
+          const updatePhysics = () => {
+            if (physicsEngine.isRunning && physicsEngine.shouldContinue()) {
+              physicsEngine.update();
+              const debris = physicsEngine.getDebris();
+              setPhysicsDebris([...debris]);
+              console.log('Physics update:', debris.length, 'debris particles');
+              
+              requestAnimationFrame(updatePhysics);
+            } else {
+              // Simulation ended
+              console.log('Physics simulation ended');
+              setTimeout(() => {
+                physicsEngine.destroy();
+                setPhysicsDebris([]);
+              }, 1000);
+            }
+          };
+          
+          requestAnimationFrame(updatePhysics);
+          
+        } catch (error) {
+          console.error('Physics simulation error:', error);
+        }
+      }
       
       // Update mineral recovery based on blast effects
       const recoveryImpact = result.affectedCells.length * 2
@@ -225,7 +295,7 @@ function App() {
         setExplosionAnimations([])
       }, 1500)
       
-      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells`)
+      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells, destroyed ${result.destroyedCells?.length || 0} cells`)
     }
   }
 
@@ -245,54 +315,6 @@ function App() {
     console.log('Replaying last simulation...')
     handleRunSimulation()
   }
-
-  // Blast placement functions
-  const handleBlockClick = (block, position) => {
-    if (!block) return;
-
-    if (isPlacementMode) {
-      // Placement mode: place blast markers
-      const result = gameState.addBlast(position.y, position.x);
-      
-      if (result.success) {
-        console.log('Blast placed at:', position);
-      } else {
-        console.log('Failed to place blast:', result.reason);
-      }
-    }
-  };
-
-  const togglePlacementMode = () => {
-    setIsPlacementMode(!isPlacementMode);
-  };
-
-  const clearAllBlasts = () => {
-    gameState.clearBlasts();
-  };
-
-  const executeAllBlasts = () => {
-    if (!oreGrid) return;
-    
-    const blasts = gameState.getBlasts();
-    if (blasts.length === 0) {
-      console.log('No blasts to execute');
-      return;
-    }
-
-    console.log(`Executing ${blasts.length} blasts...`);
-    
-    // Simple simulation of blast effects
-    const recovery = Math.max(60, 100 - (blasts.length * 5) + Math.random() * 20);
-    const newDilution = Math.max(0, (blasts.length * 3) + Math.random() * 10);
-    
-    setMineralRecovery(Math.round(recovery));
-    setDilution(Math.round(newDilution));
-
-    // Clear blasts after execution
-    setTimeout(() => {
-      gameState.clearBlasts();
-    }, 1000);
-  };
 
   // Home View (UPLOAD-CSV Interface)
   const renderHomeView = () => (
@@ -402,72 +424,36 @@ function App() {
               <div className="canvas-section">
                 <div className="canvas-container">
                   <OreGridCanvas 
-                    grid={oreGrid}
+                    ref={canvasRef}
+                    grid={oreGrid} 
                     onBlockClick={handleBlockClick}
-                    placedBlasts={placedBlasts}
-                    isPlacementMode={isPlacementMode}
-                    maxBlasts={gameState.getMaxBlasts()}
+                    placementMode={placementMode}
+                    blastMarkers={blasts}
+                    explosionAnimations={explosionAnimations}
+                    physicsDebris={physicsDebris}
                   />
-                  <div className="mt-2 space-y-2">
-                    <p className="canvas-instruction">
-                      {isPlacementMode 
-                        ? `Click cells to place explosives (${placedBlasts.length}/${gameState.getMaxBlasts()} placed)`
-                        : 'Click on any ore block to apply a blast effect'
-                      }
-                    </p>
-                    
-                    {/* Blast placement controls */}
-                    {isPlacementMode && (
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={clearAllBlasts}
-                          disabled={placedBlasts.length === 0}
-                          className="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Clear All ({placedBlasts.length})
-                        </button>
-                        <button
-                          onClick={executeAllBlasts}
-                          disabled={placedBlasts.length === 0}
-                          className="px-3 py-1 text-xs bg-orange-500/20 text-orange-400 rounded border border-orange-500/30 hover:bg-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Execute All
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <p className="canvas-instruction">
+                    {placementMode 
+                      ? "Click on grid cells to place explosives" 
+                      : "Enable placement mode to add explosives"}
+                  </p>
                 </div>
               </div>
               
-              {/* Controls Section - Side by Side Layout */}
+              {/* Controls Section - Three Column Layout */}
               <div className="controls-section">
                 <div className="controls-row">
-                  {/* Mode Toggle */}
-                  <div className="mode-toggle-section">
-                    <button 
-                      onClick={togglePlacementMode}
-                      className={`w-full h-12 flex items-center justify-center rounded-lg font-bold text-sm tracking-wide mb-4 ${
-                        isPlacementMode 
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                          : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                      }`}
-                    >
-                      {isPlacementMode ? '🎯 Placement Mode' : '💥 Execution Mode'}
-                    </button>
-                    
-                    <button 
-                      onClick={isPlacementMode ? executeAllBlasts : handleRunSimulation}
-                      disabled={isPlacementMode && placedBlasts.length === 0}
-                      className="w-full h-12 flex items-center justify-center rounded-lg bg-primary text-background-dark font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed mb-2"
-                    >
-                      {isPlacementMode ? `Execute ${placedBlasts.length} Blasts` : 'Run Simulation'}
-                    </button>
-                  </div>
-
+                  <BlastPlacementPanel
+                    onPlacementModeChange={handlePlacementModeChange}
+                    onTriggerBlasts={handleTriggerBlasts}
+                    placementMode={placementMode}
+                    canvasRef={canvasRef}
+                  />
+                  
                   <BlastToolPanel
                     onPowerChange={handlePowerChange}
                     onDirectionChange={handleDirectionChange}
-                    onRunSimulation={isPlacementMode ? executeAllBlasts : handleRunSimulation}
+                    onRunSimulation={handleRunSimulation}
                     onReset={handleReset}
                     onSave={handleSave}
                     onReplay={handleReplay}
