@@ -166,6 +166,31 @@ const OreGridCanvas = forwardRef(({
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
           }
           
+          // Add hover highlighting
+          if (hoveredBlock && hoveredBlock.x === x && hoveredBlock.y === y) {
+            // Check if cell is already occupied by a blast marker
+            const isOccupied = blastMarkers && blastMarkers.some(blast => blast.x === x && blast.y === y);
+            
+            if (!isOccupied && !block?.isDestroyed) {
+              // Highlight available cells
+              ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+              
+              // Add glowing border for hover effect
+              ctx.strokeStyle = '#00ff88';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
+            } else {
+              // Show red highlight for occupied/unavailable cells
+              ctx.fillStyle = 'rgba(255, 69, 0, 0.2)';
+              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+              
+              ctx.strokeStyle = '#ff4500';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
+            }
+          }
+          
           if (showGrid && scaledCellSize > 8) {
             ctx.strokeStyle = block ? '#666666' : '#444444';
             ctx.lineWidth = scaledCellSize > 20 ? 1 : 0.5;
@@ -263,7 +288,7 @@ const OreGridCanvas = forwardRef(({
       
       setIsCanvasReady(true);
     });
-  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris]);
+  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris, hoveredBlock]);
 
   useEffect(() => {
     renderGrid();
@@ -291,9 +316,11 @@ const OreGridCanvas = forwardRef(({
 
   const handleMouseMove = (event) => {
     const result = getBlockFromMouseEvent(event);
-    if (result && result.block) {
+    if (result) {
       setHoveredBlock({
         ...result.block,
+        x: result.gridX,
+        y: result.gridY,
         canvasX: result.mouseX,
         canvasY: result.mouseY
       });
@@ -309,7 +336,18 @@ const OreGridCanvas = forwardRef(({
   const handleClick = (event) => {
     const result = getBlockFromMouseEvent(event);
     if (result && onBlockClick) {
-      onBlockClick(result.block, { x: result.gridX, y: result.gridY });
+      const { gridX, gridY, block } = result;
+      
+      // Check if cell is already occupied by a blast marker
+      const isOccupied = blastMarkers && blastMarkers.some(blast => blast.x === gridX && blast.y === gridY);
+      
+      // Prevent clicking on occupied cells or destroyed blocks
+      if (isOccupied || (block && block.isDestroyed)) {
+        console.log(`Cannot place blast at (${gridX}, ${gridY}): ${isOccupied ? 'Cell already occupied' : 'Block is destroyed'}`);
+        return;
+      }
+      
+      onBlockClick(block, { x: gridX, y: gridY });
       setTimeout(renderGrid, 50);
     }
   };
@@ -321,7 +359,13 @@ const OreGridCanvas = forwardRef(({
     >
       <canvas
         ref={canvasRef}
-        className="ore-grid-canvas"
+        className={`ore-grid-canvas ${
+          hoveredBlock 
+            ? (blastMarkers && blastMarkers.some(blast => blast.x === hoveredBlock.x && blast.y === hoveredBlock.y) || hoveredBlock.isDestroyed) 
+              ? 'cursor-occupied' 
+              : 'cursor-available'
+            : 'cursor-default'
+        }`}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
@@ -330,8 +374,7 @@ const OreGridCanvas = forwardRef(({
           height: canvasDimensions.height,
           maxWidth: '100%',
           maxHeight: '100%',
-          display: canvasDimensions.width > 0 ? 'block' : 'none',
-          cursor: placementMode ? 'crosshair' : 'pointer'
+          display: canvasDimensions.width > 0 ? 'block' : 'none'
         }}
         aria-label="Interactive ore grid - click on blocks to apply blast effects"
         role="img"

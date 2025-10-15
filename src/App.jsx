@@ -7,6 +7,7 @@ import OreGridCanvas from './components/OreGridCanvas'
 import CSVErrorUI from './components/csvErrorUI'
 import BlastToolPanel from './components/BlastToolPanel'
 import BlastPlacementPanel from './components/BlastPlacementPanel'
+import BlastSummaryPanel from './components/BlastSummaryPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
@@ -48,6 +49,12 @@ function App() {
   const [placementMode, setPlacementMode] = useState(false)
   const [explosionAnimations, setExplosionAnimations] = useState([])
   const [physicsDebris, setPhysicsDebris] = useState([]) // Physics debris state
+  
+  // Blast summary panel state
+  const [showBlastSummary, setShowBlastSummary] = useState(false)
+  const [blastResults, setBlastResults] = useState(null)
+  const [previousScore, setPreviousScore] = useState(0)
+  
   const canvasRef = React.useRef(null)
 
   const handleFileUpload = (event) => {
@@ -187,6 +194,11 @@ function App() {
   }
 
   const handleBlockClick = (block, position) => {
+    // Close blast summary panel when new action begins
+    if (showBlastSummary) {
+      handleCloseBlastSummary();
+    }
+    
     if (placementMode) {
       // Place blast marker
       const success = addBlast(position.x, position.y)
@@ -198,6 +210,9 @@ function App() {
 
   const handleTriggerBlasts = async (result) => {
     if (result.blasts.length > 0) {
+      // Store previous score before blast
+      setPreviousScore(score);
+      
       // Create explosion animations
       const newAnimations = result.blasts.map(blast => ({
         x: blast.x,
@@ -208,6 +223,15 @@ function App() {
       }))
       
       setExplosionAnimations(newAnimations)
+      
+      // Calculate score increase based on materials destroyed
+      const materialsDestroyed = result.destroyedCells?.length || 0;
+      const scoreIncrease = materialsDestroyed * 10; // 10 points per material destroyed
+      addScore(scoreIncrease);
+      
+      // Show blast summary panel
+      setBlastResults(result);
+      setShowBlastSummary(true);
       
       // *** PHYSICS SIMULATION ***
       console.log('Physics check:', { 
@@ -298,6 +322,11 @@ function App() {
       console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells, destroyed ${result.destroyedCells?.length || 0} cells`)
     }
   }
+
+  const handleCloseBlastSummary = () => {
+    setShowBlastSummary(false);
+    setBlastResults(null);
+  };
 
   const handleSave = () => {
     const results = {
@@ -498,6 +527,16 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Blast Summary Panel */}
+      <BlastSummaryPanel 
+        blastResults={blastResults}
+        isVisible={showBlastSummary}
+        onClose={handleCloseBlastSummary}
+        playerScore={score}
+        previousScore={previousScore}
+        grid={oreGrid}
+      />
     </div>
   )
 }

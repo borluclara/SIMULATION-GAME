@@ -215,10 +215,21 @@ export class GameState {
       cellsDestroyed: destroyedCells.length
     });
 
+    // Add blast radius to each blast for the summary
+    const blastsWithRadius = blasts.map(blast => ({
+      ...blast,
+      radius: radius
+    }));
+
     // Clear blasts after detonation
     this.clearBlasts();
     
-    return { blasts, affectedCells, destroyedCells };
+    return { 
+      blasts: blastsWithRadius, 
+      affectedCells, 
+      destroyedCells,
+      blastRadius: radius
+    };
   }
 
   subscribe(listener) {

@@ -38,6 +38,19 @@
   box-shadow: 0 6px 25px rgba(0, 0, 0, 0.5);
 }
 
+/* Canvas cursor states for different hover conditions */
+.ore-grid-canvas.cursor-available {
+  cursor: pointer;
+}
+
+.ore-grid-canvas.cursor-occupied {
+  cursor: not-allowed;
+}
+
+.ore-grid-canvas.cursor-default {
+  cursor: crosshair;
+}
+
 /* Canvas Info Overlay */
 .canvas-info {
   position: absolute;
