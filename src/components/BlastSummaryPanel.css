@@ -2,17 +2,15 @@
 
 .blast-summary-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  top: 20px;
+  right: 20px;
+  width: auto;
+  height: auto;
+  background: none;
+  display: block;
   z-index: 1000;
-  backdrop-filter: blur(4px);
   transition: all 0.3s ease-in-out;
+  pointer-events: none;
 }
 
 .blast-summary-overlay.visible {
@@ -29,17 +27,18 @@
   background: linear-gradient(135deg, #1a3a1a 0%, #2a4a2a 100%);
   border: 2px solid rgba(0, 255, 136, 0.4);
   border-radius: 12px;
-  padding: 20px;
-  max-width: 500px;
-  min-width: 400px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  transform: scale(0.9);
-  transition: transform 0.3s ease-in-out;
+  padding: 16px;
+  max-width: 360px;
+  min-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  transform: translateX(100px);
+  transition: all 0.3s ease-in-out;
   color: white;
+  backdrop-filter: blur(8px);
 }
 
 .blast-summary-overlay.visible .blast-summary-panel {
-  transform: scale(1);
+  transform: translateX(0);
 }
 
 .summary-header {
@@ -76,24 +75,24 @@
 .summary-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
 .stat-item {
   text-align: center;
   background: rgba(0, 0, 0, 0.3);
-  padding: 12px;
-  border-radius: 8px;
+  padding: 8px;
+  border-radius: 6px;
   border: 1px solid rgba(0, 255, 136, 0.2);
 }
 
 .stat-value {
   display: block;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   font-weight: bold;
   color: #00ff88;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .stat-label {
@@ -168,25 +167,43 @@
 }
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+  .blast-summary-overlay {
+    top: 10px;
+    right: 10px;
+  }
+  
   .blast-summary-panel {
-    min-width: 320px;
-    max-width: 90%;
-    margin: 20px;
+    min-width: 280px;
+    max-width: 320px;
+    padding: 12px;
   }
 
   .summary-stats {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
   }
 
   .material-list {
     flex-direction: column;
     gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .blast-summary-overlay {
+    top: 5px;
+    right: 5px;
+  }
+  
+  .blast-summary-panel {
+    min-width: 260px;
+    max-width: calc(100vw - 20px);
+    padding: 10px;
   }
 }
 
