@@ -86,10 +86,12 @@
 /* Buttons */
 .blast-button {
   width: 100%;
+  max-width: 400px;
   height: 3.5rem;
+  padding: 1rem;
   border-radius: 0.5rem;
   border: none;
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;

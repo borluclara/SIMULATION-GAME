@@ -175,70 +175,74 @@ const BlastPlacementPanel = ({
         </div>
       </div>
 
-      {blasts.length > 0 && (
-        <div className="blast-indicators">
-          <div className="indicators-title">📍 Placed Explosives:</div>
-          <div className="blast-list">
-            {blasts.map((blast, index) => (
-              <div key={blast.id} className="blast-indicator">
-                <span className="blast-icon">💣</span>
-                <span className="blast-position">({blast.x}, {blast.y})</span>
-              </div>
-            ))}
+      <div className="panel-content">
+        {blasts.length > 0 && (
+          <div className="blast-indicators">
+            <div className="indicators-title">📍 Placed Explosives:</div>
+            <div className="blast-list">
+              {blasts.map((blast, index) => (
+                <div key={blast.id} className="blast-indicator">
+                  <span className="blast-icon">💣</span>
+                  <span className="blast-position">({blast.x}, {blast.y})</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="blast-controls">
-        <button
-          className={`control-button placement-toggle ${placementMode ? 'active' : ''}`}
-          onClick={handleTogglePlacementMode}
-          disabled={isExploding}
-        >
-          {placementMode ? '🎯 Exit Placement' : '🎯 Place Explosives'}
-        </button>
-
-        <button
-          className="control-button clear-button"
-          onClick={handleClearBlasts}
-          disabled={blasts.length === 0 || isExploding}
-        >
-          🗑️ Clear All
-        </button>
-
-        <button
-          className={`control-button trigger-button ${isExploding ? 'exploding' : ''}`}
-          onClick={handleTriggerBlasts}
-          disabled={blasts.length === 0 || isExploding}
-        >
-          {isExploding ? '💥 EXPLODING!' : '🧨 Trigger Blast'}
-        </button>
+        {physicsActive && (
+          <div className="physics-status">
+            <div className="physics-indicator">
+              <span className="physics-icon">⚛️</span>
+              <span>Physics simulation running...</span>
+            </div>
+            <div className="physics-timer">
+              Debris simulation: 5 seconds
+            </div>
+          </div>
+        )}
       </div>
 
-      {physicsActive && (
-        <div className="physics-status">
-          <div className="physics-indicator">
-            <span className="physics-icon">⚛️</span>
-            <span>Physics simulation running...</span>
-          </div>
-          <div className="physics-timer">
-            Debris simulation: 5 seconds
-          </div>
-        </div>
-      )}
+      <div className="panel-footer">
+        <div className="blast-controls">
+          <button
+            className={`control-button placement-toggle ${placementMode ? 'active' : ''}`}
+            onClick={handleTogglePlacementMode}
+            disabled={isExploding}
+          >
+            {placementMode ? '🎯 Exit Placement' : '🎯 Place Explosives'}
+          </button>
 
-      <div className="blast-instructions">
-        {placementMode ? (
-          <p>🎯 Click on grid cells to place explosives (max {maxBlasts})</p>
-        ) : (
-          <p>Enable placement mode to add explosives to the grid</p>
-        )}
-        {blasts.length > 0 && !placementMode && (
-          <p className="trigger-hint">💡 Click "Trigger Blast" to detonate with physics!</p>
-        )}
-        {physicsActive && (
-          <p className="physics-hint">⚛️ Watch the realistic debris simulation powered by Matter.js</p>
-        )}
+          <button
+            className="control-button clear-button"
+            onClick={handleClearBlasts}
+            disabled={blasts.length === 0 || isExploding}
+          >
+            🗑️ Clear All
+          </button>
+
+          <button
+            className={`control-button trigger-button ${isExploding ? 'exploding' : ''}`}
+            onClick={handleTriggerBlasts}
+            disabled={blasts.length === 0 || isExploding}
+          >
+            {isExploding ? '💥 EXPLODING!' : '🧨 Trigger Blast'}
+          </button>
+        </div>
+
+        <div className="blast-instructions">
+          {placementMode ? (
+            <p>🎯 Click on grid cells to place explosives (max {maxBlasts})</p>
+          ) : (
+            <p>Enable placement mode to add explosives to the grid</p>
+          )}
+          {blasts.length > 0 && !placementMode && (
+            <p className="trigger-hint">💡 Click "Trigger Blast" to detonate with physics!</p>
+          )}
+          {physicsActive && (
+            <p className="physics-hint">⚛️ Watch the realistic debris simulation powered by Matter.js</p>
+          )}
+        </div>
       </div>
     </div>
   );
