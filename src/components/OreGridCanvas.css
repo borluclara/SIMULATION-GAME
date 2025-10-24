@@ -8,34 +8,23 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #1a3a1a 0%, #2a4a2a 100%);
-  border-radius: 8px;
+  background: transparent;
   overflow: hidden;
-  border: 2px solid rgba(0, 255, 136, 0.2);
-  transition: border-color 0.3s ease;
-}
-
-.ore-grid-canvas-container:hover {
-  border-color: rgba(0, 255, 136, 0.4);
 }
 
 .ore-grid-canvas-container.loading {
-  background: linear-gradient(135deg, #1a3a1a 0%, #2a4a2a 100%);
-  border-color: rgba(0, 255, 136, 0.1);
+  background: transparent;
 }
 
 .ore-grid-canvas {
   display: block;
   cursor: crosshair;
-  border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .ore-grid-canvas:hover {
   cursor: pointer;
   transform: scale(1.01);
-  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.5);
 }
 
 /* Canvas cursor states for different hover conditions */
@@ -200,7 +189,6 @@
 @media (max-width: 768px) {
   .ore-grid-canvas-container {
     min-height: 250px;
-    border-width: 1px;
   }
   
   .canvas-info {
@@ -324,22 +312,15 @@
 .ore-grid-container {
   position: relative;
   display: inline-block;
-  background: #0f0f0f;
-  border: 2px solid #333;
-  border-radius: 8px;
-  padding: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  background: transparent;
 }
 
 .ore-grid-canvas {
   cursor: crosshair;
-  border: 1px solid #444;
-  border-radius: 4px;
   transition: all 0.2s ease;
 }
 
 .ore-grid-canvas:hover {
-  border-color: #ff6b35;
   box-shadow: 0 0 10px rgba(255, 107, 53, 0.3);
 }
 
@@ -349,9 +330,7 @@
   justify-content: center;
   min-height: 300px;
   min-width: 400px;
-  background: #1a1a1a;
-  border: 2px dashed #333;
-  border-radius: 8px;
+  background: transparent;
   color: #888;
   font-size: 1.1em;
 }
