@@ -51,6 +51,8 @@ export class OreBlock {
     this.value = value;
     this.damage = 0;
     this.isDestroyed = false;
+    this.recentlyDisplaced = false; // Track displacement for visual effects
+    this.displacementTimer = null;   // Timer for clearing displacement flag
   }
 
   /**
@@ -218,11 +220,12 @@ export class OreGrid {
   }
 
   /**
-   * Apply blast effect to an area
+   * Apply blast effect to an area with displacement
    */
   applyBlast(centerX, centerY, radius, power) {
     const affectedBlocks = [];
     const destroyedBlocks = [];
+    const displacedBlocks = [];
 
     for (let y = Math.max(0, centerY - radius); y <= Math.min(this.height - 1, centerY + radius); y++) {
       for (let x = Math.max(0, centerX - radius); x <= Math.min(this.width - 1, centerX + radius); x++) {
@@ -240,15 +243,169 @@ export class OreGrid {
           if (wasDestroyed) {
             destroyedBlocks.push(block);
           }
+
+          // Calculate displacement if block survives
+          if (!wasDestroyed && distance > 0) {
+            const displacement = this.calculateDisplacement(
+              block, centerX, centerY, distance, power, radius
+            );
+            if (displacement) {
+              displacedBlocks.push(displacement);
+            }
+          }
         }
       }
+    }
+
+    // Apply displacements
+    if (displacedBlocks.length > 0) {
+      this.applyDisplacements(displacedBlocks);
     }
 
     return {
       affectedBlocks,
       destroyedBlocks,
+      displacedBlocks,
       totalDamage: affectedBlocks.reduce((sum, block) => sum + block.damage, 0)
     };
+  }
+
+  /**
+   * Calculate displacement for a block
+   */
+  calculateDisplacement(block, centerX, centerY, distance, power, maxRadius) {
+    // Direction vector from blast center to block
+    const dirX = (block.x - centerX) / distance;
+    const dirY = (block.y - centerY) / distance;
+
+    // Force calculation: inverse square with minimum threshold
+    const forceFactor = Math.max(0.1, 1 - (distance / maxRadius));
+    const blastForce = (power / 100) * forceFactor;
+
+    // Material resistance (heavier materials move less)
+    const materialResistance = this.getMaterialResistance(block.oreType);
+    const effectiveForce = blastForce * materialResistance;
+
+    // Calculate displacement magnitude (max 3 grid units)
+    const displacementMagnitude = Math.min(3, effectiveForce);
+
+    // Calculate new position
+    const newX = block.x + (dirX * displacementMagnitude);
+    const newY = block.y + (dirY * displacementMagnitude);
+
+    // Clamp to grid boundaries
+    const clampedX = Math.max(0, Math.min(this.width - 1, Math.round(newX)));
+    const clampedY = Math.max(0, Math.min(this.height - 1, Math.round(newY)));
+
+    // Only displace if there's actual movement
+    if (clampedX !== block.x || clampedY !== block.y) {
+      return {
+        block,
+        originalX: block.x,
+        originalY: block.y,
+        newX: clampedX,
+        newY: clampedY,
+        force: effectiveForce
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get material resistance to displacement
+   */
+  getMaterialResistance(oreType) {
+    const resistanceMap = {
+      'diamond': 0.3,  // Very resistant
+      'gold': 0.5,     // Resistant
+      'iron': 0.6,     // Somewhat resistant
+      'silver': 0.7,   // Somewhat resistant
+      'copper': 0.8,   // Less resistant
+      'stone': 0.9,    // Not very resistant
+      'coal': 1.0      // Least resistant
+    };
+    return resistanceMap[oreType.toLowerCase()] || 0.8;
+  }
+
+  /**
+   * Apply calculated displacements to the grid
+   */
+  applyDisplacements(displacements) {
+    // First, remove blocks from their original positions
+    displacements.forEach(displacement => {
+      const { block, originalX, originalY } = displacement;
+      this.setBlock(originalX, originalY, null);
+    });
+
+    // Then, place blocks at their new positions
+    displacements.forEach(displacement => {
+      const { block, newX, newY } = displacement;
+      
+      // Check if target position is empty
+      const existingBlock = this.getBlockAtGridPos(newX, newY);
+      if (!existingBlock) {
+        // Update block coordinates
+        block.x = newX;
+        block.y = newY;
+        this.setBlock(newX, newY, block);
+        
+        // Mark as recently displaced for visual effects
+        this.markAsDisplaced(block);
+      } else {
+        // If target is occupied, find nearest empty spot
+        const nearestEmpty = this.findNearestEmptyPosition(newX, newY);
+        if (nearestEmpty) {
+          block.x = nearestEmpty.x;
+          block.y = nearestEmpty.y;
+          this.setBlock(nearestEmpty.x, nearestEmpty.y, block);
+          this.markAsDisplaced(block);
+        } else {
+          // If no empty spot found, place back at original position
+          block.x = displacement.originalX;
+          block.y = displacement.originalY;
+          this.setBlock(displacement.originalX, displacement.originalY, block);
+        }
+      }
+    });
+  }
+
+  /**
+   * Mark a block as recently displaced for visual effects
+   */
+  markAsDisplaced(block) {
+    block.recentlyDisplaced = true;
+    
+    // Clear the flag after 2 seconds
+    if (block.displacementTimer) {
+      clearTimeout(block.displacementTimer);
+    }
+    
+    block.displacementTimer = setTimeout(() => {
+      block.recentlyDisplaced = false;
+      block.displacementTimer = null;
+    }, 2000);
+  }
+
+  /**
+   * Find nearest empty position to given coordinates
+   */
+  findNearestEmptyPosition(targetX, targetY, maxSearchRadius = 3) {
+    for (let radius = 1; radius <= maxSearchRadius; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const x = targetX + dx;
+          const y = targetY + dy;
+          
+          if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+            if (!this.getBlockAtGridPos(x, y)) {
+              return { x, y };
+            }
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**

@@ -145,6 +145,19 @@ const OreGridCanvas = forwardRef(({
               ctx.fillStyle = `rgba(255, 100, 100, ${damageIntensity})`;
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
+
+            // Highlight recently displaced blocks
+            if (block.recentlyDisplaced) {
+              ctx.strokeStyle = '#ffff00';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([4, 4]);
+              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
+              ctx.setLineDash([]); // Reset line dash
+              
+              // Add subtle glow effect
+              ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
+              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+            }
             
             if (showLabels && scaledCellSize > 16) {
               const fontSize = Math.max(8, scaledCellSize / 3.5);
