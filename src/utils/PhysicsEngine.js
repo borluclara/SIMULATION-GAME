@@ -61,13 +61,24 @@ export class PhysicsEngine {
     }
   }
 
-  // Create debris particles from blast affected cells
-  createDebris(affectedCells, cellSize, blastCenter) {
+  // Create debris particles from blast affected cells with directional support
+  createDebris(affectedCells, cellSize, blastCenter, blastDirection = null) {
+    console.log('PhysicsEngine: Creating debris for', affectedCells.length, 'cells');
+    console.log('Blast center:', blastCenter, 'Direction:', blastDirection);
+    console.log('Engine initialized:', !!this.engine, 'World exists:', !!this.world);
+    
+    if (!this.world) {
+      console.error('Physics world not initialized!');
+      return [];
+    }
+    
     const debris = [];
 
-    affectedCells.forEach(cell => {
+    affectedCells.forEach((cell, index) => {
       const cellCenterX = cell.x * cellSize + cellSize / 2;
       const cellCenterY = cell.y * cellSize + cellSize / 2;
+      
+      console.log(`Processing cell ${index}: (${cell.x}, ${cell.y}) -> (${cellCenterX}, ${cellCenterY})`);
       
       // Calculate distance from blast center
       const distance = Math.sqrt(
@@ -77,6 +88,7 @@ export class PhysicsEngine {
 
       // Create multiple small particles per cell
       const particleCount = this.getParticleCount(cell.originalMaterial);
+      console.log(`Creating ${particleCount} particles for material ${cell.originalMaterial}`);
       
       for (let i = 0; i < particleCount; i++) {
         const particle = this.createDebrisParticle(
@@ -85,22 +97,25 @@ export class PhysicsEngine {
           cell.originalMaterial,
           distance,
           blastCenter,
-          cellSize
+          cellSize,
+          blastDirection
         );
         
         if (particle) {
           debris.push(particle);
           Matter.World.add(this.world, particle.body);
+          console.log(`Added particle at (${particle.body.position.x}, ${particle.body.position.y})`);
         }
       }
     });
 
+    console.log(`Created ${debris.length} total debris particles`);
     this.debrisBodies.push(...debris);
     return debris;
   }
 
-  // Create individual debris particle with render info
-  createDebrisParticle(x, y, material, distance, blastCenter, cellSize) {
+  // Create individual debris particle with render info and directional support
+  createDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection = null) {
     // Particle size
     const size = this.getParticleSize(material);
     
@@ -108,8 +123,8 @@ export class PhysicsEngine {
     const offsetX = (Math.random() - 0.5) * cellSize * 0.6;
     const offsetY = (Math.random() - 0.5) * cellSize * 0.6;
     
-    // Calculate blast force
-    const blastForce = this.calculateBlastForce(x, y, blastCenter, distance);
+    // Calculate blast force with directional support
+    const blastForce = this.calculateBlastForce(x, y, blastCenter, distance, blastDirection);
     
     // Create Matter.js body
     const body = Matter.Bodies.circle(
@@ -124,8 +139,11 @@ export class PhysicsEngine {
       }
     );
 
+    console.log(`Created particle body at (${body.position.x}, ${body.position.y}) with size ${size}`);
+
     // Apply blast force
     Matter.Body.applyForce(body, body.position, blastForce);
+    console.log(`Applied force:`, blastForce);
     
     // Add rotation
     Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
@@ -140,8 +158,8 @@ export class PhysicsEngine {
     };
   }
 
-  // Calculate blast force
-  calculateBlastForce(x, y, blastCenter, distance) {
+  // Calculate blast force with directional bias
+  calculateBlastForce(x, y, blastCenter, distance, blastDirection = null) {
     const maxDistance = 120;
     const maxForce = 0.025; // Much stronger force for bigger debris pieces
     
@@ -149,8 +167,42 @@ export class PhysicsEngine {
     const dirY = y - blastCenter.y;
     const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
     
-    const normalizedX = dirX / magnitude;
-    const normalizedY = dirY / magnitude;
+    let normalizedX = dirX / magnitude;
+    let normalizedY = dirY / magnitude;
+    
+    // Apply directional bias if specified
+    if (blastDirection !== null) {
+      const directionRadians = (blastDirection * Math.PI) / 180;
+      
+      // Direct calculation for cardinal directions to ensure accuracy
+      let preferredDirX, preferredDirY;
+      
+      if (blastDirection === 0) {        // North
+        preferredDirX = 0;
+        preferredDirY = -1;
+      } else if (blastDirection === 90) { // East
+        preferredDirX = 1;
+        preferredDirY = 0;
+      } else if (blastDirection === 180) { // South
+        preferredDirX = 0;
+        preferredDirY = 1;
+      } else if (blastDirection === 270) { // West
+        preferredDirX = -1;
+        preferredDirY = 0;
+      } else {
+        // For other angles, use trigonometry
+        preferredDirX = Math.sin(directionRadians);
+        preferredDirY = -Math.cos(directionRadians);
+      }
+      
+      console.log(`Direction ${blastDirection}°: preferred force (${preferredDirX.toFixed(3)}, ${preferredDirY.toFixed(3)})`);
+      
+      // Use 100% directional movement - completely override natural explosion pattern
+      normalizedX = preferredDirX;
+      normalizedY = preferredDirY;
+      
+      console.log(`Final force direction: (${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)})`);
+    }
     
     const forceMagnitude = Math.max(0, maxForce * (1 - distance / maxDistance));
     

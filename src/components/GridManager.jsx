@@ -51,10 +51,11 @@ const GridManager = () => {
   const handleBlockClick = (block, position) => {
     if (!block || block.isDestroyed) return;
 
-    const blastResult = applyBlast(block.x, block.y, blastRadius, blastPower);
+    const blastResult = applyBlast(block.x, block.y, blastRadius, blastPower, blastDirection);
     
     console.log('Blast applied!', {
       target: `${block.oreType} at (${block.x}, ${block.y})`,
+      direction: `${blastDirection}°`,
       result: blastResult
     });
   };
@@ -72,7 +73,7 @@ const GridManager = () => {
     const randomX = Math.floor(Math.random() * grid.width);
     const randomY = Math.floor(Math.random() * grid.height);
     
-    applyBlast(randomX, randomY, blastRadius, blastPower);
+    applyBlast(randomX, randomY, blastRadius, blastPower, blastDirection);
   };
 
   return (
@@ -124,6 +125,8 @@ const GridManager = () => {
                 showGrid={showGrid}
                 showLabels={showLabels}
                 forceRefresh={canvasRefreshKey}
+                blastDirection={blastDirection}
+                showBlastDirection={true}
                 className="w-full h-full"
               />
             </div>

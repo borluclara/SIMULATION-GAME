@@ -8,7 +8,8 @@ const BlastPlacementPanel = ({
   onTriggerBlasts = () => {},
   onPhysicsUpdate = () => {}, // NEW: callback to update physics debris
   placementMode = false,
-  canvasRef = null
+  canvasRef = null,
+  blastDirection = 90 // NEW: blast direction support
 }) => {
   const {
     blasts,
@@ -104,8 +105,8 @@ const BlastPlacementPanel = ({
 
         console.log(`Creating debris for blast at (${blast.x}, ${blast.y}):`, blastCells.length, 'cells');
 
-        // Create debris particles
-        physicsEngine.createDebris(blastCells, 30, blastCenter);
+        // Create debris particles with directional support
+        physicsEngine.createDebris(blastCells, 30, blastCenter, blastDirection);
       });
 
       // Start physics engine
