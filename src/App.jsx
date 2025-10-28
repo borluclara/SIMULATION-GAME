@@ -12,6 +12,7 @@ import ScoreFeedback from './components/ScoreFeedback'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
+import { blastAnimationEngine } from './utils/BlastAnimationEngine'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -50,6 +51,8 @@ function App() {
   const [placementMode, setPlacementMode] = useState(false)
   const [explosionAnimations, setExplosionAnimations] = useState([])
   const [physicsDebris, setPhysicsDebris] = useState([]) // Physics debris state
+  const [animationState, setAnimationState] = useState(null) // GSAP animation state
+  const [cameraShake, setCameraShake] = useState({ x: 0, y: 0 }) // Camera shake effect
   
   // Blast summary panel state
   const [showBlastSummary, setShowBlastSummary] = useState(false)
@@ -77,6 +80,14 @@ function App() {
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [currentView, originalCsvData, isLoadingGrid]);
+
+  // Cleanup animations on unmount
+  useEffect(() => {
+    return () => {
+      blastAnimationEngine.destroy();
+      physicsEngine.destroy();
+    };
+  }, []);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
@@ -209,6 +220,12 @@ function App() {
       setPlacementMode(false);
       setExplosionAnimations([]);
       setPhysicsDebris([]);
+      setAnimationState(null);
+      setCameraShake({ x: 0, y: 0 });
+      
+      // Stop any running animations
+      blastAnimationEngine.stopAll();
+      physicsEngine.destroy();
       
       // Update scenario with reset grid
       setCurrentScenario({
@@ -293,16 +310,7 @@ function App() {
       // Store previous score before blast
       setPreviousScore(score);
       
-      // Create explosion animations
-      const newAnimations = result.blasts.map(blast => ({
-        x: blast.x,
-        y: blast.y,
-        id: blast.id,
-        frame: 0,
-        maxFrames: 30
-      }))
-      
-      setExplosionAnimations(newAnimations)
+      console.log('🎆 Starting blast animation and physics');
       
       // Calculate score increase based on materials destroyed
       const materialsDestroyed = result.destroyedCells?.length || 0;
@@ -312,20 +320,55 @@ function App() {
       // Show blast summary panel
       setBlastResults(result);
       setShowBlastSummary(true);
+
+      // *** START GSAP ANIMATION SEQUENCE ***
+      const cellSize = 30; // Cell size in pixels
       
-      // *** PHYSICS SIMULATION ***
-      console.log('Physics check:', { 
-        destroyedCells: result.destroyedCells?.length || 0,
-        hasCanvas: !!canvasRef.current 
-      });
+      // Start blast animation engine
+      blastAnimationEngine.animateBlastSequence(
+        result.blasts,
+        result.affectedCells || [],
+        cellSize,
+        {
+          shockwaveDuration: 1.0,
+          blockTransitionDuration: 1.0,
+          epicenterShake: true,
+          staggerDelay: 0.03,
+          onUpdate: (animState) => {
+            // Update animation state for canvas rendering
+            setAnimationState(animState);
+            
+            // Apply screen shake effect
+            if (animState.animations) {
+              const shakeAnim = animState.animations.find(a => a.type === 'shake');
+              if (shakeAnim) {
+                const shakeX = (Math.random() - 0.5) * shakeAnim.intensity;
+                const shakeY = (Math.random() - 0.5) * shakeAnim.intensity;
+                setCameraShake({ x: shakeX, y: shakeY });
+              } else {
+                setCameraShake({ x: 0, y: 0 });
+              }
+            }
+          },
+          onComplete: () => {
+            console.log('✨ Animation complete');
+            setCameraShake({ x: 0, y: 0 });
+            
+            // Clear animation state after a delay
+            setTimeout(() => {
+              setAnimationState(null);
+            }, 500);
+          }
+        }
+      );
       
+      // *** PHYSICS SIMULATION (runs in parallel with GSAP animations) ***
       if (result.destroyedCells && result.destroyedCells.length > 0 && canvasRef.current) {
         try {
-          console.log('Starting physics simulation with', result.destroyedCells.length, 'destroyed cells');
+          console.log('💥 Starting physics simulation with', result.destroyedCells.length, 'destroyed cells');
           
           // Initialize physics engine with canvas dimensions
           const canvas = canvasRef.current;
-          console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
           
           physicsEngine.initialize({
             width: canvas.width || 800,
@@ -335,11 +378,9 @@ function App() {
 
           // Start physics simulation
           physicsEngine.start();
-          console.log('Physics engine started');
 
           // Create debris for destroyed cells
           const blastCenter = result.blasts[0]; // Use first blast as center
-          const cellSize = 30; // Assuming 30px cell size
           
           // Convert destroyed cells to the format expected by createDebris
           const debrisData = result.destroyedCells.map(cell => ({
@@ -348,8 +389,6 @@ function App() {
             originalMaterial: cell.material || 'stone'
           }));
           
-          console.log('Creating debris for cells:', debrisData);
-          
           // Create debris using the physics engine
           const debris = physicsEngine.createDebris(
             debrisData,
@@ -357,7 +396,7 @@ function App() {
             { x: blastCenter.x * cellSize, y: blastCenter.y * cellSize }
           );
           
-          console.log('Created', debris.length, 'debris particles');
+          console.log('🌪️ Created', debris.length, 'physics debris particles');
 
           // Update debris state continuously
           const updatePhysics = () => {
@@ -365,12 +404,11 @@ function App() {
               physicsEngine.update();
               const debris = physicsEngine.getDebris();
               setPhysicsDebris([...debris]);
-              console.log('Physics update:', debris.length, 'debris particles');
               
               requestAnimationFrame(updatePhysics);
             } else {
               // Simulation ended
-              console.log('Physics simulation ended');
+              console.log('🏁 Physics simulation ended');
               setTimeout(() => {
                 physicsEngine.destroy();
                 setPhysicsDebris([]);
@@ -381,25 +419,9 @@ function App() {
           requestAnimationFrame(updatePhysics);
           
         } catch (error) {
-          console.error('Physics simulation error:', error);
+          console.error('❌ Physics simulation error:', error);
         }
       }
-      
-      // Update mineral recovery based on blast effects
-      const recoveryImpact = result.affectedCells.length * 2
-      const newRecovery = Math.max(20, mineralRecovery - recoveryImpact)
-      setMineralRecovery(Math.round(newRecovery))
-      
-      // Update dilution
-      const dilutionIncrease = result.affectedCells.length * 1.5
-      setDilution(Math.min(80, dilution + dilutionIncrease))
-      
-      // Clear animations after delay
-      setTimeout(() => {
-        setExplosionAnimations([])
-      }, 1500)
-      
-      console.log(`Detonated ${result.blasts.length} blasts affecting ${result.affectedCells.length} cells, destroyed ${result.destroyedCells?.length || 0} cells`)
     }
   }
 
@@ -551,6 +573,8 @@ function App() {
                     blastMarkers={blasts}
                     explosionAnimations={explosionAnimations}
                     physicsDebris={physicsDebris}
+                    animationState={animationState}
+                    cameraShake={cameraShake}
                   />
                   <p className="canvas-instruction">
                     {placementMode 
