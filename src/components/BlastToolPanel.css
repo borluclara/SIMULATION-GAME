@@ -33,6 +33,10 @@
   margin-bottom: 0.8rem;
 }
 
+.direction-container {
+  margin-bottom: 0.8rem;
+}
+
 .slider-label {
   display: flex;
   justify-content: space-between;
@@ -204,10 +208,96 @@
   
   .run-simulation {
     padding: 0.5rem 0.6rem;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     min-height: 28px;
     max-height: 28px;
   }
+}
+
+/* Direction Compass Styles */
+.direction-compass {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0.8rem auto;
+  border: 2px solid #00FF00;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34, 139, 34, 0.2), rgba(0, 0, 0, 0.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compass-center {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px solid #00FF00;
+  border-radius: 50%;
+}
+
+.direction-arrow {
+  position: absolute;
+  font-size: 24px;
+  color: #FF4444;
+  font-weight: bold;
+  text-shadow: 0 0 4px rgba(255, 68, 68, 0.8);
+  transition: transform 0.3s ease;
+  z-index: 2;
+}
+
+.blast-icon {
+  font-size: 16px;
+  opacity: 0.7;
+  z-index: 1;
+}
+
+.direction-btn {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #00FF00;
+  background: rgba(34, 139, 34, 0.3);
+  color: #00FF00;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.direction-btn:hover {
+  background: rgba(0, 255, 0, 0.4);
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+  transform: scale(1.1);
+}
+
+.direction-btn:active {
+  transform: scale(0.95);
+  background: rgba(0, 255, 0, 0.6);
+}
+
+/* Position direction buttons around the compass */
+.direction-btn.north { top: -16px; left: 50%; transform: translateX(-50%); }
+.direction-btn.northeast { top: 8px; right: 8px; }
+.direction-btn.east { right: -16px; top: 50%; transform: translateY(-50%); }
+.direction-btn.southeast { bottom: 8px; right: 8px; }
+.direction-btn.south { bottom: -16px; left: 50%; transform: translateX(-50%); }
+.direction-btn.southwest { bottom: 8px; left: 8px; }
+.direction-btn.west { left: -16px; top: 50%; transform: translateY(-50%); }
+.direction-btn.northwest { top: 8px; left: 8px; }
+
+.direction-slider {
+  margin-top: 0.5rem;
+  background: linear-gradient(to right, #FF4444, #FFAA44, #44FF44, #44AAFF, #FF4444);
 }
 
 @media (max-width: 480px) {

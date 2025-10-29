@@ -57,14 +57,14 @@ export const useOreGrid = (initialDataPath = null) => {
     }
   }, [loadGridFromContent]);
 
-  // Apply blast to grid
-  const applyBlast = useCallback((x, y, radius = 2, power = 50) => {
+  // Apply blast to grid with directional support
+  const applyBlast = useCallback((x, y, radius = 2, power = 50, direction = null) => {
     if (!grid || !isReady) {
       console.warn('Grid not ready for blast');
       return null;
     }
 
-    const result = grid.applyBlast(x, y, radius, power);
+    const result = grid.applyBlast(x, y, radius, power, direction);
     
     // Trigger re-render by creating new grid reference
     setGrid(new OreGrid(grid.width, grid.height));
@@ -74,6 +74,7 @@ export const useOreGrid = (initialDataPath = null) => {
       center: [x, y],
       radius,
       power,
+      direction: direction !== null ? `${direction}°` : 'omni-directional',
       affected: result.affectedBlocks.length,
       destroyed: result.destroyedBlocks.length,
       totalDamage: result.totalDamage

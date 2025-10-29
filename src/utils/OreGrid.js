@@ -220,9 +220,9 @@ export class OreGrid {
   }
 
   /**
-   * Apply blast effect to an area with displacement
+   * Apply blast effect to an area with optional direction
    */
-  applyBlast(centerX, centerY, radius, power) {
+  applyBlast(centerX, centerY, radius, power, direction = null) {
     const affectedBlocks = [];
     const destroyedBlocks = [];
     const displacedBlocks = [];
@@ -234,7 +234,22 @@ export class OreGrid {
 
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         if (distance <= radius) {
-          const damageFactor = 1 - (distance / radius);
+          let damageFactor = 1 - (distance / radius);
+          
+          // Apply directional bias to damage if direction is specified
+          if (direction !== null) {
+            const directionRadians = (direction * Math.PI) / 180;
+            const blockAngle = Math.atan2(y - centerY, x - centerX);
+            const angleFromDirection = Math.abs(blockAngle - (directionRadians - Math.PI/2));
+            const normalizedAngle = Math.min(angleFromDirection, 2 * Math.PI - angleFromDirection);
+            
+            // Boost damage in the direction of the blast (within 90-degree cone)
+            if (normalizedAngle <= Math.PI / 2) {
+              const directionBoost = 1 + (0.5 * (1 - normalizedAngle / (Math.PI / 2)));
+              damageFactor *= directionBoost;
+            }
+          }
+          
           const damage = power * damageFactor;
           
           const wasDestroyed = block.takeDamage(damage);
@@ -266,7 +281,8 @@ export class OreGrid {
       affectedBlocks,
       destroyedBlocks,
       displacedBlocks,
-      totalDamage: affectedBlocks.reduce((sum, block) => sum + block.damage, 0)
+      totalDamage: affectedBlocks.reduce((sum, block) => sum + block.damage, 0),
+      direction: direction // Include direction in result for physics engine
     };
   }
 

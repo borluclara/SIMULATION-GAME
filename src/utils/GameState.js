@@ -67,9 +67,14 @@ export class GameState {
     this.reset(false);
   }
 
-  addBlast(x, y) {
+  addBlast(x, y, direction = 90) {
     if (this.state.blasts.length < this.state.maxBlasts) {
-      this.state.blasts.push({ x, y, id: Date.now() });
+      this.state.blasts.push({ 
+        x, 
+        y, 
+        direction, 
+        id: Date.now() 
+      });
       this.notifyListeners();
       return true;
     }
@@ -103,7 +108,7 @@ export class GameState {
     return this.state.grid;
   }
 
-  // FIXED: Execute blast detonation with proper grid handling
+  // Execute blast detonation with directional support
   triggerBlasts() {
     const blasts = [...this.state.blasts];
     const grid = this.state.grid;
@@ -113,106 +118,51 @@ export class GameState {
       return { blasts: [], affectedCells: [] };
     }
 
-    const affectedCells = [];
-    const destroyedCells = []; // Track destroyed cells for physics
+    let allAffectedCells = [];
+    let allDestroyedCells = [];
     const radius = this.state.blastRadius;
+    const power = 100; // Standard blast power
 
-    console.log('Processing blasts:', {
+    console.log('Processing directional blasts:', {
       blastCount: blasts.length,
       radius: radius,
-      gridType: typeof grid,
-      hasGetBlock: typeof grid.getBlockAtGridPos === 'function'
+      hasDirections: blasts.some(b => b.direction !== undefined)
     });
 
-    // Calculate affected cells for each blast
+    // Process each blast with its individual direction
     blasts.forEach(blast => {
-      // IMPORTANT: Include the blast epicenter itself (where explosive was placed)
-      // First, add the epicenter cell
-      const epicenterBlock = grid.getBlockAtGridPos(blast.x, blast.y);
-      if (epicenterBlock) {
-        const epicenterMaterial = epicenterBlock.oreType || epicenterBlock.material || 'unknown';
-        affectedCells.push({
-          x: blast.x,
-          y: blast.y,
-          distance: 0, // Distance 0 = epicenter
-          blastId: blast.id,
-          originalMaterial: epicenterMaterial
-        });
-        // Destroy epicenter completely
-        epicenterBlock.isDestroyed = true;
-        epicenterBlock.damage = epicenterBlock.maxHealth;
-        
-        // Add to destroyed cells for physics
-        destroyedCells.push({
-          x: blast.x,
-          y: blast.y,
-          material: epicenterMaterial
-        });
-      }
+      console.log(`Processing blast at (${blast.x}, ${blast.y}) with direction ${blast.direction}°`);
+      
+      // Use OreGrid's applyBlast method with direction support
+      const blastResult = grid.applyBlast(blast.x, blast.y, radius, power, blast.direction);
+      
+      // Convert affected blocks to the format expected by physics engine
+      const affectedCells = blastResult.affectedBlocks.map(block => ({
+        x: block.x,
+        y: block.y,
+        distance: Math.sqrt((block.x - blast.x) ** 2 + (block.y - blast.y) ** 2),
+        blastId: blast.id,
+        blastDirection: blast.direction, // Include direction for physics
+        originalMaterial: block.oreType || block.material || 'unknown'
+      }));
 
-      // Then process surrounding cells in radius
-      for (let dx = -radius; dx <= radius; dx++) {
-        for (let dy = -radius; dy <= radius; dy++) {
-          // Skip the epicenter since we already added it
-          if (dx === 0 && dy === 0) continue;
-          
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance <= radius) {
-            const x = blast.x + dx;
-            const y = blast.y + dy;
-            
-            // Check if coordinates are within grid bounds
-            if (x >= 0 && x < grid.width && y >= 0 && y < grid.height) {
-              // Get block using OreGrid's method
-              const block = grid.getBlockAtGridPos(x, y);
-              
-              if (block && !block.isDestroyed) {
-                // Determine material/ore type
-                const material = block.oreType || block.material || 'unknown';
-                
-                affectedCells.push({ 
-                  x, 
-                  y, 
-                  distance, 
-                  blastId: blast.id,
-                  originalMaterial: material
-                });
+      // Convert destroyed blocks
+      const destroyedCells = blastResult.destroyedBlocks.map(block => ({
+        x: block.x,
+        y: block.y,
+        material: block.oreType || block.material || 'unknown',
+        blastDirection: blast.direction // Include direction for physics
+      }));
 
-                // Destroy blocks based on distance from epicenter
-                if (distance <= radius * 0.6) {
-                  block.isDestroyed = true;
-                  block.damage = block.maxHealth;
-                  
-                  // Add to destroyed cells for physics
-                  destroyedCells.push({
-                    x: x,
-                    y: y,
-                    material: material
-                  });
-                } else if (distance <= radius * 0.9) {
-                  block.damage = Math.min(block.maxHealth, block.damage + block.maxHealth * 0.7);
-                  if (block.damage >= block.maxHealth) {
-                    block.isDestroyed = true;
-                    
-                    // Add to destroyed cells for physics
-                    destroyedCells.push({
-                      x: x,
-                      y: y,
-                      material: material
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+      allAffectedCells.push(...affectedCells);
+      allDestroyedCells.push(...destroyedCells);
     });
 
-    console.log('Blast results:', {
+    console.log('Directional blast results:', {
       blastsProcessed: blasts.length,
-      cellsAffected: affectedCells.length,
-      cellsDestroyed: destroyedCells.length
+      cellsAffected: allAffectedCells.length,
+      cellsDestroyed: allDestroyedCells.length,
+      directionsUsed: blasts.map(b => b.direction)
     });
 
     // Add blast radius to each blast for the summary
@@ -226,8 +176,8 @@ export class GameState {
     
     return { 
       blasts: blastsWithRadius, 
-      affectedCells, 
-      destroyedCells,
+      affectedCells: allAffectedCells, 
+      destroyedCells: allDestroyedCells,
       blastRadius: radius
     };
   }

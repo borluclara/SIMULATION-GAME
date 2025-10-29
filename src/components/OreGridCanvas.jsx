@@ -11,7 +11,9 @@ const OreGridCanvas = forwardRef(({
   placementMode = false,
   blastMarkers = [],
   explosionAnimations = [],
-  physicsDebris = []  // NEW: debris particles from physics
+  physicsDebris = [],  // NEW: debris particles from physics
+  blastDirection = 90,  // NEW: blast direction for visual indicators
+  showBlastDirection = true  // NEW: toggle for blast direction indicators
 }, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -145,19 +147,6 @@ const OreGridCanvas = forwardRef(({
               ctx.fillStyle = `rgba(255, 100, 100, ${damageIntensity})`;
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
-
-            // Highlight recently displaced blocks
-            if (block.recentlyDisplaced) {
-              ctx.strokeStyle = '#ffff00';
-              ctx.lineWidth = 2;
-              ctx.setLineDash([4, 4]);
-              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
-              ctx.setLineDash([]); // Reset line dash
-              
-              // Add subtle glow effect
-              ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            }
             
             if (showLabels && scaledCellSize > 16) {
               const fontSize = Math.max(8, scaledCellSize / 3.5);
@@ -193,15 +182,8 @@ const OreGridCanvas = forwardRef(({
               ctx.strokeStyle = '#00ff88';
               ctx.lineWidth = 2;
               ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
-            } else {
-              // Show red highlight for occupied/unavailable cells
-              ctx.fillStyle = 'rgba(255, 69, 0, 0.2)';
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-              
-              ctx.strokeStyle = '#ff4500';
-              ctx.lineWidth = 2;
-              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
             }
+            // Removed red highlight for occupied/unavailable cells
           }
           
           if (showGrid && scaledCellSize > 8) {
@@ -218,28 +200,66 @@ const OreGridCanvas = forwardRef(({
           const blastX = Math.floor(blast.x * scaledCellSize);
           const blastY = Math.floor(blast.y * scaledCellSize);
           const markerSize = scaledCellSize * 0.8;
+          const centerX = blastX + scaledCellSize / 2;
+          const centerY = blastY + scaledCellSize / 2;
           
+          // Draw main blast marker circle
           ctx.fillStyle = 'rgba(255, 69, 0, 0.8)';
           ctx.beginPath();
-          ctx.arc(
-            blastX + scaledCellSize / 2, 
-            blastY + scaledCellSize / 2, 
-            markerSize / 2, 
-            0, 
-            2 * Math.PI
-          );
+          ctx.arc(centerX, centerY, markerSize / 2, 0, 2 * Math.PI);
           ctx.fill();
           
           ctx.strokeStyle = '#ff0000';
           ctx.lineWidth = 2;
           ctx.stroke();
           
+          // Draw directional arrow if blast has direction
+          if (blast.direction !== undefined && scaledCellSize > 20) {
+            const directionRadians = (blast.direction * Math.PI) / 180;
+            const arrowLength = scaledCellSize * 0.4;
+            
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 2;
+            
+            // Calculate arrow end point (0° = North, 90° = East, 180° = South, 270° = West)
+            const endX = centerX + Math.sin(directionRadians) * arrowLength;
+            const endY = centerY - Math.cos(directionRadians) * arrowLength;
+            
+            // Draw arrow line
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Draw arrowhead
+            const arrowHeadSize = scaledCellSize * 0.15;
+            const arrowHeadAngle = Math.PI / 6; // 30 degrees
+            
+            const leftX = endX - Math.sin(directionRadians - arrowHeadAngle) * arrowHeadSize;
+            const leftY = endY + Math.cos(directionRadians - arrowHeadAngle) * arrowHeadSize;
+            const rightX = endX - Math.sin(directionRadians + arrowHeadAngle) * arrowHeadSize;
+            const rightY = endY + Math.cos(directionRadians + arrowHeadAngle) * arrowHeadSize;
+            
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(leftX, leftY);
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(rightX, rightY);
+            ctx.stroke();
+            
+            ctx.restore();
+          }
+          
           if (scaledCellSize > 16) {
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${scaledCellSize * 0.5}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('💣', blastX + scaledCellSize / 2, blastY + scaledCellSize / 2);
+            ctx.fillText('💣', centerX, centerY);
           }
         });
       }
@@ -256,9 +276,9 @@ const OreGridCanvas = forwardRef(({
             expX + scaledCellSize / 2, expY + scaledCellSize / 2, 0,
             expX + scaledCellSize / 2, expY + scaledCellSize / 2, radius
           );
-          gradient.addColorStop(0, `rgba(255, 255, 0, ${1 - progress})`);
-          gradient.addColorStop(0.5, `rgba(255, 69, 0, ${0.8 - progress})`);
-          gradient.addColorStop(1, `rgba(255, 0, 0, ${0.3 - progress})`);
+          gradient.addColorStop(0, `rgba(255, 255, 255, ${1 - progress})`);
+          gradient.addColorStop(0.5, `rgba(200, 200, 200, ${0.8 - progress})`);
+          gradient.addColorStop(1, `rgba(150, 150, 150, ${0.3 - progress})`);
           
           ctx.fillStyle = gradient;
           ctx.beginPath();
@@ -275,8 +295,10 @@ const OreGridCanvas = forwardRef(({
 
       // *** NEW: Draw physics debris particles ***
       if (physicsDebris && physicsDebris.length > 0) {
+        console.log('Canvas: Drawing', physicsDebris.length, 'debris particles');
         physicsDebris.forEach(debris => {
           const pos = debris.body.position;
+          console.log('Drawing debris at:', pos.x, pos.y);
           
           // Draw particle with glow effect
           ctx.save();
@@ -298,10 +320,12 @@ const OreGridCanvas = forwardRef(({
           ctx.restore();
         });
       }
+
+      // Blast direction indicator removed
       
       setIsCanvasReady(true);
     });
-  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris, hoveredBlock]);
+  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris, hoveredBlock, blastDirection, showBlastDirection, onBlockClick]);
 
   useEffect(() => {
     renderGrid();

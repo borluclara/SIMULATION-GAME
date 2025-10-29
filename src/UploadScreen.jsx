@@ -37,12 +37,12 @@ const UploadScreen = ({ onDataParsed }) => {
         </div>
 
         <div className="w-full max-w-sm flex flex-col space-y-4">
-          <button className="w-full rounded-lg h-14 bg-primary text-background-dark text-lg font-bold">
+          <button className="w-full rounded-lg bg-background-dark/50 dark:bg-background-light/10 border-2 border-primary/50 hover:border-primary text-white text-base font-bold p-4 transition-colors">
             Start Simulation
           </button>
 
-          <label className="w-full rounded-lg h-14 bg-primary/20 dark:bg-primary/30 text-white text-lg font-bold flex items-center justify-center cursor-pointer">
-            Load CSV Scenario
+          <label className="w-full rounded-lg bg-background-dark/50 dark:bg-background-light/10 border-2 border-primary/50 hover:border-primary text-white text-base font-bold p-4 flex items-center justify-center cursor-pointer transition-colors">
+            UPLOAD CSV FILE
             <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
           </label>
 

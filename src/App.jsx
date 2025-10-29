@@ -280,8 +280,8 @@ function App() {
     }
     
     if (placementMode) {
-      // Place blast marker
-      const success = addBlast(position.x, position.y)
+      // Place blast marker with current direction
+      const success = addBlast(position.x, position.y, blastDirection)
       if (!success) {
         alert('Maximum number of blasts reached!')
       }
@@ -372,39 +372,96 @@ function App() {
           
           // Initialize physics engine with canvas dimensions
           const canvas = canvasRef.current;
-          console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
+          const canvasWidth = canvas.width || canvas.clientWidth || 800;
+          const canvasHeight = canvas.height || canvas.clientHeight || 600;
+          
+          console.log('Canvas dimensions:', { 
+            width: canvasWidth, 
+            height: canvasHeight,
+            clientWidth: canvas.clientWidth,
+            clientHeight: canvas.clientHeight,
+            actualWidth: canvas.width,
+            actualHeight: canvas.height
+          });
           
           physicsEngine.initialize({
-            width: canvas.width || 800,
-            height: canvas.height || 600,
+            width: canvasWidth,
+            height: canvasHeight,
             gravity: { x: 0, y: 0.8 }
           });
 
+          // Add boundaries to contain debris
+          physicsEngine.addBoundaries(canvasWidth, canvasHeight);
+
           // Start physics simulation
           physicsEngine.start();
-          console.log('Physics engine started');
+          console.log('Physics engine started with boundaries');
 
-          // Create debris for destroyed cells
-          const blastCenter = result.blasts[0]; // Use first blast as center
           const cellSize = 30; // Assuming 30px cell size
+          let totalDebris = 0;
           
-          // Convert destroyed cells to the format expected by createDebris
-          const debrisData = result.destroyedCells.map(cell => ({
-            x: cell.x,
-            y: cell.y,
-            originalMaterial: cell.material || 'stone'
-          }));
+          // Create debris for all destroyed cells with averaged blast center
+          if (result.destroyedCells.length > 0) {
+            // Calculate average blast center for physics simulation
+            const avgBlastCenter = result.blasts.reduce((acc, blast) => ({
+              x: acc.x + blast.x / result.blasts.length,
+              y: acc.y + blast.y / result.blasts.length
+            }), { x: 0, y: 0 });
+            
+            // Convert all destroyed cells to debris data
+            const debrisData = result.destroyedCells.map(cell => ({
+              x: cell.x,
+              y: cell.y,
+              originalMaterial: cell.material || 'stone'
+            }));
+            
+            console.log(`Creating debris for ${debrisData.length} destroyed cells`);
+            console.log('Average blast center:', avgBlastCenter);
+            console.log('Blast directions used:', result.blasts.map(b => b.direction));
+            
+            // Create debris using the physics engine
+            // For now, use the first blast's direction if available
+            const primaryDirection = result.blasts.length > 0 ? result.blasts[0].direction : null;
+            
+            const debris = physicsEngine.createDebris(
+              debrisData,
+              cellSize,
+              { x: avgBlastCenter.x * cellSize, y: avgBlastCenter.y * cellSize },
+              primaryDirection
+            );
+            
+            totalDebris = debris.length;
+            console.log(`Created ${debris.length} debris particles with direction ${primaryDirection}°`);
+            
+            // Force initial debris state update
+            if (debris.length > 0) {
+              setPhysicsDebris([...debris]);
+              console.log('Initial physics debris state set with', debris.length, 'particles');
+              
+              // Debug: Check first few particle positions
+              debris.slice(0, 3).forEach((particle, i) => {
+                console.log(`Particle ${i}:`, {
+                  position: particle.body.position,
+                  color: particle.color,
+                  size: particle.size
+                });
+              });
+            } else {
+              console.error('No debris particles were created!');
+              
+              // Fallback: Create a simple test particle
+              console.log('Creating fallback test debris...');
+              const testDebris = [{
+                body: { position: { x: 400, y: 300 } },
+                color: '#FFD700',
+                size: 8,
+                material: 'test'
+              }];
+              setPhysicsDebris(testDebris);
+            }
+          }
           
-          console.log('Creating debris for cells:', debrisData);
-          
-          // Create debris using the physics engine
-          const debris = physicsEngine.createDebris(
-            debrisData,
-            cellSize,
-            { x: blastCenter.x * cellSize, y: blastCenter.y * cellSize }
-          );
-          
-          console.log('Created', debris.length, 'debris particles');
+          console.log('Created', totalDebris, 'total debris particles');
 
           // Update debris state continuously
           const updatePhysics = () => {
@@ -412,7 +469,13 @@ function App() {
               physicsEngine.update();
               const debris = physicsEngine.getDebris();
               setPhysicsDebris([...debris]);
-              console.log('Physics update:', debris.length, 'debris particles');
+              
+              // More detailed debugging
+              if (debris.length > 0) {
+                console.log('Physics update:', debris.length, 'debris particles');
+                console.log('First particle position:', debris[0]?.body?.position);
+                console.log('Physics debris state being set:', debris.length);
+              }
               
               requestAnimationFrame(updatePhysics);
             } else {
@@ -615,6 +678,7 @@ function App() {
                     onTriggerBlasts={handleTriggerBlasts}
                     placementMode={placementMode}
                     canvasRef={canvasRef}
+                    blastDirection={blastDirection}
                   />
                   
                   <BlastToolPanel

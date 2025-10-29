@@ -42,7 +42,7 @@ export const useGameState = () => {
     fullReset: () => gameState.fullReset(),
     
     // Blast actions
-    addBlast: (x, y) => gameState.addBlast(x, y),
+    addBlast: (x, y, direction) => gameState.addBlast(x, y, direction),
     removeBlast: (blastId) => gameState.removeBlast(blastId),
     clearBlasts: () => gameState.clearBlasts(),
     canPlaceBlast: () => gameState.canPlaceBlast(),

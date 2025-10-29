@@ -9,6 +9,33 @@ const BlastToolPanel = ({
   onSimulate, 
   onReset 
 }) => {
+  // Helper function to get direction name
+  const getDirectionName = (angle) => {
+    const directions = [
+      { name: 'North', angle: 0 },
+      { name: 'NE', angle: 45 },
+      { name: 'East', angle: 90 },
+      { name: 'SE', angle: 135 },
+      { name: 'South', angle: 180 },
+      { name: 'SW', angle: 225 },
+      { name: 'West', angle: 270 },
+      { name: 'NW', angle: 315 }
+    ];
+    
+    const closest = directions.reduce((prev, curr) => {
+      const prevDiff = Math.abs(prev.angle - angle);
+      const currDiff = Math.abs(curr.angle - angle);
+      return currDiff < prevDiff ? curr : prev;
+    });
+    
+    return closest.name;
+  };
+
+  // Arrow button handlers
+  const handleDirectionClick = (angle) => {
+    setBlastDirection(angle);
+  };
+
   return (
     <div className="blast-tool-panel">
       <h3 className="panel-title">Blast Tool Panel</h3>
@@ -32,7 +59,7 @@ const BlastToolPanel = ({
       <div className="slider-container">
         <div className="slider-label">
           <span>Blast Direction</span>
-          <span className="slider-value">{blastDirection}°</span>
+          <span className="slider-value">{blastDirection}° ({getDirectionName(blastDirection)})</span>
         </div>
         <input
           id="blast-direction"
