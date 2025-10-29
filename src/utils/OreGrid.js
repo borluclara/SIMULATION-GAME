@@ -57,13 +57,14 @@ export class OreBlock {
 
   /**
    * Apply damage to the block
+   * (This method is replaced by the one below; remove this duplicate)
    */
-  takeDamage(damage) {
-    this.damage += damage;
-    this.health = Math.max(0, this.maxHealth - this.damage);
-    this.isDestroyed = this.health <= 0;
-    return this.isDestroyed;
-  }
+  // takeDamage(damage) {
+  //   this.damage += damage;
+  //   this.health = Math.max(0, this.maxHealth - this.damage);
+  //   this.isDestroyed = this.health <= 0;
+  //   return this.isDestroyed;
+  // }
 
   /**
    * Get the color for this ore block
@@ -221,48 +222,79 @@ export class OreGrid {
 
   /**
    * Apply blast effect to an area with optional direction
+   * (direction in degrees, or null for omnidirectional)
    */
   applyBlast(centerX, centerY, radius, power, direction = null) {
+    const startTime = performance.now(); // Performance monitoring
     const affectedBlocks = [];
     const destroyedBlocks = [];
     const displacedBlocks = [];
 
-    for (let y = Math.max(0, centerY - radius); y <= Math.min(this.height - 1, centerY + radius); y++) {
-      for (let x = Math.max(0, centerX - radius); x <= Math.min(this.width - 1, centerX + radius); x++) {
+    // Pre-calculate decay constants for performance
+    const decayConstant = 0.5; // Exponential decay constant (k)
+    const linearDecayRate = power / radius; // Linear decay rate
+    const maxDisplacementRadius = radius * 1.5; // Extended radius for displacement effects
+
+    console.log('Applying blast with decay function:', {
+      center: `(${centerX}, ${centerY})`,
+      radius,
+      power,
+      decayConstant,
+      maxDisplacementRadius
+    });
+
+    for (let y = Math.max(0, centerY - maxDisplacementRadius); y <= Math.min(this.height - 1, centerY + maxDisplacementRadius); y++) {
+      for (let x = Math.max(0, centerX - maxDisplacementRadius); x <= Math.min(this.width - 1, centerX + maxDisplacementRadius); x++) {
         const block = this.getBlockAtGridPos(x, y);
         if (!block || block.isDestroyed) continue;
 
+        // Pre-calculate distance once for performance
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
-        if (distance <= radius) {
-          let damageFactor = 1 - (distance / radius);
+        
+        if (distance <= maxDisplacementRadius) {
+          // Apply decay function to calculate effective power
+          const decayedPower = this.calculateDecayedPower(power, distance, decayConstant);
           
-          // Apply directional bias to damage if direction is specified
-          if (direction !== null) {
-            const directionRadians = (direction * Math.PI) / 180;
-            const blockAngle = Math.atan2(y - centerY, x - centerX);
-            const angleFromDirection = Math.abs(blockAngle - (directionRadians - Math.PI/2));
-            const normalizedAngle = Math.min(angleFromDirection, 2 * Math.PI - angleFromDirection);
+          // Apply damage within the main blast radius
+          if (distance <= radius) {
+            let damageFactor = 1 - (distance / radius);
             
-            // Boost damage in the direction of the blast (within 90-degree cone)
-            if (normalizedAngle <= Math.PI / 2) {
-              const directionBoost = 1 + (0.5 * (1 - normalizedAngle / (Math.PI / 2)));
-              damageFactor *= directionBoost;
+            // Apply directional bias to damage if direction is specified
+            if (direction !== null) {
+              const directionRadians = (direction * Math.PI) / 180;
+              const blockAngle = Math.atan2(y - centerY, x - centerX);
+              const angleFromDirection = Math.abs(blockAngle - (directionRadians - Math.PI/2));
+              const normalizedAngle = Math.min(angleFromDirection, 2 * Math.PI - angleFromDirection);
+              
+              // Boost damage in the direction of the blast (within 90-degree cone)
+              if (normalizedAngle <= Math.PI / 2) {
+                const directionBoost = 1 + (0.5 * (1 - normalizedAngle / (Math.PI / 2)));
+                damageFactor *= directionBoost;
+              }
+            }
+            
+            const damage = decayedPower * damageFactor;
+            const wasDestroyed = block.takeDamage(damage);
+            affectedBlocks.push(block);
+            
+            if (wasDestroyed) {
+              destroyedBlocks.push(block);
+            }
+
+            // Calculate displacement if block survives
+            if (!wasDestroyed && distance > 0) {
+              const displacement = this.calculateRadialDisplacement(
+                block, centerX, centerY, distance, decayedPower, maxDisplacementRadius
+              );
+              if (displacement) {
+                displacedBlocks.push(displacement);
+              }
             }
           }
-          
-          const damage = power * damageFactor;
-          
-          const wasDestroyed = block.takeDamage(damage);
-          affectedBlocks.push(block);
-          
-          if (wasDestroyed) {
-            destroyedBlocks.push(block);
-          }
-
-          // Calculate displacement if block survives
-          if (!wasDestroyed && distance > 0) {
-            const displacement = this.calculateDisplacement(
-              block, centerX, centerY, distance, power, radius
+          // Apply only displacement for blocks outside damage radius but within displacement radius
+          else if (distance > 0) {
+            const displacement = this.calculateRadialDisplacement(
+              block, centerX, centerY, distance, decayedPower, maxDisplacementRadius
             );
             if (displacement) {
               displacedBlocks.push(displacement);
@@ -276,6 +308,14 @@ export class OreGrid {
     if (displacedBlocks.length > 0) {
       this.applyDisplacements(displacedBlocks);
     }
+
+    const endTime = performance.now();
+    console.log('Blast processing completed:', {
+      processingTime: `${(endTime - startTime).toFixed(2)}ms`,
+      affectedBlocks: affectedBlocks.length,
+      destroyedBlocks: destroyedBlocks.length,
+      displacedBlocks: displacedBlocks.length
+    });
 
     return {
       affectedBlocks,
@@ -305,6 +345,11 @@ export class OreGrid {
     // Calculate displacement magnitude (max 3 grid units)
     const displacementMagnitude = Math.min(3, effectiveForce);
 
+    // Only displace if force is significant enough
+    if (displacementMagnitude < 0.2) {
+      return null; // Too weak to cause displacement
+    }
+
     // Calculate new position
     const newX = block.x + (dirX * displacementMagnitude);
     const newY = block.y + (dirY * displacementMagnitude);
@@ -321,7 +366,78 @@ export class OreGrid {
         originalY: block.y,
         newX: clampedX,
         newY: clampedY,
-        force: effectiveForce
+        force: effectiveForce,
+        distance: distance
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate power with decay function - combines exponential and linear decay
+   */
+  calculateDecayedPower(basePower, distance, decayConstant) {
+    // Exponential decay: force = F0 * e^(-k * r)
+    const exponentialDecay = basePower * Math.exp(-decayConstant * distance);
+    
+    // Linear decay: force = F0 - k * r (with minimum floor)
+    const linearDecay = Math.max(0, basePower - (decayConstant * distance * basePower));
+    
+    // Hybrid approach: use exponential for close range, linear for far range
+    // This provides smooth close-range falloff with gradual distant effects
+    const blendFactor = Math.min(1, distance / 3); // Blend over 3 units
+    const hybridDecay = (1 - blendFactor) * exponentialDecay + blendFactor * linearDecay;
+    
+    return Math.max(0.01, hybridDecay); // Minimum threshold to prevent zero values
+  }
+
+  /**
+   * Calculate radial displacement based on decayed power
+   */
+  calculateRadialDisplacement(block, centerX, centerY, distance, decayedPower, maxRadius) {
+    // Direction vector from blast center to block (radial outward)
+    const dirX = (block.x - centerX) / distance;
+    const dirY = (block.y - centerY) / distance;
+
+    // Force calculation based on decayed power
+    const baseForce = decayedPower / 100; // Scale for displacement
+    
+    // Additional distance-based reduction for displacement
+    const distanceFactor = Math.max(0.1, 1 - (distance / maxRadius));
+    const effectiveForce = baseForce * distanceFactor;
+
+    // Material resistance (heavier materials move less)
+    const materialResistance = this.getMaterialResistance(block.oreType);
+    const finalForce = effectiveForce * materialResistance;
+
+    // Calculate displacement magnitude (max 2 grid units, scaled by force)
+    const maxDisplacement = 2;
+    const displacementMagnitude = Math.min(maxDisplacement, finalForce * 3);
+
+    // Only apply displacement if force is significant enough
+    if (displacementMagnitude < 0.2) {
+      return null; // Too weak to cause displacement
+    }
+
+    // Calculate new position
+    const newX = block.x + (dirX * displacementMagnitude);
+    const newY = block.y + (dirY * displacementMagnitude);
+
+    // Clamp to grid boundaries
+    const clampedX = Math.max(0, Math.min(this.width - 1, Math.round(newX)));
+    const clampedY = Math.max(0, Math.min(this.height - 1, Math.round(newY)));
+
+    // Only displace if there's actual movement
+    if (clampedX !== block.x || clampedY !== block.y) {
+      return {
+        block,
+        originalX: block.x,
+        originalY: block.y,
+        newX: clampedX,
+        newY: clampedY,
+        force: finalForce,
+        distance: distance
       };
     }
 
@@ -348,6 +464,9 @@ export class OreGrid {
    * Apply calculated displacements to the grid
    */
   applyDisplacements(displacements) {
+    // Sort by distance to handle closest displacements first
+    displacements.sort((a, b) => a.distance - b.distance);
+
     // First, remove blocks from their original positions
     displacements.forEach(displacement => {
       const { block, originalX, originalY } = displacement;
@@ -404,24 +523,28 @@ export class OreGrid {
   }
 
   /**
-   * Find nearest empty position to given coordinates
+   * Find nearest empty position for displaced block
    */
   findNearestEmptyPosition(targetX, targetY, maxSearchRadius = 3) {
     for (let radius = 1; radius <= maxSearchRadius; radius++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const x = targetX + dx;
-          const y = targetY + dy;
-          
-          if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-            if (!this.getBlockAtGridPos(x, y)) {
-              return { x, y };
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          // Only check positions on the current radius perimeter
+          if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
+            const x = targetX + dx;
+            const y = targetY + dy;
+            
+            if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+              const block = this.getBlockAtGridPos(x, y);
+              if (!block) {
+                return { x, y };
+              }
             }
           }
         }
       }
     }
-    return null;
+    return null; // No empty position found
   }
 
   /**
@@ -481,30 +604,26 @@ export class OreGrid {
       }
     });
 
-    return blocksInRadius.sort((a, b) => a.distance - b.distance);
-  }
+  return blocksInRadius.sort((a, b) => a.distance - b.distance);
+}
 
-  /**
-   * Get ore type distribution for analysis
-   */
-  getOreDistribution() {
-    const distribution = {};
-    
-    this.blocks.forEach(block => {
-      if (!block.isDestroyed) {
-        distribution[block.oreType] = (distribution[block.oreType] || 0) + 1;
-      }
-    });
+/**
+ * Get ore type distribution for analysis
+ */
+getOreDistribution() {
+  const distribution = {};
+  
+  this.blocks.forEach(block => {
+    if (!block.isDestroyed) {
+      distribution[block.oreType] = (distribution[block.oreType] || 0) + 1;
+    }
+  });
+  return distribution;
+}
 
-// Remove these method definitions from here and move them inside the OreGrid class definition above, after getStats().
-
-// (No code here; methods should be inside the OreGrid class)
-    return distribution;
-  }
-
-  /**
-   * Print grid to console for debugging
-   */
+/**
+ * Print grid to console for debugging
+ */
   printToConsole() {
     console.log('=== ORE GRID DEBUG ===');
     console.log(`Dimensions: ${this.width}x${this.height}`);

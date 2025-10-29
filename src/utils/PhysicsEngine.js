@@ -14,6 +14,15 @@ export class PhysicsEngine {
     this.isRunning = false;
     this.animationFrameId = null;
     this.startTime = null;
+    
+    // Configurable decay constants for experimentation
+    this.decayConfig = {
+      exponentialK: 0.03,     // Exponential decay constant (experiment: 0.02-0.05)
+      linearK: null,          // Will be calculated based on maxDistance
+      blendThreshold: 0.4,    // Blend point (40% of max distance)
+      maxDistance: 120,       // Maximum blast range
+      maxForce: 0.025        // Base force magnitude
+    };
   }
 
   // Initialize the physics engine (NO RENDERER - we'll draw manually)
@@ -74,7 +83,12 @@ export class PhysicsEngine {
     
     const debris = [];
 
-    affectedCells.forEach((cell, index) => {
+    // Pre-calculate blast center coordinates for performance
+    const blastCenterX = blastCenter.x;
+    const blastCenterY = blastCenter.y;
+
+    affectedCells.forEach(cell => {
+      // Pre-calculate cell center coordinates
       const cellCenterX = cell.x * cellSize + cellSize / 2;
       const cellCenterY = cell.y * cellSize + cellSize / 2;
       
@@ -82,8 +96,8 @@ export class PhysicsEngine {
       
       // Calculate distance from blast center
       const distance = Math.sqrt(
-        Math.pow(cellCenterX - blastCenter.x, 2) + 
-        Math.pow(cellCenterY - blastCenter.y, 2)
+        Math.pow(cellCenterX - blastCenterX, 2) + 
+        Math.pow(cellCenterY - blastCenterY, 2)
       );
 
       // Create multiple small particles per cell
@@ -95,7 +109,7 @@ export class PhysicsEngine {
           cellCenterX, 
           cellCenterY, 
           cell.originalMaterial,
-          distance,
+          distance, // Pass pre-calculated distance
           blastCenter,
           cellSize,
           blastDirection
@@ -158,11 +172,11 @@ export class PhysicsEngine {
     };
   }
 
-  // Calculate blast force with directional bias
+  // Calculate blast force with directional bias with advanced decay models
   calculateBlastForce(x, y, blastCenter, distance, blastDirection = null) {
-    const maxDistance = 120;
-    const maxForce = 0.025; // Much stronger force for bigger debris pieces
+    const { maxDistance, maxForce, exponentialK, blendThreshold } = this.decayConfig;
     
+    // Pre-calculate direction vector components for performance
     const dirX = x - blastCenter.x;
     const dirY = y - blastCenter.y;
     const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
@@ -204,12 +218,46 @@ export class PhysicsEngine {
       console.log(`Final force direction: (${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)})`);
     }
     
-    const forceMagnitude = Math.max(0, maxForce * (1 - distance / maxDistance));
+    // **MATHEMATICAL DECAY MODELS**
+    
+    // Exponential decay: force = F0 * e^(-k * r)
+    const exponentialForce = maxForce * Math.exp(-exponentialK * distance);
+    
+    // Linear decay: force = F0 - k * r
+    const linearK = maxForce / maxDistance; // Auto-calculate linear decay constant
+    const linearForce = Math.max(0, maxForce - linearK * distance);
+    
+    // Hybrid model: combine exponential (close range) with linear (far range)
+    const blendDistance = maxDistance * blendThreshold;
+    const blendFactor = Math.min(1, distance / blendDistance);
+    
+    // Choose decay model based on distance for optimal visual balance
+    let forceMagnitude;
+    if (distance <= blendDistance) {
+      // Close range: Use exponential decay for dramatic falloff
+      forceMagnitude = exponentialForce;
+    } else {
+      // Far range: Blend exponential with linear for smooth transition
+      forceMagnitude = (1 - blendFactor) * exponentialForce + blendFactor * linearForce;
+    }
+    
+    // Ensure minimum threshold to prevent insignificant forces
+    forceMagnitude = Math.max(0, forceMagnitude);
     
     return {
       x: normalizedX * forceMagnitude,
       y: normalizedY * forceMagnitude
     };
+  }
+
+  // Method to experiment with decay constants for visual balance
+  setDecayConstants(exponentialK, blendThreshold, maxDistance, maxForce) {
+    this.decayConfig.exponentialK = exponentialK || 0.03;
+    this.decayConfig.blendThreshold = blendThreshold || 0.4;
+    this.decayConfig.maxDistance = maxDistance || 120;
+    this.decayConfig.maxForce = maxForce || 0.025;
+    
+    console.log('Updated decay constants:', this.decayConfig);
   }
 
   // Get particle count based on material - MORE BIG DEBRIS  
