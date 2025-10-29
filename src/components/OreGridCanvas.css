@@ -497,3 +497,61 @@
 .ore-grid-canvas.animating {
   animation: blockDestruction 0.3s ease-out;
 }
+
+/* ===== BLAST ANIMATION ENHANCEMENTS ===== */
+
+/* Hardware acceleration for smooth 60fps animations */
+.ore-grid-canvas-container {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.ore-grid-canvas {
+  transform: translateZ(0);
+  will-change: transform;
+  image-rendering: optimizeQuality;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Smooth animation transitions */
+@media (prefers-reduced-motion: no-preference) {
+  .ore-grid-canvas {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Accessibility: Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .ore-grid-canvas,
+  .ore-grid-canvas-container,
+  .block-tooltip,
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shockwave pulse effect on container */
+@keyframes shockwavePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 30px rgba(255, 140, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 140, 0, 0);
+  }
+}
+
+.canvas-container.blasting {
+  animation: shockwavePulse 1s ease-out;
+}
+
+/* Performance hint for GPU acceleration */
+.ore-grid-canvas * {
+  transform: translateZ(0);
+}

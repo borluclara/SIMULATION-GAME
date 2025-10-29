@@ -13,7 +13,9 @@ const OreGridCanvas = forwardRef(({
   explosionAnimations = [],
   physicsDebris = [],  // NEW: debris particles from physics
   blastDirection = 90,  // NEW: blast direction for visual indicators
-  showBlastDirection = true  // NEW: toggle for blast direction indicators
+  showBlastDirection = true,  // NEW: toggle for blast direction indicators
+  animationState = null,  // NEW: Animation state from BlastAnimationEngine
+  cameraShake = { x: 0, y: 0 }  // NEW: Camera shake offset
 }, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -85,6 +87,21 @@ const OreGridCanvas = forwardRef(({
     };
   }, [calculateCanvasSize]);
 
+  // Helper function to get material color
+  const getMaterialColorFromType = useCallback((material) => {
+    const colors = {
+      'iron': '#8C7853',
+      'gold': '#FFD700',
+      'copper': '#B87333',
+      'silver': '#C0C0C0',
+      'coal': '#36454F',
+      'stone': '#808080',
+      'destroyed': '#654321',
+      'cracked': '#A0A0A0'
+    };
+    return colors[material?.toLowerCase()] || '#808080';
+  }, []);
+
   const renderGrid = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -108,9 +125,13 @@ const OreGridCanvas = forwardRef(({
       canvas.style.height = `${height}px`;
       ctx.scale(dpr, dpr);
 
+      // Apply camera shake
+      ctx.save();
+      ctx.translate(cameraShake.x, cameraShake.y);
+
       // Clear canvas
       ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-cameraShake.x, -cameraShake.y, width + Math.abs(cameraShake.x) * 2, height + Math.abs(cameraShake.y) * 2);
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -323,9 +344,105 @@ const OreGridCanvas = forwardRef(({
 
       // Blast direction indicator removed
       
+      // *** NEW: Draw GSAP animated shockwaves ***
+      if (animationState && animationState.shockwaves && animationState.shockwaves.length > 0) {
+        animationState.shockwaves.forEach(shockwave => {
+          const shockX = Math.floor(shockwave.x * scaledCellSize + scaledCellSize / 2);
+          const shockY = Math.floor(shockwave.y * scaledCellSize + scaledCellSize / 2);
+          const shockRadius = shockwave.radius * scaleFactor;
+          
+          // Draw shockwave ring with gradient
+          ctx.save();
+          ctx.strokeStyle = `rgba(255, 140, 0, ${shockwave.opacity})`;
+          ctx.lineWidth = shockwave.lineWidth;
+          ctx.shadowColor = 'rgba(255, 69, 0, 0.8)';
+          ctx.shadowBlur = 10;
+          
+          ctx.beginPath();
+          ctx.arc(shockX, shockY, shockRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Inner glow
+          ctx.strokeStyle = `rgba(255, 200, 0, ${shockwave.opacity * 0.6})`;
+          ctx.lineWidth = shockwave.lineWidth * 1.5;
+          ctx.shadowBlur = 15;
+          ctx.stroke();
+          
+          ctx.restore();
+        });
+      }
+
+      // *** NEW: Draw animated block transitions ***
+      if (animationState && animationState.blockTransitions && animationState.blockTransitions.length > 0) {
+        animationState.blockTransitions.forEach(transition => {
+          const blockX = transition.currentX * scaledCellSize;
+          const blockY = transition.currentY * scaledCellSize;
+          const blockSize = scaledCellSize * transition.scale;
+          
+          ctx.save();
+          ctx.globalAlpha = transition.opacity;
+          ctx.translate(blockX + scaledCellSize / 2, blockY + scaledCellSize / 2);
+          ctx.rotate((transition.rotation * Math.PI) / 180);
+          
+          // Draw block with material color
+          const materialColor = getMaterialColorFromType(transition.material);
+          ctx.fillStyle = materialColor;
+          ctx.fillRect(-blockSize / 2, -blockSize / 2, blockSize, blockSize);
+          
+          // Add highlight
+          const gradient = ctx.createLinearGradient(-blockSize / 2, -blockSize / 2, blockSize / 2, blockSize / 2);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(-blockSize / 2, -blockSize / 2, blockSize, blockSize);
+          
+          ctx.restore();
+          
+          // Motion trail effect - draw faded copy behind moving block
+          if (transition.progress > 0.1 && transition.progress < 0.9) {
+            const trailX = (transition.originalX + (transition.currentX - transition.originalX) * 0.7) * scaledCellSize;
+            const trailY = (transition.originalY + (transition.currentY - transition.originalY) * 0.7) * scaledCellSize;
+            
+            ctx.save();
+            ctx.globalAlpha = 0.2 * transition.opacity;
+            ctx.fillStyle = materialColor;
+            ctx.fillRect(trailX, trailY, blockSize, blockSize);
+            ctx.restore();
+          }
+        });
+      }
+
+      // *** NEW: Draw flash effects ***
+      if (animationState && animationState.animations) {
+        animationState.animations.forEach(anim => {
+          if (anim.type === 'flash') {
+            const flashX = Math.floor(anim.x * scaledCellSize + scaledCellSize / 2);
+            const flashY = Math.floor(anim.y * scaledCellSize + scaledCellSize / 2);
+            const flashRadius = scaledCellSize * anim.scale;
+            
+            // Bright flash
+            const gradient = ctx.createRadialGradient(
+              flashX, flashY, 0,
+              flashX, flashY, flashRadius
+            );
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${anim.opacity})`);
+            gradient.addColorStop(0.4, `rgba(255, 200, 0, ${anim.opacity * 0.7})`);
+            gradient.addColorStop(1, `rgba(255, 100, 0, 0)`);
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(flashX, flashY, flashRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+      }
+
+      // Restore context after camera shake
+      ctx.restore();
+      
       setIsCanvasReady(true);
     });
-  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris, hoveredBlock, blastDirection, showBlastDirection, onBlockClick]);
+  }, [grid, canvasDimensions, scaleFactor, cellSize, showGrid, showLabels, blastMarkers, explosionAnimations, physicsDebris, hoveredBlock, animationState, cameraShake, getMaterialColorFromType]);
 
   useEffect(() => {
     renderGrid();
