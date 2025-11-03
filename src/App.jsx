@@ -389,7 +389,11 @@ function App() {
           physicsEngine.initialize({
             width: canvasWidth,
             height: canvasHeight,
-            gravity: { x: 0, y: 0.8 }
+            gravity: { x: 0, y: 0.9 }, // Enhanced gravity for better falling effect
+            enableSleeping: false, // Keep particles active for visual effect
+            constraintIterations: 2,
+            positionIterations: 6,
+            velocityIterations: 4
           });
 
           // Add boundaries to contain debris
@@ -645,6 +649,8 @@ function App() {
                     physicsDebris={physicsDebris}
                     animationState={animationState}
                     cameraShake={cameraShake}
+                    blastDirection={blastDirection}
+                    showBlastDirection={true}
                   />
                   <p className="canvas-instruction">
                     {placementMode 

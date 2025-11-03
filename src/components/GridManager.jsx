@@ -42,7 +42,7 @@ const GridManager = () => {
   const [cellSize, setCellSize] = useState(30);
   const [showGrid, setShowGrid] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
-  const [blastRadius, setBlastRadius] = useState(2);
+  const [blastRadius, setBlastRadius] = useState(1);
   const [blastPower, setBlastPower] = useState(50);
   const [blastDirection, setBlastDirection] = useState(90);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0); // For forcing canvas refresh

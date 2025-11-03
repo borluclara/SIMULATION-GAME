@@ -29,16 +29,35 @@ export class PhysicsEngine {
   // Initialize the physics engine (NO RENDERER - we'll draw manually)
   initialize(options = {}) {
     const defaultOptions = {
-      gravity: { x: 0, y: 1 }
+      gravity: { x: 0, y: 0.8 }, // More realistic gravity for falling debris
+      enableSleeping: false, // Keep particles active for better visual effect
+      constraintIterations: 2,
+      positionIterations: 6,
+      velocityIterations: 4,
+      timing: {
+        timeScale: 1
+      }
     };
 
     const config = { ...defaultOptions, ...options };
 
-    // Create engine with gravity
-    this.engine = Matter.Engine.create({
-      gravity: config.gravity
-    });
+    // Create engine with enhanced physics settings
+    this.engine = Matter.Engine.create();
     this.world = this.engine.world;
+    
+    // Configure engine properties for better debris simulation
+    this.engine.world.gravity.x = config.gravity.x;
+    this.engine.world.gravity.y = config.gravity.y;
+    this.engine.enableSleeping = config.enableSleeping;
+    this.engine.constraintIterations = config.constraintIterations;
+    this.engine.positionIterations = config.positionIterations;
+    this.engine.velocityIterations = config.velocityIterations;
+    this.engine.timing.timeScale = config.timing.timeScale;
+
+    console.log('PhysicsEngine initialized with enhanced settings:', {
+      gravity: this.engine.world.gravity,
+      enableSleeping: this.engine.enableSleeping
+    });
 
     return this;
   }
@@ -64,16 +83,81 @@ export class PhysicsEngine {
     return this;
   }
 
-  // Manual update loop (call this from your render function)
+  // Enhanced update loop for better falling debris simulation
   update(deltaTime = 16.67) {
     if (this.isRunning && this.engine) {
+      // Update the physics engine
       Matter.Engine.update(this.engine, deltaTime);
+      
+      // Update debris particle states for enhanced effects
+      this.debrisBodies.forEach(debris => {
+        if (debris.body && debris.isActive) {
+          // Track bounce count for visual effects
+          this.updateDebrisBounceCount(debris);
+          
+          // Apply air resistance effects based on material
+          this.applyMaterialAirEffects(debris, deltaTime);
+          
+          // Check for settling (debris coming to rest)
+          this.checkDebrisSettling(debris);
+        }
+      });
+    }
+  }
+  
+  // Update bounce count for debris particles
+  updateDebrisBounceCount(debris) {
+    const velocity = debris.body.velocity;
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    
+    // If particle was moving and now nearly stopped, it likely bounced
+    if (debris.previousSpeed > 2 && speed < 0.5) {
+      debris.bounceCount = (debris.bounceCount || 0) + 1;
+      console.log(`Debris bounced ${debris.bounceCount} times`);
+    }
+    
+    debris.previousSpeed = speed;
+  }
+  
+  // Apply material-specific air effects
+  applyMaterialAirEffects(debris, deltaTime) {
+    if (!debris.materialProps) return;
+    
+    const density = debris.materialProps.density || 2.7;
+    const fragmentationIndex = debris.materialProps.fragmentation_index || 0.5;
+    
+    // Light materials experience more air turbulence
+    if (density < 2.0 && Math.random() < 0.02) {
+      const turbulence = {
+        x: (Math.random() - 0.5) * 0.001 * fragmentationIndex,
+        y: (Math.random() - 0.5) * 0.0005 * fragmentationIndex
+      };
+      Matter.Body.applyForce(debris.body, debris.body.position, turbulence);
+    }
+  }
+  
+  // Check if debris particle has settled and should become inactive
+  checkDebrisSettling(debris) {
+    const velocity = debris.body.velocity;
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    const angularSpeed = Math.abs(debris.body.angularVelocity);
+    
+    // If debris is barely moving for a while, mark as settled
+    if (speed < 0.1 && angularSpeed < 0.01) {
+      debris.settleTime = (debris.settleTime || 0) + 1;
+      
+      if (debris.settleTime > 60) { // ~1 second at 60fps
+        debris.isActive = false;
+        console.log(`Debris particle settled and marked inactive`);
+      }
+    } else {
+      debris.settleTime = 0; // Reset settle time if it starts moving again
     }
   }
 
-  // Create debris particles from blast affected cells with directional support
+  // Create debris particles from blast affected cells with enhanced falling effects
   createDebris(affectedCells, cellSize, blastCenter, blastDirection = null) {
-    console.log('PhysicsEngine: Creating debris for', affectedCells.length, 'cells');
+    console.log('PhysicsEngine: Creating enhanced falling debris for', affectedCells.length, 'cells');
     console.log('Blast center:', blastCenter, 'Direction:', blastDirection);
     console.log('Engine initialized:', !!this.engine, 'World exists:', !!this.world);
     
@@ -83,108 +167,172 @@ export class PhysicsEngine {
     }
     
     const debris = [];
-
-    // Pre-calculate blast center coordinates for performance
     const blastCenterX = blastCenter.x;
     const blastCenterY = blastCenter.y;
 
-    affectedCells.forEach(cell => {
-      // Pre-calculate cell center coordinates
+    affectedCells.forEach((cell, index) => {
       const cellCenterX = cell.x * cellSize + cellSize / 2;
       const cellCenterY = cell.y * cellSize + cellSize / 2;
       
       console.log(`Processing cell ${index}: (${cell.x}, ${cell.y}) -> (${cellCenterX}, ${cellCenterY})`);
       
-      // Calculate distance from blast center
       const distance = Math.sqrt(
         Math.pow(cellCenterX - blastCenterX, 2) + 
         Math.pow(cellCenterY - blastCenterY, 2)
       );
 
-      // Create multiple small particles per cell
+      // Create multiple particles per cell with varied properties for realistic falling
       const particleCount = this.getParticleCount(cell.originalMaterial);
-      console.log(`Creating ${particleCount} particles for material ${cell.originalMaterial}`);
+      console.log(`Creating ${particleCount} falling debris particles for ${cell.originalMaterial}`);
       
       for (let i = 0; i < particleCount; i++) {
-        const particle = this.createDebrisParticle(
+        const particle = this.createEnhancedDebrisParticle(
           cellCenterX, 
           cellCenterY, 
           cell.originalMaterial,
-          distance, // Pass pre-calculated distance
+          distance,
           blastCenter,
           cellSize,
-          blastDirection
+          blastDirection,
+          i / particleCount // Variation factor for diverse particle behavior
         );
         
         if (particle) {
           debris.push(particle);
           Matter.World.add(this.world, particle.body);
-          console.log(`Added particle at (${particle.body.position.x}, ${particle.body.position.y})`);
+          
+          // Apply initial upward velocity for realistic blast ejection
+          const upwardForce = this.calculateInitialEjectionForce(distance, particle.materialProps);
+          Matter.Body.applyForce(particle.body, particle.body.position, {
+            x: upwardForce.x,
+            y: upwardForce.y - 0.01 // Initial upward component
+          });
+          
+          console.log(`Added falling debris particle at (${particle.body.position.x.toFixed(1)}, ${particle.body.position.y.toFixed(1)}) with ejection force`);
         }
       }
     });
 
-    console.log(`Created ${debris.length} total debris particles`);
+    console.log(`Created ${debris.length} total falling debris particles`);
     this.debrisBodies.push(...debris);
     return debris;
   }
+  
+  // Calculate initial ejection force for realistic blast effect before gravity takes over
+  calculateInitialEjectionForce(distance, materialProps) {
+    const maxEjectionDistance = 120;
+    const baseEjectionForce = 0.03;
+    
+    // Distance-based force reduction
+    const distanceFactor = Math.max(0.1, 1 - (distance / maxEjectionDistance));
+    
+    // Material-based ejection modifications
+    const density = materialProps.density || 2.7;
+    const hardness = materialProps.hardness || 5;
+    
+    // Lighter materials get more ejection force
+    const densityModifier = Math.max(0.3, 2.0 / Math.sqrt(density));
+    
+    // Softer materials fragment and eject more easily
+    const hardnessModifier = Math.max(0.4, (10 - hardness) / 6);
+    
+    const totalForce = baseEjectionForce * distanceFactor * densityModifier * hardnessModifier;
+    
+    // Random radial direction for natural spread
+    const angle = Math.random() * 2 * Math.PI;
+    const variation = 0.7 + (Math.random() * 0.6); // Add force variation
+    
+    return {
+      x: Math.cos(angle) * totalForce * variation,
+      y: Math.sin(angle) * totalForce * variation * 0.5 // Reduce y-component so particles don't fly too high
+    };
+  }
 
-  // Create individual debris particle with enhanced material property integration
-  createDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection = null) {
+  // Create enhanced falling debris particle with realistic physics properties
+  createEnhancedDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection = null, variationFactor = 0) {
     // Get material properties for enhanced physics
     const materialProps = materialPropertyHandler.getMaterialProperties(material);
     
-    // Particle size based on material properties
-    const size = this.getParticleSize(material);
+    // Varied particle size based on material properties and variation
+    const baseSize = this.getParticleSize(material);
+    const sizeVariation = 0.3 + (variationFactor * 0.7); // 30-100% of base size
+    const size = baseSize * sizeVariation;
     
-    // Random offset within cell
-    const offsetX = (Math.random() - 0.5) * cellSize * 0.6;
-    const offsetY = (Math.random() - 0.5) * cellSize * 0.6;
+    // Enhanced random positioning within cell for more natural spread
+    const spreadFactor = 0.8 + (Math.random() * 0.4); // 0.8-1.2 spread multiplier
+    const offsetX = (Math.random() - 0.5) * cellSize * spreadFactor;
+    const offsetY = (Math.random() - 0.5) * cellSize * spreadFactor;
     
-    // Calculate enhanced blast force with material coefficients
-    const blastForce = this.calculateEnhancedBlastForce(x, y, blastCenter, distance, blastDirection, materialProps);
-    
-    // Get material-based physics properties
-    const density = this.getMaterialDensity(material);
+    // Enhanced material-based physics properties for realistic falling
+    const density = this.getEnhancedMaterialDensity(material);
     const hardness = materialProps.hardness || 5;
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
     
-    // Create Matter.js body with enhanced properties
+    // Create particle body with enhanced physics properties for falling debris
     const body = Matter.Bodies.circle(
       x + offsetX, 
       y + offsetY, 
       size, 
       {
         density: density,
-        friction: 0.5 + (hardness / 20), // Harder materials have more friction
-        frictionAir: 0.01 + (density * 5), // Denser materials have more air resistance
-        restitution: Math.max(0.2, 0.6 - (hardness / 15)) // Harder materials bounce less
+        // Enhanced friction for more realistic bouncing and sliding
+        friction: 0.4 + (hardness / 25) + (Math.random() * 0.2), // 0.4-0.8 range
+        frictionAir: 0.008 + (density * 3) + (Math.random() * 0.005), // Air resistance
+        restitution: Math.max(0.15, 0.5 - (hardness / 20) + (Math.random() * 0.2)), // Bounce factor
+        // Enhanced collision properties
+        frictionStatic: 0.6 + (hardness / 20),
+        inertia: Matter.Body._inertiaScale * density * size * size, // Realistic rotational inertia
       }
     );
 
-    console.log(`Created enhanced particle for ${material}:`, {
+    // Add natural rotation variation for more dynamic falling motion
+    const rotationStrength = 0.05 + (fragmentationIndex * 0.1) + (Math.random() * 0.1);
+    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * rotationStrength);
+
+    console.log(`Created enhanced falling debris for ${material}:`, {
       size: size.toFixed(1),
       density: density.toFixed(4),
       hardness: hardness,
-      friction: body.friction.toFixed(2),
-      restitution: body.restitution.toFixed(2)
+      friction: body.friction.toFixed(3),
+      restitution: body.restitution.toFixed(3),
+      frictionAir: body.frictionAir.toFixed(5),
+      position: `(${body.position.x.toFixed(1)}, ${body.position.y.toFixed(1)})`
     });
 
-    // Apply enhanced blast force
-    Matter.Body.applyForce(body, body.position, blastForce);
-    
-    // Add rotation based on material properties
-    const rotationStrength = 0.1 + (materialProps.fragmentation_index || 0.5) * 0.15;
-    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * rotationStrength);
-
-    // Return particle with enhanced rendering info
+    // Return enhanced particle with additional properties for falling animation
     return {
       body: body,
       color: this.getMaterialColor(material),
       size: size,
       material: material,
       materialProps: materialProps,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      variationFactor: variationFactor,
+      // Additional properties for enhanced falling effects
+      originalSize: baseSize,
+      rotationSpeed: rotationStrength,
+      lifetime: 8000 + (Math.random() * 4000), // 8-12 second lifetime
+      bounceCount: 0, // Track number of bounces for effects
+      isActive: true
     };
+  }
+
+  // Create individual debris particle with enhanced material property integration (legacy method)
+  createDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection = null) {
+    // Delegate to enhanced method for consistency
+    return this.createEnhancedDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection, Math.random());
+  }
+  
+  // Enhanced material density calculation for more realistic falling behavior
+  getEnhancedMaterialDensity(material) {
+    const baseDensity = this.getMaterialDensity(material);
+    
+    // Add slight random variation for more natural physics (±10%)
+    const variation = 0.9 + (Math.random() * 0.2);
+    const enhancedDensity = baseDensity * variation;
+    
+    // Ensure minimum density for proper physics simulation
+    return Math.max(0.001, enhancedDensity);
   }
 
   // Calculate enhanced blast force with material property integration
@@ -337,7 +485,7 @@ export class PhysicsEngine {
     return Math.max(5, Math.min(30, finalCount));
   }
 
-  // Get particle size based on material properties - Enhanced with density and hardness
+  // Get particle size based on material properties - Enhanced with bigger sizes for better visibility
   getParticleSize(material) {
     // Get material properties for accurate sizing
     const materialProps = materialPropertyHandler.getMaterialProperties(material);
@@ -345,28 +493,30 @@ export class PhysicsEngine {
     const hardness = materialProps.hardness || 5;
     const fragmentationIndex = materialProps.fragmentation_index || 0.5;
     
-    // Base size influenced by material properties
-    let baseSize = 6; // Default size
+    // INCREASED BASE SIZE for better visibility
+    let baseSize = 12; // Increased from 6 to 12 for better visibility
     
     // Dense materials create larger, fewer particles
-    if (density > 15) baseSize = 9;      // Very heavy metals
-    else if (density > 8) baseSize = 8;  // Heavy materials
-    else if (density > 4) baseSize = 7;  // Medium materials
-    else if (density < 2) baseSize = 5;  // Light materials
+    if (density > 15) baseSize = 18;      // Very heavy metals - much larger
+    else if (density > 8) baseSize = 16;  // Heavy materials  
+    else if (density > 4) baseSize = 14;  // Medium materials
+    else if (density < 2) baseSize = 10;  // Light materials
     
     // Hard materials create larger chunks
-    if (hardness >= 9) baseSize += 1;    // Very hard
-    else if (hardness >= 7) baseSize += 0.5; // Hard
-    else if (hardness <= 2) baseSize -= 1;   // Very soft
+    if (hardness >= 9) baseSize += 3;     // Very hard - bigger bonus
+    else if (hardness >= 7) baseSize += 2; // Hard
+    else if (hardness <= 2) baseSize -= 1; // Very soft
     
-    // High fragmentation creates smaller pieces
-    if (fragmentationIndex > 0.8) baseSize -= 1.5;
+    // High fragmentation creates smaller pieces (but still bigger than before)
+    if (fragmentationIndex > 0.8) baseSize -= 2;
     else if (fragmentationIndex > 0.6) baseSize -= 1;
-    else if (fragmentationIndex < 0.3) baseSize += 1;
+    else if (fragmentationIndex < 0.3) baseSize += 2;
     
-    // Size variation for realism
-    const sizeVariation = (Math.random() - 0.5) * 2;
-    const finalSize = Math.max(3, baseSize + sizeVariation);
+    // Increased size variation for more dramatic visual effect
+    const sizeVariation = (Math.random() - 0.5) * 4; // Increased from 2 to 4
+    const finalSize = Math.max(8, baseSize + sizeVariation); // Minimum size increased from 3 to 8
+    
+    console.log(`Enhanced debris size for ${material}: baseSize=${baseSize}, variation=${sizeVariation.toFixed(1)}, final=${finalSize.toFixed(1)}`);
     
     return finalSize;
   }
@@ -437,9 +587,51 @@ export class PhysicsEngine {
     return boundaries;
   }
 
-  // Get all debris for rendering
+  // Get all debris for rendering with enhanced cleanup
   getDebris() {
+    // Clean up old or inactive debris particles
+    this.debrisBodies = this.debrisBodies.filter(debris => {
+      const age = Date.now() - debris.createdAt;
+      const isAlive = debris.lifetime ? age < debris.lifetime : age < 10000; // Default 10s lifetime
+      const isOnScreen = this.isDebrisOnScreen(debris);
+      const hasMovement = this.hasSignificantMovement(debris);
+      
+      // Keep debris that is alive, on screen, or still moving significantly
+      const shouldKeep = debris.isActive && (isAlive || (isOnScreen && hasMovement));
+      
+      if (!shouldKeep) {
+        // Remove from physics world
+        if (debris.body && this.world) {
+          Matter.World.remove(this.world, debris.body);
+        }
+        console.log(`Cleaned up debris particle: age=${age}ms, onScreen=${isOnScreen}, hasMovement=${hasMovement}`);
+      }
+      
+      return shouldKeep;
+    });
+    
     return this.debrisBodies;
+  }
+  
+  // Check if debris particle is still visible on screen
+  isDebrisOnScreen(debris, margin = 100) {
+    if (!debris.body) return false;
+    
+    const pos = debris.body.position;
+    // Rough screen bounds check (can be refined with actual canvas dimensions)
+    return pos.x > -margin && pos.x < 1200 + margin && 
+           pos.y > -margin && pos.y < 800 + margin;
+  }
+  
+  // Check if debris particle has significant movement
+  hasSignificantMovement(debris, threshold = 0.1) {
+    if (!debris.body) return false;
+    
+    const velocity = debris.body.velocity;
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    const angularSpeed = Math.abs(debris.body.angularVelocity);
+    
+    return speed > threshold || angularSpeed > 0.01;
   }
 
   // Check if simulation should continue

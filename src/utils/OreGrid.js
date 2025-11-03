@@ -90,6 +90,13 @@ export class OreBlock {
     
     // Material properties integration
     this.materialProperties = materialProperties || materialPropertyHandler.getMaterialProperties(oreType);
+    
+    // Crack effect properties for visual damage indication
+    this.crackLevel = 0; // 0 = no cracks, 1 = light, 2 = medium, 3 = heavy
+    this.crackPatterns = []; // Array of crack line patterns
+    this.lastDamageAmount = 0; // Track recent damage for crack generation
+    this.crackSeed = Math.random(); // Random seed for consistent crack patterns
+    this.cracksGenerated = false; // Track if cracks have been generated for this damage level
   }
 
   /**
@@ -169,6 +176,8 @@ export class OreBlock {
     const willFragment = this.checkFragmentation(effectiveDamage);
     
     this.health -= effectiveDamage;
+    this.lastDamageAmount = effectiveDamage; // Track recent damage for crack generation
+    
     if (this.health <= 0) {
       this.isDestroyed = true;
       
@@ -182,6 +191,9 @@ export class OreBlock {
       
       return true; // Block was destroyed
     }
+    
+    // Generate crack effects for surviving blocks based on damage level
+    this.updateCrackEffects();
     
     // Store partial damage fragmentation info
     if (willFragment) {
@@ -219,7 +231,146 @@ export class OreBlock {
   }
 
   /**
-   * Get visual representation info
+   * Update crack effects based on current damage level
+   */
+  updateCrackEffects() {
+    if (this.isDestroyed) return;
+    
+    const damagePercentage = (this.maxHealth - this.health) / this.maxHealth;
+    const newCrackLevel = this.calculateCrackLevel(damagePercentage);
+    
+    // Only generate new crack patterns if crack level increased
+    if (newCrackLevel > this.crackLevel) {
+      this.crackLevel = newCrackLevel;
+      this.generateCrackPatterns();
+      console.log(`Block at (${this.x}, ${this.y}) crack level increased to ${this.crackLevel} (${(damagePercentage * 100).toFixed(1)}% damage)`);
+    }
+  }
+
+  /**
+   * Calculate crack level based on damage percentage
+   */
+  calculateCrackLevel(damagePercentage) {
+    if (damagePercentage < 0.25) return 0; // No visible cracks
+    if (damagePercentage < 0.5) return 1;  // Light cracks
+    if (damagePercentage < 0.75) return 2; // Medium cracks
+    return 3; // Heavy cracks (near destruction)
+  }
+
+  /**
+   * Generate crack patterns based on crack level and material properties
+   */
+  generateCrackPatterns() {
+    this.crackPatterns = [];
+    
+    // Use crack seed for consistent patterns
+    const random = this.seededRandom(this.crackSeed);
+    const materialProps = this.materialProperties || {};
+    const hardness = materialProps.hardness || 5;
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    
+    // Number of crack lines based on crack level and fragmentation
+    const baseCrackCount = [0, 2, 4, 6][this.crackLevel] || 0;
+    const fragmentationBonus = Math.floor(fragmentationIndex * 3);
+    const crackCount = baseCrackCount + fragmentationBonus;
+    
+    for (let i = 0; i < crackCount; i++) {
+      // Generate crack line with start and end points (normalized 0-1)
+      const crack = this.generateCrackLine(random + i * 0.1, hardness, i);
+      this.crackPatterns.push(crack);
+    }
+    
+    this.cracksGenerated = true;
+  }
+
+  /**
+   * Generate a single crack line pattern
+   */
+  generateCrackLine(seedOffset, hardness, index) {
+    const random = (offset) => this.seededRandom(this.crackSeed + seedOffset + offset * 0.1);
+    
+    // Crack direction bias based on material hardness
+    // Hard materials have straighter cracks, soft materials have more chaotic cracks
+    const straightness = Math.min(0.8, hardness / 10);
+    
+    // Generate crack from edge to center or center to edge
+    const startFromEdge = random(1) > 0.5;
+    let startX, startY, endX, endY;
+    
+    if (startFromEdge) {
+      // Start from random edge
+      const edge = Math.floor(random(2) * 4);
+      switch (edge) {
+        case 0: // Top edge
+          startX = random(3);
+          startY = 0;
+          break;
+        case 1: // Right edge
+          startX = 1;
+          startY = random(4);
+          break;
+        case 2: // Bottom edge
+          startX = random(5);
+          startY = 1;
+          break;
+        case 3: // Left edge
+          startX = 0;
+          startY = random(6);
+          break;
+      }
+      
+      // End somewhere in the middle
+      endX = 0.3 + random(7) * 0.4;
+      endY = 0.3 + random(8) * 0.4;
+    } else {
+      // Start from center area
+      startX = 0.4 + random(9) * 0.2;
+      startY = 0.4 + random(10) * 0.2;
+      
+      // End at random point
+      endX = random(11);
+      endY = random(12);
+    }
+    
+    // Add some irregularity for more natural look
+    const irregularity = 1 - straightness;
+    const midPoints = [];
+    const segments = 2 + Math.floor(irregularity * 3); // 2-4 segments based on material
+    
+    for (let seg = 1; seg < segments; seg++) {
+      const t = seg / segments;
+      const baseX = startX + (endX - startX) * t;
+      const baseY = startY + (endY - startY) * t;
+      
+      // Add random offset based on material properties
+      const offsetX = (random(13 + seg) - 0.5) * irregularity * 0.1;
+      const offsetY = (random(14 + seg) - 0.5) * irregularity * 0.1;
+      
+      midPoints.push({
+        x: Math.max(0, Math.min(1, baseX + offsetX)),
+        y: Math.max(0, Math.min(1, baseY + offsetY))
+      });
+    }
+    
+    return {
+      start: { x: startX, y: startY },
+      end: { x: endX, y: endY },
+      midPoints: midPoints,
+      width: this.crackLevel * 0.5 + 0.5, // Crack width based on level
+      opacity: Math.min(1, this.crackLevel * 0.3 + 0.4) // Crack opacity
+    };
+  }
+
+  /**
+   * Seeded random function for consistent crack patterns
+   */
+  seededRandom(seed) {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  }
+
+  /**
+   * Get visual representation info including crack effects
    */
   getVisualState() {
     return {
@@ -227,7 +378,10 @@ export class OreBlock {
       opacity: this.isDestroyed ? 0.1 : (this.health / this.maxHealth),
       oreType: this.oreType,
       position: { x: this.x, y: this.y },
-      isDestroyed: this.isDestroyed
+      isDestroyed: this.isDestroyed,
+      crackLevel: this.crackLevel,
+      crackPatterns: this.crackPatterns,
+      damagePercentage: (this.maxHealth - this.health) / this.maxHealth
     };
   }
 }
@@ -349,7 +503,7 @@ export class OreGrid {
     // Pre-calculate decay constants for performance
     const decayConstant = 0.5; // Exponential decay constant (k)
     const linearDecayRate = power / radius; // Linear decay rate
-    const maxDisplacementRadius = radius * 1.5; // Extended radius for displacement effects
+    const maxDisplacementRadius = radius * 1.2; // Extended radius for displacement effects
 
     console.log('Applying blast with decay function:', {
       center: `(${centerX}, ${centerY})`,
@@ -412,7 +566,7 @@ export class OreGrid {
             // Calculate displacement if block survives
             if (!wasDestroyed && distance > 0) {
               const displacement = this.calculateRadialDisplacement(
-                block, centerX, centerY, distance, decayedPower, maxDisplacementRadius
+                block, centerX, centerY, distance, decayedPower, maxDisplacementRadius, direction
               );
               if (displacement) {
                 displacedBlocks.push(displacement);
@@ -422,7 +576,7 @@ export class OreGrid {
           // Apply only displacement for blocks outside damage radius but within displacement radius
           else if (distance > 0) {
             const displacement = this.calculateRadialDisplacement(
-              block, centerX, centerY, distance, decayedPower, maxDisplacementRadius
+              block, centerX, centerY, distance, decayedPower, maxDisplacementRadius, direction
             );
             if (displacement) {
               displacedBlocks.push(displacement);
@@ -521,15 +675,51 @@ export class OreGrid {
   }
 
   /**
-   * Calculate radial displacement based on decayed power with enhanced material properties
+   * Calculate radial displacement based on decayed power with enhanced material properties and directional bias
    */
-  calculateRadialDisplacement(block, centerX, centerY, distance, decayedPower, maxRadius) {
+  calculateRadialDisplacement(block, centerX, centerY, distance, decayedPower, maxRadius, direction = null) {
     // Get material properties for enhanced calculations
     const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
     
-    // Direction vector from blast center to block (radial outward)
-    const dirX = (block.x - centerX) / distance;
-    const dirY = (block.y - centerY) / distance;
+    // Calculate base direction vector from blast center to block (radial outward)
+    let dirX = (block.x - centerX) / distance;
+    let dirY = (block.y - centerY) / distance;
+    
+    // Apply directional bias if blast direction is specified
+    if (direction !== null) {
+      // Convert blast direction to unit vector
+      const directionRadians = (direction * Math.PI) / 180;
+      const blastDirX = Math.sin(directionRadians); // 0° = North = -Y, but sin gives us X component
+      const blastDirY = -Math.cos(directionRadians); // -cos gives us proper Y component for 0° = North
+      
+      // Calculate the angle between natural radial direction and blast direction
+      const naturalAngle = Math.atan2(dirY, dirX);
+      const blastAngle = Math.atan2(blastDirY, blastDirX);
+      
+      // Determine how much to bias toward blast direction (stronger bias for closer blocks)
+      const maxBiasDistance = maxRadius * 0.7; // Bias affects blocks within 70% of max radius
+      const biasStrength = Math.max(0, 1 - (distance / maxBiasDistance));
+      const directionWeight = biasStrength * 0.8; // Up to 80% directional influence
+      
+      // Blend radial and directional forces
+      dirX = (dirX * (1 - directionWeight)) + (blastDirX * directionWeight);
+      dirY = (dirY * (1 - directionWeight)) + (blastDirY * directionWeight);
+      
+      // Normalize the combined direction vector
+      const combinedMagnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+      dirX /= combinedMagnitude;
+      dirY /= combinedMagnitude;
+      
+      console.log(`Directional displacement for block at (${block.x}, ${block.y}):`, {
+        blastDirection: direction,
+        distance: distance.toFixed(2),
+        biasStrength: biasStrength.toFixed(3),
+        directionWeight: directionWeight.toFixed(3),
+        originalDir: `(${((block.x - centerX) / distance).toFixed(3)}, ${((block.y - centerY) / distance).toFixed(3)})`,
+        blastDir: `(${blastDirX.toFixed(3)}, ${blastDirY.toFixed(3)})`,
+        finalDir: `(${dirX.toFixed(3)}, ${dirY.toFixed(3)})`
+      });
+    }
 
     // Force calculation based on decayed power
     const baseForce = decayedPower / 100; // Scale for displacement

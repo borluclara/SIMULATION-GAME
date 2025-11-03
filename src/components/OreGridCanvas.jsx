@@ -180,6 +180,11 @@ const OreGridCanvas = forwardRef(({
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
             
+            // NEW: Crack visualization for damaged blocks
+            if (block.crackLevel > 0 && block.crackPatterns && block.crackPatterns.length > 0) {
+              renderCrackPatterns(ctx, pixelX, pixelY, cellWidth, cellHeight, block);
+            }
+            
             // Enhanced displacement visual effects with movement behavior
             if (block.recentlyDisplaced) {
               const displacementColor = movementBehavior.movementColor;
@@ -326,130 +331,187 @@ const OreGridCanvas = forwardRef(({
         });
       }
 
-      // *** NEW: Draw physics debris particles with material properties ***
+      // *** ENHANCED: Draw falling physics debris with realistic effects ***
       if (physicsDebris && physicsDebris.length > 0) {
-        console.log('Canvas: Drawing', physicsDebris.length, 'debris particles');
+        console.log('Canvas: Drawing', physicsDebris.length, 'enhanced falling debris particles');
         physicsDebris.forEach(debris => {
           const pos = debris.body.position;
           const velocity = debris.body.velocity;
           const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+          const rotation = debris.body.angle;
           
           ctx.save();
           
-          // Material-based particle rendering
+          // Material-based particle rendering with enhanced effects
           const materialProps = debris.materialProps || {};
           const density = materialProps.density || 2.5;
           const hardness = materialProps.hardness || 5;
           const fragmentation = materialProps.fragmentation_index || 0.5;
-          const value = materialProps.economic_value || 1;
+          const bounceCount = debris.bounceCount || 0;
           
-          // Base particle color from material
-          ctx.fillStyle = debris.color;
+          // Enhanced particle size based on fragmentation and age
+          const age = Date.now() - debris.createdAt;
+          const ageFactor = Math.max(0.7, 1 - (age / 15000)); // Slowly shrink over 15s
+          const effectiveSize = debris.size * (0.4 + fragmentation * 0.6) * ageFactor;
           
-          // Material-specific visual effects
+          // Rotation-based visual effects for falling debris
+          ctx.translate(pos.x, pos.y);
+          ctx.rotate(rotation);
+          
+          // Base particle color with brightness based on speed
+          const speedBrightness = Math.min(1, 0.6 + (speed * 0.1));
+          const baseColor = debris.color;
+          
+          // Enhanced motion trails for falling particles
+          if (speed > 1) {
+            const trailLength = Math.min(speed * 3, 20);
+            const trailOpacity = Math.min(speed * 0.15, 0.7);
+            
+            ctx.strokeStyle = `rgba(255, 150, 50, ${trailOpacity})`;
+            ctx.lineWidth = effectiveSize * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(-trailLength, 0);
+            ctx.lineTo(0, 0);
+            ctx.stroke();
+          }
+          
+          // Material-specific enhanced visual effects
           if (density > 4.0) {
-            // Dense materials: strong glow, less motion blur
-            ctx.shadowColor = debris.color;
-            ctx.shadowBlur = 6;
+            // Dense materials: strong metallic glow, spark effects
+            ctx.shadowColor = baseColor;
+            ctx.shadowBlur = 8 + (speed * 0.5);
+            
+            // Sparks for high-speed dense materials
+            if (speed > 3) {
+              ctx.fillStyle = 'rgba(255, 255, 150, 0.8)';
+              for (let i = 0; i < 3; i++) {
+                const sparkAngle = (i * Math.PI * 2 / 3) + rotation;
+                const sparkDistance = effectiveSize * 1.5;
+                ctx.beginPath();
+                ctx.arc(
+                  Math.cos(sparkAngle) * sparkDistance, 
+                  Math.sin(sparkAngle) * sparkDistance, 
+                  1, 0, Math.PI * 2
+                );
+                ctx.fill();
+              }
+            }
           } else if (density < 2.0) {
-            // Light materials: scattered glow, motion blur
-            ctx.shadowColor = 'rgba(200, 200, 255, 0.5)';
-            ctx.shadowBlur = 8;
+            // Light materials: floating, wispy effects
+            ctx.shadowColor = 'rgba(200, 220, 255, 0.6)';
+            ctx.shadowBlur = 12;
             
-            // Motion trail for light particles
-            if (speed > 2) {
-              ctx.strokeStyle = `rgba(200, 200, 255, ${Math.min(speed * 0.1, 0.6)})`;
-              ctx.lineWidth = debris.size * 0.5;
-              ctx.beginPath();
-              ctx.moveTo(pos.x - velocity.x * 2, pos.y - velocity.y * 2);
-              ctx.lineTo(pos.x, pos.y);
-              ctx.stroke();
+            // Dust trail for light materials
+            if (speed > 0.5) {
+              ctx.fillStyle = `rgba(180, 180, 200, ${Math.min(speed * 0.2, 0.4)})`;
+              for (let i = 1; i <= 3; i++) {
+                const dustSize = effectiveSize * (0.3 / i);
+                ctx.beginPath();
+                ctx.arc(-i * 5, (Math.random() - 0.5) * 4, dustSize, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           } else {
-            // Medium density: standard glow
-            ctx.shadowColor = debris.color;
-            ctx.shadowBlur = 4;
+            // Medium density: standard effects with bounce enhancement
+            ctx.shadowColor = baseColor;
+            ctx.shadowBlur = 6 + (bounceCount * 2); // Glow increases with bounces
           }
           
-          // Particle size based on fragmentation
-          const effectiveSize = debris.size * (0.5 + fragmentation * 0.5);
+          // Main particle with enhanced shape based on material
+          ctx.fillStyle = baseColor;
           
-          // Draw main particle
-          ctx.beginPath();
-          ctx.arc(pos.x, pos.y, effectiveSize, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Material-specific additional effects
-          ctx.shadowBlur = 0;
-          
-          // Hardness indicator (crystal-like sparkle for hard materials)
           if (hardness >= 7) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            // Hard materials: angular, crystalline shapes
             ctx.beginPath();
-            ctx.arc(pos.x - effectiveSize * 0.3, pos.y - effectiveSize * 0.3, effectiveSize * 0.2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Diamond sparkle pattern for very hard materials
-            if (hardness >= 9) {
-              ctx.strokeStyle = 'rgba(200, 255, 255, 0.7)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(pos.x - effectiveSize * 0.6, pos.y);
-              ctx.lineTo(pos.x + effectiveSize * 0.6, pos.y);
-              ctx.moveTo(pos.x, pos.y - effectiveSize * 0.6);
-              ctx.lineTo(pos.x, pos.y + effectiveSize * 0.6);
-              ctx.stroke();
-            }
-          } else if (hardness <= 3) {
-            // Soft materials: dusty effect
-            ctx.fillStyle = `rgba(150, 100, 80, ${0.3 + Math.random() * 0.2})`;
-            for (let i = 0; i < 3; i++) {
-              const dustX = pos.x + (Math.random() - 0.5) * effectiveSize * 2;
-              const dustY = pos.y + (Math.random() - 0.5) * effectiveSize * 2;
-              ctx.beginPath();
-              ctx.arc(dustX, dustY, effectiveSize * 0.1, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else {
-            // Standard highlight for medium hardness
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.beginPath();
-            ctx.arc(pos.x - effectiveSize * 0.2, pos.y - effectiveSize * 0.2, effectiveSize * 0.4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          
-          // Valuable material golden sparkles
-          if (value > 10) {
-            const sparkleIntensity = Math.min(value / 50, 1);
-            ctx.fillStyle = `rgba(255, 215, 0, ${sparkleIntensity * 0.8})`;
-            
-            for (let i = 0; i < Math.floor(value / 15); i++) {
-              const sparkleX = pos.x + (Math.random() - 0.5) * effectiveSize * 1.5;
-              const sparkleY = pos.y + (Math.random() - 0.5) * effectiveSize * 1.5;
-              ctx.beginPath();
-              ctx.arc(sparkleX, sparkleY, 0.5, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-          
-          // Fragmentation indicator (jagged edges for fragile materials)
-          if (fragmentation > 0.7) {
-            ctx.strokeStyle = `rgba(100, 100, 100, 0.6)`;
-            ctx.lineWidth = 1;
-            const segments = 6;
-            ctx.beginPath();
-            for (let i = 0; i < segments; i++) {
-              const angle = (i / segments) * Math.PI * 2;
-              const radius = effectiveSize * (0.8 + Math.random() * 0.4);
-              const x = pos.x + Math.cos(angle) * radius;
-              const y = pos.y + Math.sin(angle) * radius;
+            const sides = 6;
+            for (let i = 0; i < sides; i++) {
+              const angle = (i * Math.PI * 2 / sides);
+              const x = Math.cos(angle) * effectiveSize;
+              const y = Math.sin(angle) * effectiveSize;
               if (i === 0) ctx.moveTo(x, y);
               else ctx.lineTo(x, y);
             }
             ctx.closePath();
-            ctx.stroke();
+            ctx.fill();
+          } else if (fragmentation > 0.7) {
+            // High fragmentation: irregular shapes
+            ctx.beginPath();
+            const irregularity = fragmentation * 0.3;
+            for (let i = 0; i < 8; i++) {
+              const angle = (i * Math.PI * 2 / 8);
+              const variation = 1 + (Math.sin(angle * 3 + rotation) * irregularity);
+              const x = Math.cos(angle) * effectiveSize * variation;
+              const y = Math.sin(angle) * effectiveSize * variation;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            // Standard materials: circular particles
+            ctx.beginPath();
+            ctx.arc(0, 0, effectiveSize, 0, Math.PI * 2);
+            ctx.fill();
           }
           
+          // Enhanced material-specific additional effects
+          ctx.shadowBlur = 0;
+          
+          // Hardness indicator with enhanced sparkle effects for falling debris
+          if (hardness >= 7) {
+            // Bright highlight spot
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + (speed * 0.1)})`;
+            ctx.beginPath();
+            ctx.arc(-effectiveSize * 0.3, -effectiveSize * 0.3, effectiveSize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Enhanced sparkle pattern for very hard materials with rotation
+            if (hardness >= 9) {
+              ctx.strokeStyle = `rgba(200, 255, 255, ${0.5 + (speed * 0.2)})`;
+              ctx.lineWidth = Math.max(1, effectiveSize * 0.1);
+              ctx.beginPath();
+              // Rotating cross pattern
+              ctx.moveTo(-effectiveSize * 0.8, 0);
+              ctx.lineTo(effectiveSize * 0.8, 0);
+              ctx.moveTo(0, -effectiveSize * 0.8);
+              ctx.lineTo(0, effectiveSize * 0.8);
+              // Diagonal cross
+              ctx.moveTo(-effectiveSize * 0.6, -effectiveSize * 0.6);
+              ctx.lineTo(effectiveSize * 0.6, effectiveSize * 0.6);
+              ctx.moveTo(effectiveSize * 0.6, -effectiveSize * 0.6);
+              ctx.lineTo(-effectiveSize * 0.6, effectiveSize * 0.6);
+              ctx.stroke();
+            }
+          }
+          
+          // Enhanced valuable materials with dynamic shimmer based on movement
+          const economicValue = materialProps.economic_value || 1;
+          if (economicValue >= 5) {
+            const shimmerIntensity = 0.3 + (speed * 0.1) + (Math.sin(Date.now() * 0.01) * 0.2);
+            ctx.fillStyle = `rgba(255, 215, 0, ${shimmerIntensity})`;
+            ctx.beginPath();
+            ctx.arc(effectiveSize * 0.4, -effectiveSize * 0.4, effectiveSize * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Extra sparkle for very valuable materials
+            if (economicValue >= 10) {
+              ctx.fillStyle = `rgba(255, 255, 150, ${shimmerIntensity * 0.8})`;
+              ctx.beginPath();
+              ctx.arc(-effectiveSize * 0.2, effectiveSize * 0.3, effectiveSize * 0.1, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          
+          // Bounce effect indicator
+          if (bounceCount > 0 && bounceCount < 5) {
+            const bounceGlow = Math.max(0, 1 - (age / 2000)); // Fade over 2 seconds
+            ctx.strokeStyle = `rgba(255, 100, 100, ${bounceGlow * 0.5})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, effectiveSize * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
           ctx.restore();
         });
       }
@@ -649,6 +711,79 @@ const OreGridCanvas = forwardRef(({
         ctx.fillRect(x, y + height - cornerSize, cornerSize, cornerSize);
       }
     }
+  }, []);
+
+  // Render crack patterns on damaged blocks
+  const renderCrackPatterns = useCallback((ctx, x, y, width, height, block) => {
+    if (!block.crackPatterns || block.crackPatterns.length === 0) return;
+    
+    ctx.save();
+    
+    // Set up crack rendering properties
+    const baseColor = block.getColor();
+    const crackIntensity = Math.min(1, block.crackLevel / 3);
+    
+    // Create darker version of block color for cracks
+    const crackColor = darkenColor(baseColor, 0.6 + (crackIntensity * 0.3));
+    
+    // Render each crack pattern
+    block.crackPatterns.forEach(crack => {
+      ctx.strokeStyle = crackColor;
+      ctx.lineWidth = Math.max(1, crack.width * (width / 30)); // Scale with cell size
+      ctx.globalAlpha = crack.opacity * crackIntensity;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Start the crack path
+      ctx.beginPath();
+      
+      // Convert normalized coordinates to pixel coordinates
+      const startX = x + crack.start.x * width;
+      const startY = y + crack.start.y * height;
+      const endX = x + crack.end.x * width;
+      const endY = y + crack.end.y * height;
+      
+      ctx.moveTo(startX, startY);
+      
+      // Draw through mid points for irregular cracks
+      if (crack.midPoints && crack.midPoints.length > 0) {
+        crack.midPoints.forEach(point => {
+          const midX = x + point.x * width;
+          const midY = y + point.y * height;
+          ctx.lineTo(midX, midY);
+        });
+      }
+      
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      
+      // Add subtle glow for more visible cracks on higher damage levels
+      if (block.crackLevel >= 2) {
+        ctx.shadowColor = crackColor;
+        ctx.shadowBlur = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    });
+    
+    ctx.restore();
+  }, []);
+  
+  // Helper function to darken colors for crack effect
+  const darkenColor = useCallback((hexColor, factor) => {
+    // Convert hex to RGB
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    // Darken by factor
+    const newR = Math.floor(r * factor);
+    const newG = Math.floor(g * factor);
+    const newB = Math.floor(b * factor);
+    
+    // Convert back to hex
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
   }, []);
 
   const handleMouseMove = (event) => {
