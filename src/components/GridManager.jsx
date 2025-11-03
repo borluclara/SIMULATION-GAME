@@ -47,16 +47,12 @@ const GridManager = () => {
     reader.readAsText(file);
   };
 
-  // Handle block click for blasting
+  // Block click functionality removed - ore blocks should only explode with explosives
   const handleBlockClick = (block, position) => {
-    if (!block || block.isDestroyed) return;
-
-    const blastResult = applyBlast(block.x, block.y, blastRadius, blastPower, blastDirection);
-    
-    console.log('Blast applied!', {
-      target: `${block.oreType} at (${block.x}, ${block.y})`,
-      direction: `${blastDirection}°`,
-      result: blastResult
+    // No action on block click - explosives must be placed and triggered manually
+    console.log('Block clicked, but no action taken:', {
+      block: block ? `${block.oreType} at (${block.x}, ${block.y})` : 'null',
+      position
     });
   };
 
@@ -131,7 +127,7 @@ const GridManager = () => {
               />
             </div>
             <p className="canvas-helper-text">
-              Click on any ore block to apply a blast effect
+              Place explosives and trigger them to blast ore blocks
             </p>
           </div>
 

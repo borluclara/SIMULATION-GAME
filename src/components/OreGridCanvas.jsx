@@ -543,7 +543,7 @@ const OreGridCanvas = forwardRef(({
           maxHeight: '100%',
           display: canvasDimensions.width > 0 ? 'block' : 'none'
         }}
-        aria-label="Interactive ore grid - click on blocks to apply blast effects"
+        aria-label="Interactive ore grid - place explosives to blast ore blocks"
         role="img"
       />
       

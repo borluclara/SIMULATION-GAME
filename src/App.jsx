@@ -303,52 +303,8 @@ function App() {
         alert('Maximum number of blasts reached!')
       }
     } else {
-      // Apply immediate blast with displacement
-      if (oreGrid && block) {
-        console.log('Applying blast with displacement at:', position);
-        
-        // Calculate blast parameters based on current power setting
-        const blastRadius = Math.max(2, Math.min(5, blastPower / 200)); // Scale radius with power
-        const effectivePower = blastPower / 10; // Scale power for damage calculation
-        
-        // Apply blast with displacement
-        const blastResult = oreGrid.applyBlast(
-          position.x, 
-          position.y, 
-          blastRadius, 
-          effectivePower
-        );
-        
-        if (blastResult) {
-          console.log('Blast result:', {
-            affected: blastResult.affectedBlocks.length,
-            destroyed: blastResult.destroyedBlocks.length,
-            displaced: blastResult.displacedBlocks.length
-          });
-
-          // Log displacement details for debugging
-          if (blastResult.displacedBlocks.length > 0) {
-            console.log('Displacement details:');
-            blastResult.displacedBlocks.forEach((displacement, index) => {
-              console.log(`  ${index + 1}. ${displacement.block.oreType} moved from (${displacement.originalX},${displacement.originalY}) to (${displacement.newX},${displacement.newY}) with force ${displacement.force.toFixed(2)}`);
-            });
-          }
-          
-          // Update score based on affected blocks
-          const scoreIncrease = blastResult.affectedBlocks.length * 5;
-          addScore(scoreIncrease);
-          
-          // Update mineral recovery and dilution based on results
-          const recovery = Math.max(60, 100 - (blastResult.destroyedBlocks.length * 5));
-          const newDilution = Math.max(0, (blastResult.affectedBlocks.length / 10));
-          
-          setMineralRecovery(Math.round(recovery));
-          setDilution(Math.round(newDilution));
-          
-          // Force canvas re-render by updating the grid reference
-          setOreGrid({...oreGrid}); // Shallow copy to trigger re-render
-        }
-      }
+      // No direct blasting - explosives must be placed and triggered
+      console.log('Block clicked, but direct blasting is disabled. Use placement mode to add explosives.');
     }
   }
 
@@ -691,7 +647,7 @@ function App() {
                   <p className="canvas-instruction">
                     {placementMode 
                       ? "Click on grid cells to place explosives" 
-                      : "Click on ore blocks to create instant blast displacement effects"}
+                      : "Enable placement mode to add explosives, then trigger blasts"}
                   </p>
                 </div>
               </div>
