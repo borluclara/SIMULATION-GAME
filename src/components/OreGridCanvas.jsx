@@ -216,23 +216,8 @@ const OreGridCanvas = forwardRef(({
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
           }
           
-          // Add hover highlighting
-          if (hoveredBlock && hoveredBlock.x === x && hoveredBlock.y === y) {
-            // Check if cell is already occupied by a blast marker
-            const isOccupied = blastMarkers && blastMarkers.some(blast => blast.x === x && blast.y === y);
-            
-            if (!isOccupied && !block?.isDestroyed) {
-              // Highlight available cells
-              ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-              
-              // Add glowing border for hover effect
-              ctx.strokeStyle = '#00ff88';
-              ctx.lineWidth = 2;
-              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
-            }
-            // Removed red highlight for occupied/unavailable cells
-          }
+          // Hover highlighting removed
+          // No visual effects when hovering over grid cells
           
           if (showGrid && scaledCellSize > 8) {
             ctx.strokeStyle = block ? '#666666' : '#444444';
@@ -630,49 +615,11 @@ const OreGridCanvas = forwardRef(({
       ctx.setLineDash([]);
     }
     
-    // Fragmentation visualization
-    if (materialTexture.showCracks) {
-      ctx.strokeStyle = 'rgba(100, 100, 100, 0.4)';
-      ctx.lineWidth = 1;
-      
-      // Draw crack patterns for fragile materials
-      const centerX = x + width / 2;
-      const centerY = y + height / 2;
-      
-      // Diagonal cracks
-      ctx.beginPath();
-      ctx.moveTo(x + width * 0.2, y + height * 0.2);
-      ctx.lineTo(x + width * 0.8, y + height * 0.8);
-      ctx.moveTo(x + width * 0.8, y + height * 0.2);
-      ctx.lineTo(x + width * 0.2, y + height * 0.8);
-      ctx.stroke();
-    }
+    // Fragmentation visualization removed
+    // No X marks or crack patterns on materials
     
-    // Valuable ore sparkles
-    if (materialTexture.showSparkles && cellSize > 16) {
-      const sparkleCount = Math.floor(cellSize / 12);
-      ctx.fillStyle = 'rgba(255, 255, 200, 0.8)';
-      
-      for (let i = 0; i < sparkleCount; i++) {
-        const sparkleX = x + Math.random() * width;
-        const sparkleY = y + Math.random() * height;
-        const sparkleSize = 1 + Math.random() * 2;
-        
-        ctx.beginPath();
-        ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Small star sparkles
-        ctx.strokeStyle = 'rgba(255, 255, 200, 0.6)';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(sparkleX - sparkleSize, sparkleY);
-        ctx.lineTo(sparkleX + sparkleSize, sparkleY);
-        ctx.moveTo(sparkleX, sparkleY - sparkleSize);
-        ctx.lineTo(sparkleX, sparkleY + sparkleSize);
-        ctx.stroke();
-      }
-    }
+    // Valuable ore sparkles removed
+    // No sparkly effects on valuable materials
     
     // Grain texture for soft materials
     if (materialTexture.showGrain && cellSize > 12) {
