@@ -9,26 +9,20 @@ const BlastToolPanel = ({
   onSimulate, 
   onReset 
 }) => {
-  // Helper function to get direction name
-  const getDirectionName = (angle) => {
-    const directions = [
-      { name: 'North', angle: 0 },
-      { name: 'NE', angle: 45 },
-      { name: 'East', angle: 90 },
-      { name: 'SE', angle: 135 },
-      { name: 'South', angle: 180 },
-      { name: 'SW', angle: 225 },
-      { name: 'West', angle: 270 },
-      { name: 'NW', angle: 315 }
-    ];
+  // Helper function to get precise direction name following real-world bearing conventions
+  const getDirectionName = (degrees) => {
+    const normalized = ((degrees % 360) + 360) % 360;
     
-    const closest = directions.reduce((prev, curr) => {
-      const prevDiff = Math.abs(prev.angle - angle);
-      const currDiff = Math.abs(curr.angle - angle);
-      return currDiff < prevDiff ? curr : prev;
-    });
+    if (normalized === 0 || normalized === 360) return "North";
+    if (normalized > 0 && normalized < 90) return "Northeast";
+    if (normalized === 90) return "East";
+    if (normalized > 90 && normalized < 180) return "Southeast";
+    if (normalized === 180) return "South";
+    if (normalized > 180 && normalized < 270) return "Southwest";
+    if (normalized === 270) return "West";
+    if (normalized > 270 && normalized < 360) return "Northwest";
     
-    return closest.name;
+    return "Unknown";
   };
 
   // Arrow button handlers

@@ -3,6 +3,38 @@
  * Handles ore block data, color mapping, and grid operations
  */
 
+// Utility functions for directional calculations
+/**
+ * Get bearing name from degrees following real-world conventions
+ * @param {number} degrees - Direction in degrees (0-360)
+ * @returns {string} - Bearing name (e.g., "North", "Northeast", etc.)
+ */
+function getBearingName(degrees) {
+  const normalized = ((degrees % 360) + 360) % 360; // Normalize to 0-360
+  
+  if (normalized === 0 || normalized === 360) return "North";
+  if (normalized > 0 && normalized < 90) return "Northeast";
+  if (normalized === 90) return "East";
+  if (normalized > 90 && normalized < 180) return "Southeast";
+  if (normalized === 180) return "South";
+  if (normalized > 180 && normalized < 270) return "Southwest";
+  if (normalized === 270) return "West";
+  if (normalized > 270 && normalized < 360) return "Northwest";
+  
+  return "Unknown";
+}
+
+/**
+ * Validate and log direction for debugging
+ * @param {number} direction - Direction in degrees
+ * @param {string} context - Context for logging
+ */
+function validateDirection(direction, context = "") {
+  const bearing = getBearingName(direction);
+  console.log(`Direction ${context}: ${direction}° (${bearing})`);
+  return direction;
+}
+
 // Define ore type to color mapping - Updated to match vibrant design
 export const ORE_COLORS = {
   stone: '#8B4513',     // Saddle brown (rich brown)
@@ -226,6 +258,12 @@ export class OreGrid {
    */
   applyBlast(centerX, centerY, radius, power, direction = null) {
     const startTime = performance.now(); // Performance monitoring
+    
+    // Validate and log direction for debugging
+    if (direction !== null) {
+      validateDirection(direction, `blast at (${centerX}, ${centerY})`);
+    }
+    
     const affectedBlocks = [];
     const destroyedBlocks = [];
     const displacedBlocks = [];
@@ -261,14 +299,26 @@ export class OreGrid {
             
             // Apply directional bias to damage if direction is specified
             if (direction !== null) {
+              // Convert direction to radians (0° = North, 90° = East, 180° = South, 270° = West)
               const directionRadians = (direction * Math.PI) / 180;
+              
+              // Calculate angle from blast center to block (standard atan2: 0° = East, 90° = North)
               const blockAngle = Math.atan2(y - centerY, x - centerX);
-              const angleFromDirection = Math.abs(blockAngle - (directionRadians - Math.PI/2));
-              const normalizedAngle = Math.min(angleFromDirection, 2 * Math.PI - angleFromDirection);
+              
+              // Convert blast direction to standard mathematical convention for comparison
+              // Our direction: 0° = North (-Y), but math convention: 0° = East (+X)
+              // So we need to rotate by -90° to align: directionRadians - Math.PI/2
+              const adjustedDirectionAngle = directionRadians - Math.PI/2;
+              
+              // Calculate angular difference between block direction and blast direction
+              let angleFromDirection = Math.abs(blockAngle - adjustedDirectionAngle);
+              
+              // Normalize angle to [0, π] (shortest angular distance)
+              angleFromDirection = Math.min(angleFromDirection, 2 * Math.PI - angleFromDirection);
               
               // Boost damage in the direction of the blast (within 90-degree cone)
-              if (normalizedAngle <= Math.PI / 2) {
-                const directionBoost = 1 + (0.5 * (1 - normalizedAngle / (Math.PI / 2)));
+              if (angleFromDirection <= Math.PI / 2) {
+                const directionBoost = 1 + (0.5 * (1 - angleFromDirection / (Math.PI / 2)));
                 damageFactor *= directionBoost;
               }
             }

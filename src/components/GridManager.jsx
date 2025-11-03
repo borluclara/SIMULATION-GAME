@@ -10,6 +10,22 @@ import OreGridCanvas from './OreGridCanvas';
 import { ORE_COLORS } from '../utils/OreGrid';
 import './GridManager.css';
 
+// Utility function to get bearing name from degrees
+const getBearingName = (degrees) => {
+  const normalized = ((degrees % 360) + 360) % 360;
+  
+  if (normalized === 0 || normalized === 360) return "North";
+  if (normalized > 0 && normalized < 90) return "Northeast";
+  if (normalized === 90) return "East";
+  if (normalized > 90 && normalized < 180) return "Southeast";
+  if (normalized === 180) return "South";
+  if (normalized > 180 && normalized < 270) return "Southwest";
+  if (normalized === 270) return "West";
+  if (normalized > 270 && normalized < 360) return "Northwest";
+  
+  return "Unknown";
+};
+
 const GridManager = () => {
   const {
     grid,
@@ -158,7 +174,9 @@ const GridManager = () => {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-base font-medium text-white dark:text-white">Direction</label>
-                  <span className="text-sm font-normal text-white/80 dark:text-white/80">{blastDirection}°</span>
+                  <span className="text-sm font-normal text-white/80 dark:text-white/80">
+                    {blastDirection}° ({getBearingName(blastDirection)})
+                  </span>
                 </div>
                 <div className="relative h-2 w-full rounded-full bg-white/20 dark:bg-white/20">
                   <div 
