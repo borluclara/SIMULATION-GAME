@@ -9,6 +9,7 @@ import BlastToolPanel from './components/BlastToolPanel'
 import BlastPlacementPanel from './components/BlastPlacementPanel'
 import BlastSummaryPanel from './components/BlastSummaryPanel'
 import ScoreFeedback from './components/ScoreFeedback'
+import MaterialLegend from './components/MaterialLegend'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
@@ -685,6 +686,9 @@ function App() {
           )}
         </main>
       </div>
+      
+      {/* Material Legend - only show in game view */}
+      <MaterialLegend grid={oreGrid} />
     </div>
   )
 
