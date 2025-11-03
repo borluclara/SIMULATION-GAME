@@ -173,12 +173,7 @@ const OreGridCanvas = forwardRef(({
             ctx.fillStyle = gradient;
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             
-            // Damage visualization
-            if (block.damage > 0) {
-              const damageIntensity = (block.damage / block.maxHealth) * 0.4;
-              ctx.fillStyle = `rgba(255, 100, 100, ${damageIntensity})`;
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            }
+            // Damage visualization removed (preserve original material colors after blasts)
             
             // NEW: Crack visualization for damaged blocks
             if (block.crackLevel > 0 && block.crackPatterns && block.crackPatterns.length > 0) {

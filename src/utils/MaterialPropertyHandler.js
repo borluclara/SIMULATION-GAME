@@ -469,19 +469,9 @@ export const materialPropertyHandler = new MaterialPropertyHandler();
 
 // Export utility functions
 export function getMaterialColor(materialName, damage = 0, maxHealth = 100) {
+  // Always return stable material color; ignore damage for visual consistency
   const props = materialPropertyHandler.getMaterialProperties(materialName);
-  
-  // Enhanced material-based coloring system
-  let baseColor = getEnhancedMaterialColor(materialName, props);
-  
-  // Apply damage darkening
-  if (damage > 0) {
-    const damageRatio = damage / maxHealth;
-    const darkenFactor = 1 - (damageRatio * 0.4); // Reduced darkening for better visibility
-    return adjustColorBrightness(baseColor, darkenFactor);
-  }
-  
-  return baseColor;
+  return getEnhancedMaterialColor(materialName, props);
 }
 
 /**

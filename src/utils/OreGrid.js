@@ -175,7 +175,9 @@ export class OreBlock {
     // Check for fragmentation before applying damage
     const willFragment = this.checkFragmentation(effectiveDamage);
     
-    this.health -= effectiveDamage;
+  // Track cumulative damage for reporting/visuals (was not updated previously)
+  this.damage += effectiveDamage;
+  this.health -= effectiveDamage;
     this.lastDamageAmount = effectiveDamage; // Track recent damage for crack generation
     
     if (this.health <= 0) {
@@ -598,6 +600,23 @@ export class OreGrid {
       destroyedBlocks: destroyedBlocks.length,
       displacedBlocks: displacedBlocks.length
     });
+
+    // Edge safeguard: ensure rightmost blasts show effect
+    if (centerX === this.width - 1 && destroyedBlocks.length === 0 && affectedBlocks.length === 0) {
+      const fallbackY = Math.max(0, Math.min(this.height - 1, centerY));
+      const edgeBlock = this.getBlockAtGridPos(centerX, fallbackY);
+      if (edgeBlock && !edgeBlock.isDestroyed) {
+        const forcedDamage = Math.max(5, power * 0.1);
+        const destroyed = edgeBlock.takeDamage(forcedDamage);
+        affectedBlocks.push(edgeBlock);
+        if (destroyed) destroyedBlocks.push(edgeBlock);
+        console.warn('Applied edge fallback blast damage to last-column block:', {
+          x: centerX,
+          y: fallbackY,
+          forcedDamage
+        });
+      }
+    }
 
     return {
       affectedBlocks,
