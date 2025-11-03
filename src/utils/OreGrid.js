@@ -3,6 +3,8 @@
  * Handles ore block data, color mapping, and grid operations
  */
 
+import { materialPropertyHandler, getMaterialColor } from './MaterialPropertyHandler.js';
+
 // Utility functions for directional calculations
 /**
  * Get bearing name from degrees following real-world conventions
@@ -73,7 +75,7 @@ export const ORE_PROPERTIES = {
  * Represents a single ore block in the grid
  */
 export class OreBlock {
-  constructor(x, y, oreType, hardness = 100, value = 10) {
+  constructor(x, y, oreType, hardness = 100, value = 10, materialProperties = null) {
     this.x = x;
     this.y = y;
     this.oreType = oreType;
@@ -85,6 +87,37 @@ export class OreBlock {
     this.isDestroyed = false;
     this.recentlyDisplaced = false; // Track displacement for visual effects
     this.displacementTimer = null;   // Timer for clearing displacement flag
+    
+    // Material properties integration
+    this.materialProperties = materialProperties || materialPropertyHandler.getMaterialProperties(oreType);
+  }
+
+  /**
+   * Get material-based blast resistance
+   */
+  getBlastResistance() {
+    return this.materialProperties?.blast_resistance || 0.5;
+  }
+
+  /**
+   * Get material density for physics calculations
+   */
+  getDensity() {
+    return this.materialProperties?.density || 2.7;
+  }
+
+  /**
+   * Get fragmentation index for break behavior
+   */
+  getFragmentationIndex() {
+    return this.materialProperties?.fragmentation_index || 0.5;
+  }
+
+  /**
+   * Get material hardness
+   */
+  getMaterialHardness() {
+    return this.materialProperties?.hardness || 5;
   }
 
   /**
@@ -106,16 +139,8 @@ export class OreBlock {
       return '#1a1a1a'; // Dark for destroyed blocks
     }
     
-    const baseColor = ORE_COLORS[this.oreType] || ORE_COLORS.default;
-    
-    // Darken color based on damage
-    if (this.damage > 0) {
-      const damageRatio = this.damage / this.maxHealth;
-      const darkenFactor = 1 - (damageRatio * 0.5);
-      return this.adjustColorBrightness(baseColor, darkenFactor);
-    }
-    
-    return baseColor;
+    // Use material-based coloring
+    return getMaterialColor(this.oreType, this.damage, this.maxHealth);
   }
 
   /**
@@ -132,12 +157,16 @@ export class OreBlock {
   }
 
   /**
-   * Apply blast damage to this block
+   * Apply blast damage to this block with material resistance
    */
   takeDamage(damage) {
     if (this.isDestroyed) return false;
     
-    this.health -= damage;
+    // Apply material-based blast resistance
+    const resistance = this.getBlastResistance();
+    const effectiveDamage = materialPropertyHandler.calculateBlastEffectiveness(this.oreType, damage);
+    
+    this.health -= effectiveDamage;
     if (this.health <= 0) {
       this.isDestroyed = true;
       return true; // Block was destroyed
@@ -172,11 +201,14 @@ export class OreGrid {
   }
 
   /**
-   * Create grid from CSV data
+   * Create grid from CSV data with material property integration
    */
   static fromCSVData(csvData) {
     const lines = csvData.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
+    
+    // Load material properties from CSV if columns exist
+    materialPropertyHandler.loadFromCSV(csvData);
     
     // Find required columns
     const xIndex = headers.findIndex(h => h.toLowerCase().includes('x'));
@@ -204,7 +236,9 @@ export class OreGrid {
       const value = valueIndex !== -1 ? parseInt(row[valueIndex]) || 10 : 10;
 
       if (!isNaN(x) && !isNaN(y) && oreType) {
-        blocks.push(new OreBlock(x, y, oreType, hardness, value));
+        // Get material properties for this block
+        const materialProperties = materialPropertyHandler.getMaterialProperties(oreType);
+        blocks.push(new OreBlock(x, y, oreType, hardness, value, materialProperties));
         maxX = Math.max(maxX, x);
         maxY = Math.max(maxY, y);
       }
@@ -495,19 +529,10 @@ export class OreGrid {
   }
 
   /**
-   * Get material resistance to displacement
+   * Get material resistance to displacement using material properties
    */
   getMaterialResistance(oreType) {
-    const resistanceMap = {
-      'diamond': 0.3,  // Very resistant
-      'gold': 0.5,     // Resistant
-      'iron': 0.6,     // Somewhat resistant
-      'silver': 0.7,   // Somewhat resistant
-      'copper': 0.8,   // Less resistant
-      'stone': 0.9,    // Not very resistant
-      'coal': 1.0      // Least resistant
-    };
-    return resistanceMap[oreType.toLowerCase()] || 0.8;
+    return materialPropertyHandler.getDisplacementResistance(oreType);
   }
 
   /**

@@ -13,6 +13,7 @@ import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
 import { blastAnimationEngine } from './utils/BlastAnimationEngine'
+import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 
 function App() {
   // Use global game state instead of individual state variables
