@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import './OreGridCanvas.css';
+import { getMaterialTexture, getMovementBehavior } from '../utils/MaterialPropertyHandler';
 
 const OreGridCanvas = forwardRef(({ 
   grid, 
@@ -154,31 +155,44 @@ const OreGridCanvas = forwardRef(({
               continue;
             }
 
+            // Enhanced material-based rendering
+            const materialTexture = getMaterialTexture(block.oreType);
+            const movementBehavior = getMovementBehavior(block.oreType);
+            
+            // Base color
             ctx.fillStyle = block.getColor();
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             
+            // Material-specific visual effects
+            renderMaterialEffects(ctx, pixelX, pixelY, cellWidth, cellHeight, block, materialTexture);
+            
+            // Base gradient for depth
             const gradient = ctx.createLinearGradient(pixelX, pixelY, pixelX + cellWidth, pixelY + cellHeight);
             gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
             ctx.fillStyle = gradient;
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             
+            // Damage visualization
             if (block.damage > 0) {
               const damageIntensity = (block.damage / block.maxHealth) * 0.4;
               ctx.fillStyle = `rgba(255, 100, 100, ${damageIntensity})`;
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
             
-            // Add displacement visual effects
+            // Enhanced displacement visual effects with movement behavior
             if (block.recentlyDisplaced) {
-              ctx.strokeStyle = '#00ff88';
+              const displacementColor = movementBehavior.movementColor;
+              ctx.strokeStyle = displacementColor;
               ctx.lineWidth = 2;
               ctx.setLineDash([4, 4]);
               ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
               ctx.setLineDash([]); // Reset line dash
               
-              // Add subtle glow effect for displaced blocks
-              ctx.fillStyle = 'rgba(0, 255, 136, 0.15)';
+              // Movement range indicator
+              const alpha = movementBehavior.displacementRange === 'far' ? 0.25 : 
+                           movementBehavior.displacementRange === 'medium' ? 0.15 : 0.08;
+              ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
               ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
             }
             
@@ -327,29 +341,129 @@ const OreGridCanvas = forwardRef(({
         });
       }
 
-      // *** NEW: Draw physics debris particles ***
+      // *** NEW: Draw physics debris particles with material properties ***
       if (physicsDebris && physicsDebris.length > 0) {
         console.log('Canvas: Drawing', physicsDebris.length, 'debris particles');
         physicsDebris.forEach(debris => {
           const pos = debris.body.position;
-          console.log('Drawing debris at:', pos.x, pos.y);
+          const velocity = debris.body.velocity;
+          const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
           
-          // Draw particle with glow effect
           ctx.save();
+          
+          // Material-based particle rendering
+          const materialProps = debris.materialProps || {};
+          const density = materialProps.density || 2.5;
+          const hardness = materialProps.hardness || 5;
+          const fragmentation = materialProps.fragmentation_index || 0.5;
+          const value = materialProps.economic_value || 1;
+          
+          // Base particle color from material
           ctx.fillStyle = debris.color;
-          ctx.shadowColor = debris.color;
-          ctx.shadowBlur = 4;
           
+          // Material-specific visual effects
+          if (density > 4.0) {
+            // Dense materials: strong glow, less motion blur
+            ctx.shadowColor = debris.color;
+            ctx.shadowBlur = 6;
+          } else if (density < 2.0) {
+            // Light materials: scattered glow, motion blur
+            ctx.shadowColor = 'rgba(200, 200, 255, 0.5)';
+            ctx.shadowBlur = 8;
+            
+            // Motion trail for light particles
+            if (speed > 2) {
+              ctx.strokeStyle = `rgba(200, 200, 255, ${Math.min(speed * 0.1, 0.6)})`;
+              ctx.lineWidth = debris.size * 0.5;
+              ctx.beginPath();
+              ctx.moveTo(pos.x - velocity.x * 2, pos.y - velocity.y * 2);
+              ctx.lineTo(pos.x, pos.y);
+              ctx.stroke();
+            }
+          } else {
+            // Medium density: standard glow
+            ctx.shadowColor = debris.color;
+            ctx.shadowBlur = 4;
+          }
+          
+          // Particle size based on fragmentation
+          const effectiveSize = debris.size * (0.5 + fragmentation * 0.5);
+          
+          // Draw main particle
           ctx.beginPath();
-          ctx.arc(pos.x, pos.y, debris.size, 0, Math.PI * 2);
+          ctx.arc(pos.x, pos.y, effectiveSize, 0, Math.PI * 2);
           ctx.fill();
           
-          // Add inner highlight
+          // Material-specific additional effects
           ctx.shadowBlur = 0;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.beginPath();
-          ctx.arc(pos.x - debris.size * 0.2, pos.y - debris.size * 0.2, debris.size * 0.4, 0, Math.PI * 2);
-          ctx.fill();
+          
+          // Hardness indicator (crystal-like sparkle for hard materials)
+          if (hardness >= 7) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(pos.x - effectiveSize * 0.3, pos.y - effectiveSize * 0.3, effectiveSize * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Diamond sparkle pattern for very hard materials
+            if (hardness >= 9) {
+              ctx.strokeStyle = 'rgba(200, 255, 255, 0.7)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pos.x - effectiveSize * 0.6, pos.y);
+              ctx.lineTo(pos.x + effectiveSize * 0.6, pos.y);
+              ctx.moveTo(pos.x, pos.y - effectiveSize * 0.6);
+              ctx.lineTo(pos.x, pos.y + effectiveSize * 0.6);
+              ctx.stroke();
+            }
+          } else if (hardness <= 3) {
+            // Soft materials: dusty effect
+            ctx.fillStyle = `rgba(150, 100, 80, ${0.3 + Math.random() * 0.2})`;
+            for (let i = 0; i < 3; i++) {
+              const dustX = pos.x + (Math.random() - 0.5) * effectiveSize * 2;
+              const dustY = pos.y + (Math.random() - 0.5) * effectiveSize * 2;
+              ctx.beginPath();
+              ctx.arc(dustX, dustY, effectiveSize * 0.1, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else {
+            // Standard highlight for medium hardness
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(pos.x - effectiveSize * 0.2, pos.y - effectiveSize * 0.2, effectiveSize * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          // Valuable material golden sparkles
+          if (value > 10) {
+            const sparkleIntensity = Math.min(value / 50, 1);
+            ctx.fillStyle = `rgba(255, 215, 0, ${sparkleIntensity * 0.8})`;
+            
+            for (let i = 0; i < Math.floor(value / 15); i++) {
+              const sparkleX = pos.x + (Math.random() - 0.5) * effectiveSize * 1.5;
+              const sparkleY = pos.y + (Math.random() - 0.5) * effectiveSize * 1.5;
+              ctx.beginPath();
+              ctx.arc(sparkleX, sparkleY, 0.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          
+          // Fragmentation indicator (jagged edges for fragile materials)
+          if (fragmentation > 0.7) {
+            ctx.strokeStyle = `rgba(100, 100, 100, 0.6)`;
+            ctx.lineWidth = 1;
+            const segments = 6;
+            ctx.beginPath();
+            for (let i = 0; i < segments; i++) {
+              const angle = (i / segments) * Math.PI * 2;
+              const radius = effectiveSize * (0.8 + Math.random() * 0.4);
+              const x = pos.x + Math.cos(angle) * radius;
+              const y = pos.y + Math.sin(angle) * radius;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+          }
           
           ctx.restore();
         });
@@ -480,6 +594,115 @@ const OreGridCanvas = forwardRef(({
     
     return null;
   };
+
+  // Render material-specific visual effects
+  const renderMaterialEffects = useCallback((ctx, x, y, width, height, block, materialTexture) => {
+    const cellSize = Math.min(width, height);
+    
+    // Hardness visualization
+    if (materialTexture.hardnessLevel === 'very-hard') {
+      // Metallic shine for very hard materials
+      const shineGradient = ctx.createLinearGradient(x, y, x + width * 0.3, y + height * 0.3);
+      shineGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+      shineGradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+      ctx.fillStyle = shineGradient;
+      ctx.fillRect(x, y, width * 0.3, height * 0.3);
+    } else if (materialTexture.hardnessLevel === 'hard') {
+      // Glossy finish for hard materials
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillRect(x, y, width * 0.4, height * 0.1);
+    }
+    
+    // Density visualization - border thickness
+    if (materialTexture.densityLevel === 'very-dense') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x + 1.5, y + 1.5, width - 3, height - 3);
+    } else if (materialTexture.densityLevel === 'dense') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+    } else if (materialTexture.densityLevel === 'light') {
+      ctx.strokeStyle = 'rgba(200, 200, 255, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+      ctx.setLineDash([]);
+    }
+    
+    // Fragmentation visualization
+    if (materialTexture.showCracks) {
+      ctx.strokeStyle = 'rgba(100, 100, 100, 0.4)';
+      ctx.lineWidth = 1;
+      
+      // Draw crack patterns for fragile materials
+      const centerX = x + width / 2;
+      const centerY = y + height / 2;
+      
+      // Diagonal cracks
+      ctx.beginPath();
+      ctx.moveTo(x + width * 0.2, y + height * 0.2);
+      ctx.lineTo(x + width * 0.8, y + height * 0.8);
+      ctx.moveTo(x + width * 0.8, y + height * 0.2);
+      ctx.lineTo(x + width * 0.2, y + height * 0.8);
+      ctx.stroke();
+    }
+    
+    // Valuable ore sparkles
+    if (materialTexture.showSparkles && cellSize > 16) {
+      const sparkleCount = Math.floor(cellSize / 12);
+      ctx.fillStyle = 'rgba(255, 255, 200, 0.8)';
+      
+      for (let i = 0; i < sparkleCount; i++) {
+        const sparkleX = x + Math.random() * width;
+        const sparkleY = y + Math.random() * height;
+        const sparkleSize = 1 + Math.random() * 2;
+        
+        ctx.beginPath();
+        ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Small star sparkles
+        ctx.strokeStyle = 'rgba(255, 255, 200, 0.6)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(sparkleX - sparkleSize, sparkleY);
+        ctx.lineTo(sparkleX + sparkleSize, sparkleY);
+        ctx.moveTo(sparkleX, sparkleY - sparkleSize);
+        ctx.lineTo(sparkleX, sparkleY + sparkleSize);
+        ctx.stroke();
+      }
+    }
+    
+    // Grain texture for soft materials
+    if (materialTexture.showGrain && cellSize > 12) {
+      ctx.fillStyle = 'rgba(160, 120, 80, 0.1)';
+      const grainSize = 2;
+      
+      for (let gx = 0; gx < width; gx += grainSize * 2) {
+        for (let gy = 0; gy < height; gy += grainSize * 2) {
+          if (Math.random() > 0.7) {
+            ctx.fillRect(x + gx, y + gy, grainSize, grainSize);
+          }
+        }
+      }
+    }
+    
+    // Material type indicator corners
+    if (cellSize > 20) {
+      const cornerSize = cellSize * 0.15;
+      
+      if (block.materialProperties?.type === 'ore') {
+        // Gold corner for ore
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.7)';
+        ctx.fillRect(x + width - cornerSize, y, cornerSize, cornerSize);
+      } else if (block.materialProperties?.type === 'waste') {
+        // Gray corner for waste
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+        ctx.fillRect(x, y + height - cornerSize, cornerSize, cornerSize);
+      }
+    }
+  }, []);
 
   const handleMouseMove = (event) => {
     const result = getBlockFromMouseEvent(event);

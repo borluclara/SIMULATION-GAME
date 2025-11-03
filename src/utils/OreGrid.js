@@ -157,21 +157,65 @@ export class OreBlock {
   }
 
   /**
-   * Apply blast damage to this block with material resistance
+   * Apply blast damage to this block with material resistance and fragmentation
    */
   takeDamage(damage) {
     if (this.isDestroyed) return false;
     
     // Apply material-based blast resistance
-    const resistance = this.getBlastResistance();
     const effectiveDamage = materialPropertyHandler.calculateBlastEffectiveness(this.oreType, damage);
+    
+    // Check for fragmentation before applying damage
+    const willFragment = this.checkFragmentation(effectiveDamage);
     
     this.health -= effectiveDamage;
     if (this.health <= 0) {
       this.isDestroyed = true;
+      
+      // Store fragmentation info for physics engine
+      this.fragmentationData = {
+        willFragment: willFragment,
+        fragmentationIndex: this.getFragmentationIndex(),
+        materialDensity: this.getDensity(),
+        hardness: this.getMaterialHardness()
+      };
+      
       return true; // Block was destroyed
     }
+    
+    // Store partial damage fragmentation info
+    if (willFragment) {
+      this.fragmentationData = {
+        willFragment: true,
+        fragmentationIndex: this.getFragmentationIndex(),
+        isPartialDamage: true
+      };
+    }
+    
     return false; // Block survived
+  }
+
+  /**
+   * Check if this block should fragment based on damage and material properties
+   */
+  checkFragmentation(damage) {
+    const materialProps = this.materialProperties || materialPropertyHandler.getMaterialProperties(this.oreType);
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    const hardness = materialProps.hardness || 5;
+    
+    // Calculate fragmentation probability
+    const damageFactor = damage / this.maxHealth;
+    const fragmentationChance = fragmentationIndex * damageFactor;
+    
+    // Hard materials resist fragmentation
+    const hardnessReduction = Math.max(0.1, 1 - (hardness / 15));
+    const finalChance = fragmentationChance * hardnessReduction;
+    
+    // Higher chance if block is nearly destroyed
+    const healthBonus = (this.maxHealth - this.health) / this.maxHealth * 0.3;
+    const totalChance = Math.min(0.9, finalChance + healthBonus);
+    
+    return Math.random() < totalChance;
   }
 
   /**
@@ -477,9 +521,12 @@ export class OreGrid {
   }
 
   /**
-   * Calculate radial displacement based on decayed power
+   * Calculate radial displacement based on decayed power with enhanced material properties
    */
   calculateRadialDisplacement(block, centerX, centerY, distance, decayedPower, maxRadius) {
+    // Get material properties for enhanced calculations
+    const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
+    
     // Direction vector from blast center to block (radial outward)
     const dirX = (block.x - centerX) / distance;
     const dirY = (block.y - centerY) / distance;
@@ -489,19 +536,48 @@ export class OreGrid {
     
     // Additional distance-based reduction for displacement
     const distanceFactor = Math.max(0.1, 1 - (distance / maxRadius));
-    const effectiveForce = baseForce * distanceFactor;
+    let effectiveForce = baseForce * distanceFactor;
 
-    // Material resistance (heavier materials move less)
-    const materialResistance = this.getMaterialResistance(block.oreType);
-    const finalForce = effectiveForce * materialResistance;
+    // ENHANCED MATERIAL COEFFICIENT INTEGRATION
+    
+    // 1. Density-based resistance (heavier materials move less)
+    const density = materialProps.density || 2.7; // g/cm³
+    const densityResistance = this.calculateDensityResistance(density);
+    
+    // 2. Hardness-based resistance (harder materials resist displacement)
+    const hardness = materialProps.hardness || 5; // Mohs scale
+    const hardnessResistance = this.calculateHardnessResistance(hardness);
+    
+    // 3. Combined material resistance factor
+    const materialResistance = densityResistance * hardnessResistance;
+    
+    // 4. Fragmentation factor (affects how force is transmitted)
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    const fragmentationFactor = this.calculateFragmentationFactor(fragmentationIndex);
+    
+    // Apply all material factors to force
+    effectiveForce = effectiveForce * materialResistance * fragmentationFactor;
+    
+    console.log(`Material displacement analysis for ${block.oreType}:`, {
+      density: density,
+      hardness: hardness,
+      fragmentationIndex: fragmentationIndex,
+      densityResistance: densityResistance.toFixed(3),
+      hardnessResistance: hardnessResistance.toFixed(3),
+      fragmentationFactor: fragmentationFactor.toFixed(3),
+      finalResistance: materialResistance.toFixed(3),
+      baseForce: baseForce.toFixed(3),
+      effectiveForce: effectiveForce.toFixed(3)
+    });
 
-    // Calculate displacement magnitude (max 2 grid units, scaled by force)
-    const maxDisplacement = 2;
-    const displacementMagnitude = Math.min(maxDisplacement, finalForce * 3);
+    // Calculate displacement magnitude with enhanced scaling
+    const maxDisplacement = this.calculateMaxDisplacement(materialProps);
+    const displacementMagnitude = Math.min(maxDisplacement, effectiveForce * 4);
 
-    // Only apply displacement if force is significant enough
-    if (displacementMagnitude < 0.2) {
-      return null; // Too weak to cause displacement
+    // Apply minimum displacement threshold based on material
+    const minDisplacementThreshold = this.getMinDisplacementThreshold(materialProps);
+    if (displacementMagnitude < minDisplacementThreshold) {
+      return null; // Too weak to cause displacement for this material
     }
 
     // Calculate new position
@@ -520,8 +596,14 @@ export class OreGrid {
         originalY: block.y,
         newX: clampedX,
         newY: clampedY,
-        force: finalForce,
-        distance: distance
+        force: effectiveForce,
+        distance: distance,
+        materialData: {
+          density: density,
+          hardness: hardness,
+          fragmentationIndex: fragmentationIndex,
+          displacementMagnitude: displacementMagnitude
+        }
       };
     }
 
@@ -533,6 +615,134 @@ export class OreGrid {
    */
   getMaterialResistance(oreType) {
     return materialPropertyHandler.getDisplacementResistance(oreType);
+  }
+
+  /**
+   * Calculate density-based resistance factor
+   * Lighter materials (lower density) move more easily
+   */
+  calculateDensityResistance(density) {
+    // Density range: 1.0 - 20.0 g/cm³
+    // Resistance range: 0.2 - 1.0 (lighter = lower resistance = more movement)
+    const normalizedDensity = Math.max(1.0, Math.min(20.0, density));
+    
+    // Logarithmic scaling for more realistic physics
+    // Very light materials (1-2 g/cm³) move easily
+    // Heavy materials (15-20 g/cm³) resist movement strongly
+    const resistance = 0.2 + (Math.log(normalizedDensity) / Math.log(20)) * 0.8;
+    
+    return Math.min(1.0, resistance);
+  }
+
+  /**
+   * Calculate hardness-based resistance factor
+   * Harder materials resist displacement more
+   */
+  calculateHardnessResistance(hardness) {
+    // Hardness range: 1 - 10 (Mohs scale)
+    // Resistance range: 0.3 - 1.0 (softer = less resistance = more movement)
+    const normalizedHardness = Math.max(1, Math.min(10, hardness));
+    
+    // Linear scaling with slight curve
+    const resistance = 0.3 + (normalizedHardness / 10) * 0.7;
+    
+    return resistance;
+  }
+
+  /**
+   * Calculate fragmentation factor
+   * Higher fragmentation index = breaks easier = transfers force less efficiently
+   */
+  calculateFragmentationFactor(fragmentationIndex) {
+    // Fragmentation range: 0.0 - 1.0
+    // Factor range: 0.4 - 1.2 (high fragmentation = less efficient force transfer)
+    const normalizedFragmentation = Math.max(0.0, Math.min(1.0, fragmentationIndex));
+    
+    // Inverse relationship: more fragmentation = less force transfer
+    // But slight boost for materials that fragment easily (they can "flow" more)
+    const factor = 1.2 - (normalizedFragmentation * 0.8);
+    
+    return Math.max(0.4, factor);
+  }
+
+  /**
+   * Calculate maximum displacement distance based on material properties
+   */
+  calculateMaxDisplacement(materialProps) {
+    const density = materialProps.density || 2.7;
+    const hardness = materialProps.hardness || 5;
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    
+    // Base displacement: 1-4 grid units depending on material
+    let baseMax = 2.0;
+    
+    // Light materials can move farther
+    if (density < 2.0) baseMax = 4.0;
+    else if (density < 4.0) baseMax = 3.0;
+    else if (density > 10.0) baseMax = 1.5;
+    
+    // Soft materials can move farther
+    if (hardness <= 3) baseMax += 0.5;
+    else if (hardness >= 8) baseMax -= 0.5;
+    
+    // High fragmentation materials can move farther (flow-like behavior)
+    if (fragmentationIndex > 0.8) baseMax += 1.0;
+    
+    return Math.max(1.0, baseMax);
+  }
+
+  /**
+   * Get minimum displacement threshold based on material properties
+   */
+  getMinDisplacementThreshold(materialProps) {
+    const density = materialProps.density || 2.7;
+    const hardness = materialProps.hardness || 5;
+    
+    // Heavy or hard materials need more force to move
+    let threshold = 0.2;
+    
+    if (density > 15.0) threshold = 0.4; // Very heavy materials
+    else if (density > 10.0) threshold = 0.3; // Heavy materials
+    else if (density < 2.0) threshold = 0.1; // Light materials
+    
+    if (hardness >= 9) threshold += 0.2; // Very hard materials
+    else if (hardness >= 7) threshold += 0.1; // Hard materials
+    
+    return Math.min(0.6, threshold);
+  }
+
+  /**
+   * Check if block should fragment based on material properties and damage
+   */
+  shouldFragment(block, damage) {
+    const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    const hardness = materialProps.hardness || 5;
+    
+    // Calculate fragmentation probability
+    const damageFactor = damage / block.maxHealth;
+    const fragmentationChance = fragmentationIndex * damageFactor;
+    
+    // Hard materials resist fragmentation
+    const hardnessReduction = Math.max(0.1, 1 - (hardness / 15));
+    const finalChance = fragmentationChance * hardnessReduction;
+    
+    // Random chance with material-based probability
+    const roll = Math.random();
+    const willFragment = roll < finalChance;
+    
+    console.log(`Fragmentation check for ${block.oreType}:`, {
+      fragmentationIndex: fragmentationIndex.toFixed(2),
+      hardness: hardness,
+      damageFactor: damageFactor.toFixed(2),
+      fragmentationChance: fragmentationChance.toFixed(2),
+      hardnessReduction: hardnessReduction.toFixed(2),
+      finalChance: finalChance.toFixed(2),
+      roll: roll.toFixed(2),
+      willFragment: willFragment
+    });
+    
+    return willFragment;
   }
 
   /**

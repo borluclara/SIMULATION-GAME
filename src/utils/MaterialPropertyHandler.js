@@ -471,31 +471,146 @@ export const materialPropertyHandler = new MaterialPropertyHandler();
 export function getMaterialColor(materialName, damage = 0, maxHealth = 100) {
   const props = materialPropertyHandler.getMaterialProperties(materialName);
   
-  // Base colors based on material type and properties
-  let baseColor;
+  // Enhanced material-based coloring system
+  let baseColor = getEnhancedMaterialColor(materialName, props);
   
-  if (props.type === 'ore') {
-    // Ore colors based on value/rarity
-    if (props.game_value >= 100) baseColor = '#FFD700'; // Gold color for precious
-    else if (props.game_value >= 50) baseColor = '#CD853F'; // Bronze for valuable
-    else if (props.game_value >= 25) baseColor = '#D2691E'; // Copper for moderate
-    else baseColor = '#696969'; // Dark gray for low value
-  } else {
-    // Waste rock colors based on hardness
-    if (props.hardness >= 7) baseColor = '#708090'; // Hard rock - slate gray
-    else if (props.hardness >= 5) baseColor = '#8B4513'; // Medium rock - saddle brown
-    else if (props.hardness >= 3) baseColor = '#F4A460'; // Soft rock - sandy brown
-    else baseColor = '#DEB887'; // Very soft - burlywood
-  }
-  
-  // Darken based on damage
+  // Apply damage darkening
   if (damage > 0) {
     const damageRatio = damage / maxHealth;
-    const darkenFactor = 1 - (damageRatio * 0.5);
+    const darkenFactor = 1 - (damageRatio * 0.4); // Reduced darkening for better visibility
     return adjustColorBrightness(baseColor, darkenFactor);
   }
   
   return baseColor;
+}
+
+/**
+ * Enhanced material color system with visual distinctions
+ */
+function getEnhancedMaterialColor(materialName, props) {
+  const normalizedName = materialName?.toLowerCase();
+  
+  // Specific material colors for easy identification
+  const specificColors = {
+    // Precious metals - Distinctive metallics
+    'gold': '#FFD700',           // Bright gold
+    'silver': '#C0C0C0',         // Silver
+    'platinum': '#E5E4E2',       // Platinum
+    
+    // Base metals - Warm tones
+    'iron': '#8B7355',           // Iron brown
+    'hematite': '#CD853F',       // Iron ore - peru
+    'magnetite': '#A0522D',      // Magnetic iron - sienna
+    'copper': '#D2691E',         // Copper orange
+    'chalcopyrite': '#DAA520',   // Copper ore - goldenrod
+    
+    // Coal and carbon - Dark tones
+    'coal': '#2F2F2F',           // Very dark gray
+    'graphite': '#36454F',       // Charcoal
+    
+    // Precious stones - Vibrant colors
+    'diamond': '#B9F2FF',        // Ice blue
+    'emerald': '#50C878',        // Emerald green
+    'ruby': '#E0115F',           // Ruby red
+    
+    // Hard rocks - Gray tones with texture indication
+    'granite': '#708090',        // Slate gray
+    'basalt': '#36454F',         // Dark charcoal
+    'quartzite': '#F5F5DC',      // Beige
+    
+    // Sedimentary rocks - Earth tones
+    'limestone': '#F5F5DC',      // Beige
+    'sandstone': '#F4A460',      // Sandy brown
+    'shale': '#8FBC8F',          // Dark sea green
+    
+    // Soft materials - Light, distinct colors
+    'soil/overburden': '#DEB887', // Burlywood
+    'clay': '#CD853F',           // Peru
+    'sand': '#F4A460'            // Sandy brown
+  };
+  
+  // Return specific color if available
+  if (specificColors[normalizedName]) {
+    return specificColors[normalizedName];
+  }
+  
+  // Property-based color assignment for unknown materials
+  if (props.type === 'ore') {
+    // Ore colors based on value and density
+    const value = props.game_value || 0;
+    const density = props.density || 2.7;
+    
+    if (value >= 100) {
+      return '#FFD700'; // Gold color for high value
+    } else if (value >= 50) {
+      return density > 8 ? '#CD853F' : '#DAA520'; // Bronze/goldenrod based on density
+    } else if (value >= 25) {
+      return '#D2691E'; // Copper for moderate value
+    } else {
+      return '#8B7355'; // Brown for low value ore
+    }
+  } else if (props.type === 'waste') {
+    // Waste rock colors based on hardness and density
+    const hardness = props.hardness || 5;
+    const density = props.density || 2.7;
+    
+    if (hardness >= 8) {
+      return density > 3 ? '#708090' : '#A9A9A9'; // Hard rock - slate or gray
+    } else if (hardness >= 5) {
+      return density > 3 ? '#8B4513' : '#CD853F'; // Medium rock - browns
+    } else if (hardness >= 3) {
+      return '#F4A460'; // Soft rock - sandy brown
+    } else {
+      return '#DEB887'; // Very soft - burlywood
+    }
+  }
+  
+  // Default fallback
+  return '#8B7355';
+}
+
+/**
+ * Get visual texture/pattern indicator based on material properties
+ */
+export function getMaterialTexture(materialName) {
+  const props = materialPropertyHandler.getMaterialProperties(materialName);
+  const hardness = props.hardness || 5;
+  const fragmentationIndex = props.fragmentation_index || 0.5;
+  const density = props.density || 2.7;
+  
+  return {
+    // Visual indicators for rendering
+    hardnessLevel: hardness >= 8 ? 'very-hard' : hardness >= 6 ? 'hard' : hardness >= 4 ? 'medium' : 'soft',
+    fragmentationLevel: fragmentationIndex >= 0.8 ? 'very-fragile' : fragmentationIndex >= 0.6 ? 'fragile' : 'stable',
+    densityLevel: density >= 15 ? 'very-dense' : density >= 8 ? 'dense' : density >= 4 ? 'medium' : 'light',
+    
+    // Visual effects
+    showSparkles: props.type === 'ore' && props.game_value >= 50, // Valuable ores sparkle
+    showCracks: fragmentationIndex >= 0.7, // Fragile materials show cracks
+    showGloss: hardness >= 8, // Hard materials are glossy
+    showGrain: hardness <= 3 && props.type === 'waste' // Soft waste shows grain texture
+  };
+}
+
+/**
+ * Get movement behavior indicator for visual feedback
+ */
+export function getMovementBehavior(materialName) {
+  const props = materialPropertyHandler.getMaterialProperties(materialName);
+  const density = props.density || 2.7;
+  const hardness = props.hardness || 5;
+  const fragmentationIndex = props.fragmentation_index || 0.5;
+  
+  return {
+    // Expected movement characteristics
+    displacementRange: density < 2 ? 'far' : density < 5 ? 'medium' : density < 10 ? 'close' : 'minimal',
+    fragmentationBehavior: fragmentationIndex >= 0.8 ? 'shatters' : fragmentationIndex >= 0.6 ? 'breaks' : 'chunks',
+    resistanceLevel: hardness >= 8 ? 'very-resistant' : hardness >= 6 ? 'resistant' : 'yielding',
+    
+    // Visual feedback colors
+    movementColor: density < 2 ? '#90EE90' : density < 5 ? '#FFD700' : density < 10 ? '#FFA500' : '#FF6347',
+    resistanceColor: hardness >= 8 ? '#FF0000' : hardness >= 6 ? '#FFA500' : '#00FF00'
+  };
 }
 
 function adjustColorBrightness(hex, factor) {

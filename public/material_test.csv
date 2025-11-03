@@ -1,0 +1,5 @@
+x,y,ore_type,hardness,value,density,fragmentation_index,blast_resistance
+0,0,gold,3,100,19.3,0.7,0.3
+1,0,coal,2,15,1.3,0.8,0.2
+0,1,granite,6,0,2.6,0.3,0.7
+1,1,limestone,3,0,2.7,0.8,0.3

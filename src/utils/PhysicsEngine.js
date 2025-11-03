@@ -1,9 +1,10 @@
 ﻿/**
  * Physics Engine Integration with Matter.js
- * FIXED VERSION - Manual rendering without Matter.Render conflicts
+ * ENHANCED VERSION - Material property integration for realistic displacement
  */
 
 import Matter from 'matter-js';
+import { materialPropertyHandler } from './MaterialPropertyHandler.js';
 
 export class PhysicsEngine {
   constructor() {
@@ -128,52 +129,66 @@ export class PhysicsEngine {
     return debris;
   }
 
-  // Create individual debris particle with render info and directional support
+  // Create individual debris particle with enhanced material property integration
   createDebrisParticle(x, y, material, distance, blastCenter, cellSize, blastDirection = null) {
-    // Particle size
+    // Get material properties for enhanced physics
+    const materialProps = materialPropertyHandler.getMaterialProperties(material);
+    
+    // Particle size based on material properties
     const size = this.getParticleSize(material);
     
     // Random offset within cell
     const offsetX = (Math.random() - 0.5) * cellSize * 0.6;
     const offsetY = (Math.random() - 0.5) * cellSize * 0.6;
     
-    // Calculate blast force with directional support
-    const blastForce = this.calculateBlastForce(x, y, blastCenter, distance, blastDirection);
+    // Calculate enhanced blast force with material coefficients
+    const blastForce = this.calculateEnhancedBlastForce(x, y, blastCenter, distance, blastDirection, materialProps);
     
-    // Create Matter.js body
+    // Get material-based physics properties
+    const density = this.getMaterialDensity(material);
+    const hardness = materialProps.hardness || 5;
+    
+    // Create Matter.js body with enhanced properties
     const body = Matter.Bodies.circle(
       x + offsetX, 
       y + offsetY, 
       size, 
       {
-        density: this.getMaterialDensity(material),
-        friction: 0.8,
-        frictionAir: 0.02,
-        restitution: 0.4
+        density: density,
+        friction: 0.5 + (hardness / 20), // Harder materials have more friction
+        frictionAir: 0.01 + (density * 5), // Denser materials have more air resistance
+        restitution: Math.max(0.2, 0.6 - (hardness / 15)) // Harder materials bounce less
       }
     );
 
-    console.log(`Created particle body at (${body.position.x}, ${body.position.y}) with size ${size}`);
+    console.log(`Created enhanced particle for ${material}:`, {
+      size: size.toFixed(1),
+      density: density.toFixed(4),
+      hardness: hardness,
+      friction: body.friction.toFixed(2),
+      restitution: body.restitution.toFixed(2)
+    });
 
-    // Apply blast force
+    // Apply enhanced blast force
     Matter.Body.applyForce(body, body.position, blastForce);
-    console.log(`Applied force:`, blastForce);
     
-    // Add rotation
-    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
+    // Add rotation based on material properties
+    const rotationStrength = 0.1 + (materialProps.fragmentation_index || 0.5) * 0.15;
+    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * rotationStrength);
 
-    // Return particle with rendering info
+    // Return particle with enhanced rendering info
     return {
       body: body,
       color: this.getMaterialColor(material),
       size: size,
       material: material,
+      materialProps: materialProps,
       createdAt: Date.now()
     };
   }
 
-  // Calculate blast force with directional bias with advanced decay models
-  calculateBlastForce(x, y, blastCenter, distance, blastDirection = null) {
+  // Calculate enhanced blast force with material property integration
+  calculateEnhancedBlastForce(x, y, blastCenter, distance, blastDirection = null, materialProps) {
     const { maxDistance, maxForce, exponentialK, blendThreshold } = this.decayConfig;
     
     // Pre-calculate direction vector components for performance
@@ -209,44 +224,66 @@ export class PhysicsEngine {
         preferredDirY = -Math.cos(directionRadians);
       }
       
-      console.log(`Direction ${blastDirection}°: preferred force (${preferredDirX.toFixed(3)}, ${preferredDirY.toFixed(3)})`);
-      
-      // Use 100% directional movement - completely override natural explosion pattern
+      // Use 100% directional movement
       normalizedX = preferredDirX;
       normalizedY = preferredDirY;
-      
-      console.log(`Final force direction: (${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)})`);
     }
     
-    // **MATHEMATICAL DECAY MODELS**
+    // **ENHANCED DECAY MODELS WITH MATERIAL PROPERTIES**
     
-    // Exponential decay: force = F0 * e^(-k * r)
+    // Base force calculation using hybrid decay model
     const exponentialForce = maxForce * Math.exp(-exponentialK * distance);
-    
-    // Linear decay: force = F0 - k * r
-    const linearK = maxForce / maxDistance; // Auto-calculate linear decay constant
+    const linearK = maxForce / maxDistance;
     const linearForce = Math.max(0, maxForce - linearK * distance);
     
-    // Hybrid model: combine exponential (close range) with linear (far range)
     const blendDistance = maxDistance * blendThreshold;
     const blendFactor = Math.min(1, distance / blendDistance);
     
-    // Choose decay model based on distance for optimal visual balance
-    let forceMagnitude;
+    let baseForceMagnitude;
     if (distance <= blendDistance) {
-      // Close range: Use exponential decay for dramatic falloff
-      forceMagnitude = exponentialForce;
+      baseForceMagnitude = exponentialForce;
     } else {
-      // Far range: Blend exponential with linear for smooth transition
-      forceMagnitude = (1 - blendFactor) * exponentialForce + blendFactor * linearForce;
+      baseForceMagnitude = (1 - blendFactor) * exponentialForce + blendFactor * linearForce;
     }
     
-    // Ensure minimum threshold to prevent insignificant forces
-    forceMagnitude = Math.max(0, forceMagnitude);
+    // **MATERIAL COEFFICIENT INTEGRATION**
+    
+    // 1. Density factor (lighter materials get more force)
+    const density = materialProps.density || 2.7;
+    const densityFactor = Math.max(0.3, 3.0 / Math.sqrt(density)); // Inverse square root for realistic physics
+    
+    // 2. Hardness factor (softer materials absorb less energy)
+    const hardness = materialProps.hardness || 5;
+    const hardnessFactor = Math.max(0.5, (12 - hardness) / 8); // Softer = more movement
+    
+    // 3. Fragmentation factor (more fragmented materials move more chaotically)
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    const fragmentationFactor = 0.8 + (fragmentationIndex * 0.4); // Range: 0.8 - 1.2
+    
+    // Combine all material factors
+    const materialMultiplier = densityFactor * hardnessFactor * fragmentationFactor;
+    
+    // Apply material effects to force
+    const enhancedForceMagnitude = baseForceMagnitude * materialMultiplier;
+    
+    console.log(`Enhanced force calculation for ${materialProps.type || 'unknown'}:`, {
+      density: density.toFixed(1),
+      hardness: hardness,
+      fragmentationIndex: fragmentationIndex.toFixed(2),
+      densityFactor: densityFactor.toFixed(2),
+      hardnessFactor: hardnessFactor.toFixed(2),
+      fragmentationFactor: fragmentationFactor.toFixed(2),
+      materialMultiplier: materialMultiplier.toFixed(2),
+      baseForceMagnitude: baseForceMagnitude.toFixed(4),
+      enhancedForceMagnitude: enhancedForceMagnitude.toFixed(4)
+    });
+    
+    // Ensure minimum threshold
+    const finalForceMagnitude = Math.max(0, enhancedForceMagnitude);
     
     return {
-      x: normalizedX * forceMagnitude,
-      y: normalizedY * forceMagnitude
+      x: normalizedX * finalForceMagnitude,
+      y: normalizedY * finalForceMagnitude
     };
   }
 
@@ -260,66 +297,116 @@ export class PhysicsEngine {
     console.log('Updated decay constants:', this.decayConfig);
   }
 
-  // Get particle count based on material - MORE BIG DEBRIS  
+  // Get particle count based on material properties - Enhanced with fragmentation
   getParticleCount(material) {
-    const counts = {
-      'iron': 12,     // More big iron chunks
-      'gold': 10,     // More valuable gold pieces
-      'copper': 12,   // More copper debris
-      'silver': 9,    // More silver pieces
-      'coal': 18,     // Coal breaks into many big pieces
-      'stone': 15,    // Stone creates lots of big debris
-      'destroyed': 20, // Maximum big debris pieces
-      'cracked': 12   // More cracked pieces
+    // Get material properties for accurate fragmentation
+    const materialProps = materialPropertyHandler.getMaterialProperties(material);
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    const density = materialProps.density || 2.7;
+    
+    // Base particle count influenced by fragmentation and density
+    let baseCount = Math.round(8 + (fragmentationIndex * 15)); // 8-23 particles
+    
+    // Dense materials create fewer, larger pieces
+    if (density > 10) baseCount = Math.round(baseCount * 0.7);
+    else if (density < 2) baseCount = Math.round(baseCount * 1.3);
+    
+    // Material-specific adjustments for realistic behavior
+    const materialAdjustments = {
+      'iron': 1.2,        // Iron fragments moderately
+      'gold': 0.8,        // Gold stays more intact
+      'coal': 1.5,        // Coal breaks into many pieces
+      'stone': 1.1,       // Stone fragments normally
+      'granite': 0.9,     // Hard granite resists fragmentation
+      'limestone': 1.3,   // Limestone fragments easily
+      'soil/overburden': 2.0, // Soil creates lots of small particles
+      'sandstone': 1.4    // Sandstone fragments well
     };
-    return counts[material?.toLowerCase()] || 10;
+    
+    const adjustment = materialAdjustments[material?.toLowerCase()] || 1.0;
+    const finalCount = Math.round(baseCount * adjustment);
+    
+    console.log(`Particle count for ${material}:`, {
+      fragmentationIndex: fragmentationIndex.toFixed(2),
+      density: density.toFixed(1),
+      baseCount: baseCount,
+      adjustment: adjustment,
+      finalCount: finalCount
+    });
+    
+    return Math.max(5, Math.min(30, finalCount));
   }
 
-  // Get particle size - BIGGER DEBRIS for better visibility
+  // Get particle size based on material properties - Enhanced with density and hardness
   getParticleSize(material) {
-    const sizes = {
-      'iron': 8,      // Much bigger iron chunks
-      'gold': 7,      // Bigger gold pieces  
-      'copper': 7,    // Bigger copper chunks
-      'silver': 6,    // Bigger silver pieces
-      'coal': 9,      // Largest coal chunks
-      'stone': 8,     // Big stone debris
-      'destroyed': 6, // Bigger destroyed pieces
-      'cracked': 7    // Bigger cracked pieces
-    };
-    const baseSize = sizes[material?.toLowerCase()] || 6;
-    // More size variation for dramatic effect
-    return baseSize + (Math.random() - 0.5) * 3;
+    // Get material properties for accurate sizing
+    const materialProps = materialPropertyHandler.getMaterialProperties(material);
+    const density = materialProps.density || 2.7;
+    const hardness = materialProps.hardness || 5;
+    const fragmentationIndex = materialProps.fragmentation_index || 0.5;
+    
+    // Base size influenced by material properties
+    let baseSize = 6; // Default size
+    
+    // Dense materials create larger, fewer particles
+    if (density > 15) baseSize = 9;      // Very heavy metals
+    else if (density > 8) baseSize = 8;  // Heavy materials
+    else if (density > 4) baseSize = 7;  // Medium materials
+    else if (density < 2) baseSize = 5;  // Light materials
+    
+    // Hard materials create larger chunks
+    if (hardness >= 9) baseSize += 1;    // Very hard
+    else if (hardness >= 7) baseSize += 0.5; // Hard
+    else if (hardness <= 2) baseSize -= 1;   // Very soft
+    
+    // High fragmentation creates smaller pieces
+    if (fragmentationIndex > 0.8) baseSize -= 1.5;
+    else if (fragmentationIndex > 0.6) baseSize -= 1;
+    else if (fragmentationIndex < 0.3) baseSize += 1;
+    
+    // Size variation for realism
+    const sizeVariation = (Math.random() - 0.5) * 2;
+    const finalSize = Math.max(3, baseSize + sizeVariation);
+    
+    return finalSize;
   }
 
-  // Get material density
+  // Get material density using real material properties
   getMaterialDensity(material) {
-    const densities = {
-      'iron': 0.006,
-      'gold': 0.01,
-      'copper': 0.005,
-      'silver': 0.007,
-      'coal': 0.002,
-      'stone': 0.004,
-      'destroyed': 0.002,
-      'cracked': 0.003
-    };
-    return densities[material?.toLowerCase()] || 0.004;
+    // Get actual material properties
+    const materialProps = materialPropertyHandler.getMaterialProperties(material);
+    const realDensity = materialProps.density || 2.7; // g/cm³
+    
+    // Convert to Matter.js density (scaled for physics simulation)
+    // Matter.js density is typically 0.001 - 0.01 for good simulation
+    // Scale real density (1-20 g/cm³) to physics density (0.001-0.015)
+    const physicsDensity = 0.001 + (realDensity / 25) * 0.014;
+    
+    console.log(`Material density for ${material}: ${realDensity} g/cm³ -> ${physicsDensity.toFixed(4)} physics units`);
+    
+    return physicsDensity;
   }
 
-  // Get material color
+  // Get material color using enhanced material property system
   getMaterialColor(material) {
-    const colors = {
-      'iron': '#8C7853',
-      'gold': '#FFD700',
-      'copper': '#B87333',
-      'silver': '#C0C0C0',
-      'coal': '#36454F',
-      'stone': '#808080',
-      'destroyed': '#654321',
-      'cracked': '#A0A0A0'
-    };
-    return colors[material?.toLowerCase()] || '#808080';
+    // Get material properties for color determination
+    const materialProps = materialPropertyHandler.getMaterialProperties(material);
+    
+    // Use the enhanced color system from MaterialPropertyHandler
+    if (materialProps.type === 'ore') {
+      // Ore colors based on value/rarity
+      if (materialProps.game_value >= 100) return '#FFD700'; // Gold color for precious
+      else if (materialProps.game_value >= 50) return '#CD853F'; // Bronze for valuable
+      else if (materialProps.game_value >= 25) return '#D2691E'; // Copper for moderate
+      else return '#696969'; // Dark gray for low value
+    } else {
+      // Waste rock colors based on hardness
+      const hardness = materialProps.hardness || 5;
+      if (hardness >= 7) return '#708090'; // Hard rock - slate gray
+      else if (hardness >= 5) return '#8B4513'; // Medium rock - saddle brown
+      else if (hardness >= 3) return '#F4A460'; // Soft rock - sandy brown
+      else return '#DEB887'; // Very soft - burlywood
+    }
   }
 
   // Add boundaries (ground and walls)
