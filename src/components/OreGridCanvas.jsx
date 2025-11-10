@@ -16,7 +16,8 @@ const OreGridCanvas = forwardRef(({
   blastDirection = 90,  // NEW: blast direction for visual indicators
   showBlastDirection = true,  // NEW: toggle for blast direction indicators
   animationState = null,  // NEW: Animation state from BlastAnimationEngine
-  cameraShake = { x: 0, y: 0 }  // NEW: Camera shake offset
+  cameraShake = { x: 0, y: 0 },  // NEW: Camera shake offset
+  highlightedCells = { recovered: [], lost: [] }  // NEW: Cells to highlight after blast
 }, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -295,6 +296,71 @@ const OreGridCanvas = forwardRef(({
             ctx.fillText('💣', centerX, centerY);
           }
         });
+      }
+
+      // Draw highlighted cells (recovered ores and waste)
+      if (highlightedCells && (highlightedCells.recovered?.length > 0 || highlightedCells.lost?.length > 0)) {
+        // Draw recovered ores (green highlights)
+        if (highlightedCells.recovered && highlightedCells.recovered.length > 0) {
+          highlightedCells.recovered.forEach(cell => {
+            const pixelX = Math.floor(cell.x * scaledCellSize);
+            const pixelY = Math.floor(cell.y * scaledCellSize);
+            const cellWidth = Math.ceil(scaledCellSize);
+            const cellHeight = Math.ceil(scaledCellSize);
+            
+            // Green border
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(pixelX + 2, pixelY + 2, cellWidth - 4, cellHeight - 4);
+            
+            // Green overlay
+            ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+            ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+            
+            // Checkmark icon
+            if (scaledCellSize > 20) {
+              ctx.fillStyle = '#00ff88';
+              ctx.font = `bold ${scaledCellSize * 0.6}px Arial`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.shadowColor = '#000';
+              ctx.shadowBlur = 4;
+              ctx.fillText('✓', pixelX + cellWidth / 2, pixelY + cellHeight / 2);
+              ctx.shadowBlur = 0;
+            }
+          });
+        }
+        
+        // Draw lost/waste ores (red highlights)
+        if (highlightedCells.lost && highlightedCells.lost.length > 0) {
+          highlightedCells.lost.forEach(cell => {
+            const pixelX = Math.floor(cell.x * scaledCellSize);
+            const pixelY = Math.floor(cell.y * scaledCellSize);
+            const cellWidth = Math.ceil(scaledCellSize);
+            const cellHeight = Math.ceil(scaledCellSize);
+            
+            // Red border
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(pixelX + 2, pixelY + 2, cellWidth - 4, cellHeight - 4);
+            
+            // Red overlay
+            ctx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+            ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+            
+            // Warning icon
+            if (scaledCellSize > 20) {
+              ctx.fillStyle = '#ff6b6b';
+              ctx.font = `bold ${scaledCellSize * 0.6}px Arial`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.shadowColor = '#000';
+              ctx.shadowBlur = 4;
+              ctx.fillText('⚠', pixelX + cellWidth / 2, pixelY + cellHeight / 2);
+              ctx.shadowBlur = 0;
+            }
+          });
+        }
       }
       
       // Draw explosion animations

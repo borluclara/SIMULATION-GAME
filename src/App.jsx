@@ -9,6 +9,7 @@ import BlastToolPanel from './components/BlastToolPanel'
 import BlastPlacementPanel from './components/BlastPlacementPanel'
 import BlastSummaryPanel from './components/BlastSummaryPanel'
 import ScoreFeedback from './components/ScoreFeedback'
+import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
@@ -61,6 +62,10 @@ function App() {
   const [blastResults, setBlastResults] = useState(null)
   const [previousScore, setPreviousScore] = useState(0)
   
+  // Blast feedback state
+  const [showBlastFeedback, setShowBlastFeedback] = useState(false)
+  const [feedbackResults, setFeedbackResults] = useState(null)
+  const [highlightedCells, setHighlightedCells] = useState({ recovered: [], lost: [] })
   
   // Reset feedback state
   const [resetMessage, setResetMessage] = useState(null)
@@ -322,6 +327,25 @@ function App() {
       const scoreIncrease = materialsDestroyed * 10; // 10 points per material destroyed
       addScore(scoreIncrease);
       
+      // Calculate highlighted cells for visual feedback
+      const oreMaterials = ['iron', 'gold', 'copper', 'silver', 'coal', 'diamond', 'emerald'];
+      const wasteMaterials = ['stone', 'dirt', 'gravel', 'sand'];
+      
+      const recoveredOres = result.destroyedCells.filter(cell => 
+        oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
+      );
+      
+      const lostWaste = result.destroyedCells.filter(cell => 
+        wasteMaterials.some(w => (cell.material || '').toLowerCase().includes(w)) ||
+        !oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
+      );
+      
+      // Set highlighted cells for canvas rendering
+      setHighlightedCells({
+        recovered: recoveredOres,
+        lost: lostWaste
+      });
+      
       // Show blast summary panel
       setBlastResults(result);
       setShowBlastSummary(true);
@@ -359,9 +383,13 @@ function App() {
             console.log('✨ Animation complete');
             setCameraShake({ x: 0, y: 0 });
             
-            // Clear animation state after a delay
+            // Clear animation state after a delay, then show feedback
             setTimeout(() => {
               setAnimationState(null);
+              
+              // Show blast feedback modal after animations complete
+              setFeedbackResults(result);
+              setShowBlastFeedback(true);
             }, 500);
           }
         }
@@ -502,6 +530,21 @@ function App() {
   const handleCloseBlastSummary = () => {
     setShowBlastSummary(false);
     setBlastResults(null);
+  };
+
+  const handleCloseFeedback = () => {
+    setShowBlastFeedback(false);
+    setFeedbackResults(null);
+    setHighlightedCells({ recovered: [], lost: [] });
+  };
+
+  const handleFeedbackReset = () => {
+    handleResetSimulation();
+  };
+
+  const handleFeedbackContinue = () => {
+    // Just close the feedback and continue playing
+    handleCloseFeedback();
   };
 
   const handleSave = () => {
@@ -684,6 +727,7 @@ function App() {
                       cameraShake={cameraShake}
                       blastDirection={blastDirection}
                       showBlastDirection={true}
+                      highlightedCells={highlightedCells}
                     />
                     <p className="canvas-instruction">
                       {placementMode 
@@ -733,6 +777,18 @@ function App() {
         blastResults={blastResults}
         isVisible={showBlastSummary}
         onClose={handleCloseBlastSummary}
+        playerScore={score}
+        previousScore={previousScore}
+        grid={oreGrid}
+      />
+
+      {/* Blast Feedback Modal */}
+      <BlastFeedback 
+        blastResults={feedbackResults}
+        isVisible={showBlastFeedback}
+        onClose={handleCloseFeedback}
+        onReset={handleFeedbackReset}
+        onContinue={handleFeedbackContinue}
         playerScore={score}
         previousScore={previousScore}
         grid={oreGrid}
