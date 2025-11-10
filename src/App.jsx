@@ -327,7 +327,7 @@ function App() {
       setShowBlastSummary(true);
 
       // *** START GSAP ANIMATION SEQUENCE ***
-      const cellSize = 30; // Cell size in pixels
+      const cellSize = 45; // Cell size in pixels (matches OreGridCanvas default)
       
       // Start blast animation engine
       blastAnimationEngine.animateBlastSequence(
@@ -403,7 +403,7 @@ function App() {
           physicsEngine.start();
           console.log('Physics engine started with boundaries');
 
-          const cellSize = 30; // Assuming 30px cell size
+          const cellSize = 45; // Cell size (matches OreGridCanvas default)
           
           // Create debris for all destroyed cells with averaged blast center
           if (result.destroyedCells.length > 0) {
@@ -626,7 +626,7 @@ function App() {
               <p>Processing CSV data and creating grid...</p>
             </div>
           ) : csvData && oreGrid ? (
-            <div className="blast-simulation-container">
+            <>
               {/* Welcome Message */}
               <div className="welcome-section">
                 <h2 className="welcome-message">
@@ -636,57 +636,64 @@ function App() {
                 </p>
               </div>
               
-              {/* Canvas Grid Section */}
-              <div className="canvas-section">
-                <div className="canvas-container">
-                  <OreGridCanvas 
-                    ref={canvasRef}
-                    grid={oreGrid} 
-                    onBlockClick={handleBlockClick}
-                    placementMode={placementMode}
-                    blastMarkers={blasts}
-                    explosionAnimations={explosionAnimations}
-                    physicsDebris={physicsDebris}
-                    animationState={animationState}
-                    cameraShake={cameraShake}
-                    blastDirection={blastDirection}
-                    showBlastDirection={true}
-                  />
-                  <p className="canvas-instruction">
-                    {placementMode 
-                      ? "Click on grid cells to place explosives with directional blast" 
-                      : "Enable placement mode to add explosives, then trigger directional blasts"}
-                  </p>
+              {/* Main Container with T-Shaped Sidebar + Centered Canvas */}
+              <div className="blast-simulation-container">
+                {/* Left Sidebar - T-Shaped Controls */}
+                <div className="controls-sidebar">
+                  {/* Top Row: Two panels side by side */}
+                  <div className="controls-top-row">
+                    <BlastToolPanel
+                      blastPower={blastPower}
+                      setBlastPower={setBlastPower}
+                      blastDirection={blastDirection}
+                      setBlastDirection={setBlastDirection}
+                      onSimulate={handleRunSimulation}
+                      onReset={handleReset}
+                    />
+                    
+                    <ScoreFeedback
+                      mineralRecovery={mineralRecovery}
+                      dilution={dilution}
+                    />
+                  </div>
+                  
+                  {/* Bottom Row: Single full-width panel */}
+                  <div className="controls-bottom-row">
+                    <BlastPlacementPanel
+                      onPlacementModeChange={handlePlacementModeChange}
+                      onTriggerBlasts={handleTriggerBlasts}
+                      placementMode={placementMode}
+                      canvasRef={canvasRef}
+                      blastDirection={blastDirection}
+                    />
+                  </div>
+                </div>
+                
+                {/* Canvas Grid Section - Centered */}
+                <div className="canvas-section">
+                  <div className="canvas-container">
+                    <OreGridCanvas 
+                      ref={canvasRef}
+                      grid={oreGrid} 
+                      onBlockClick={handleBlockClick}
+                      placementMode={placementMode}
+                      blastMarkers={blasts}
+                      explosionAnimations={explosionAnimations}
+                      physicsDebris={physicsDebris}
+                      animationState={animationState}
+                      cameraShake={cameraShake}
+                      blastDirection={blastDirection}
+                      showBlastDirection={true}
+                    />
+                    <p className="canvas-instruction">
+                      {placementMode 
+                        ? "Click on grid cells to place explosives with directional blast" 
+                        : "Enable placement mode to add explosives, then trigger directional blasts"}
+                    </p>
+                  </div>
                 </div>
               </div>
-              
-              {/* Controls Section - Three Column Layout */}
-              <div className="controls-section">
-                <div className="controls-row">
-                  <BlastPlacementPanel
-                    onPlacementModeChange={handlePlacementModeChange}
-                    onTriggerBlasts={handleTriggerBlasts}
-                    placementMode={placementMode}
-                    canvasRef={canvasRef}
-                    blastDirection={blastDirection}
-                  />
-                  
-                  <BlastToolPanel
-                    blastPower={blastPower}
-                    setBlastPower={setBlastPower}
-                    blastDirection={blastDirection}
-                    setBlastDirection={setBlastDirection}
-                    onSimulate={handleRunSimulation}
-                    onReset={handleReset}
-                  />
-                  
-                  <ScoreFeedback
-                    mineralRecovery={mineralRecovery}
-                    dilution={dilution}
-                  />
-                </div>
-              </div>
-            </div>
+            </>
           ) : (
             <GridManager />
           )}

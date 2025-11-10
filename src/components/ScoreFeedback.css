@@ -6,17 +6,18 @@
 .score-feedback {
   background: rgba(34, 139, 34, 0.15);
   border: 2px solid #228B22;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 1rem;
   margin: 0;
   width: 100%;
-  max-width: 280px;
-  min-width: 250px;
+  max-width: 100%;
+  min-width: auto;
   height: 320px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .score-title {
@@ -47,7 +48,7 @@
   color: #FFFFFF;
   font-size: 0.7rem;
   font-weight: 600;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
@@ -55,7 +56,7 @@
   font-size: 1.2rem;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -144,7 +145,7 @@
 }
 
 .feedback-messages {
-  margin-top: 0.6rem;
+  margin-top: 0.4rem;
 }
 
 .feedback-message {
@@ -152,11 +153,11 @@
   border-radius: 4px;
   font-weight: 600;
   text-align: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   animation: fadeIn 0.5s ease-in;
   font-size: 0.65rem;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 @keyframes fadeIn {

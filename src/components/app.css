@@ -236,6 +236,91 @@
     'opsz' 24;
 }
 
+/* Blast Simulation Container - T-Shaped Sidebar Layout */
+.blast-simulation-container {
+  display: flex;
+  gap: 20px;
+  padding: 0 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+/* Left Sidebar - T-Shaped Controls */
+.controls-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 400px;
+  max-width: 500px;
+  flex-shrink: 0;
+}
+
+/* Top Row: Two panels side by side */
+.controls-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Bottom Row: Single full-width panel */
+.controls-bottom-row {
+  width: 100%;
+}
+
+/* Canvas Section - Centered Grid */
+.canvas-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.canvas-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.canvas-instruction {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .blast-simulation-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .controls-sidebar {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  .canvas-section {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .controls-sidebar {
+    min-width: 100%;
+  }
+  
+  .controls-top-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
 /* Controls Row - Side by Side Layout */
 .controls-row {
   display: flex;
