@@ -455,7 +455,102 @@ export class OreGrid {
     });
     
     grid.originalData = csvData; // Store for reset functionality
+    
+    // Expand to minimum 10x10 by duplicating existing pattern
+    grid.expandTo10x10ByDuplication();
+    
     return grid;
+  }
+
+  /**
+   * Expand grid to minimum 10x10 by duplicating existing rows and columns.
+   * Creates fully functional OreBlock instances (blastable, with material properties).
+   * If grid is empty, initializes 10x10 stone field.
+   */
+  expandTo10x10ByDuplication() {
+    // Handle empty grid
+    if (this.width === 0 || this.height === 0 || !this.grid) {
+      this.width = 10;
+      this.height = 10;
+      this.grid = Array.from({ length: 10 }, (_, y) =>
+        Array.from({ length: 10 }, (_, x) => {
+          const oreType = 'stone';
+          const hardness = 100;
+          const value = 10;
+          const props = materialPropertyHandler.getMaterialProperties(oreType);
+          const block = new OreBlock(x, y, oreType, hardness, value, props);
+          this.blocks.set(`${x},${y}`, block);
+          return block;
+        })
+      );
+      console.log('Initialized empty grid to 10x10 stone');
+      return;
+    }
+
+    const originalWidth = this.width;
+    const originalHeight = this.height;
+
+    // Duplicate columns to reach width 10
+    if (this.width < 10) {
+      for (let y = 0; y < this.height; y++) {
+        for (let x = originalWidth; x < 10; x++) {
+          const sourceX = x % originalWidth;
+          const sourceBlock = this.grid[y][sourceX];
+          if (sourceBlock) {
+            const duplicate = new OreBlock(
+              x,
+              y,
+              sourceBlock.oreType,
+              sourceBlock.maxHealth,
+              sourceBlock.value,
+              sourceBlock.materialProperties
+            );
+            this.grid[y][x] = duplicate;
+            this.blocks.set(`${x},${y}`, duplicate);
+          } else {
+            // Fallback stone block
+            const props = materialPropertyHandler.getMaterialProperties('stone');
+            const filler = new OreBlock(x, y, 'stone', 100, 10, props);
+            this.grid[y][x] = filler;
+            this.blocks.set(`${x},${y}`, filler);
+          }
+        }
+      }
+      this.width = 10;
+    }
+
+    // Duplicate rows to reach height 10
+    if (this.height < 10) {
+      for (let y = originalHeight; y < 10; y++) {
+        const sourceY = y % originalHeight;
+        const sourceRow = this.grid[sourceY];
+        const newRow = new Array(this.width);
+        for (let x = 0; x < this.width; x++) {
+          const sourceBlock = sourceRow[x];
+          if (sourceBlock) {
+            const duplicate = new OreBlock(
+              x,
+              y,
+              sourceBlock.oreType,
+              sourceBlock.maxHealth,
+              sourceBlock.value,
+              sourceBlock.materialProperties
+            );
+            newRow[x] = duplicate;
+            this.blocks.set(`${x},${y}`, duplicate);
+          } else {
+            const props = materialPropertyHandler.getMaterialProperties('stone');
+            const filler = new OreBlock(x, y, 'stone', 100, 10, props);
+            newRow[x] = filler;
+            this.blocks.set(`${x},${y}`, filler);
+          }
+        }
+        this.grid.push(newRow);
+      }
+      this.height = 10;
+    }
+
+    console.log(`Grid expanded to ${this.width}x${this.height} by duplicating existing blocks`);
   }
 
   /**
@@ -474,7 +569,18 @@ export class OreGrid {
    */
   getBlockAtGridPos(x, y) {
     if (this.grid && y >= 0 && y < this.height && x >= 0 && x < this.width) {
-      return this.grid[y][x];
+      let block = this.grid[y][x];
+      // Lazy create if missing (shouldn't happen after duplication but safe fallback)
+      if (!block) {
+        const oreType = 'stone';
+        const hardness = 100;
+        const value = 10;
+        const props = materialPropertyHandler.getMaterialProperties(oreType);
+        block = new OreBlock(x, y, oreType, hardness, value, props);
+        this.grid[y][x] = block;
+        this.blocks.set(`${x},${y}`, block);
+      }
+      return block;
     }
     return null;
   }
@@ -515,10 +621,21 @@ export class OreGrid {
       maxDisplacementRadius
     });
 
+    // GUARANTEED CENTER DESTRUCTION: ensure placed explosive always destroys its cell
+    const centerBlock = this.getBlockAtGridPos(centerX, centerY);
+    if (centerBlock && !centerBlock.isDestroyed) {
+      centerBlock.health = 0;
+      centerBlock.damage = centerBlock.maxHealth;
+      centerBlock.isDestroyed = true;
+      affectedBlocks.push(centerBlock);
+      destroyedBlocks.push(centerBlock);
+    }
+
     for (let y = Math.max(0, centerY - maxDisplacementRadius); y <= Math.min(this.height - 1, centerY + maxDisplacementRadius); y++) {
       for (let x = Math.max(0, centerX - maxDisplacementRadius); x <= Math.min(this.width - 1, centerX + maxDisplacementRadius); x++) {
         const block = this.getBlockAtGridPos(x, y);
         if (!block || block.isDestroyed) continue;
+        if (x === centerX && y === centerY) continue; // Already destroyed center
 
         // Pre-calculate distance once for performance
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
