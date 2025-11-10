@@ -611,14 +611,15 @@ export class OreGrid {
     // Pre-calculate decay constants for performance
     const decayConstant = 0.5; // Exponential decay constant (k)
     const linearDecayRate = power / radius; // Linear decay rate
-    const maxDisplacementRadius = radius * 1.5; // Extended radius for displacement effects
+    const maxDisplacementRadius = Math.ceil(radius * 1.5); // Extended radius for displacement effects (ensure integer)
 
     console.log('Applying blast with decay function:', {
       center: `(${centerX}, ${centerY})`,
       radius,
       power,
       decayConstant,
-      maxDisplacementRadius
+      maxDisplacementRadius,
+      gridSize: `${this.width}x${this.height}`
     });
 
     // GUARANTEED CENTER DESTRUCTION: ensure placed explosive always destroys its cell
@@ -629,10 +630,19 @@ export class OreGrid {
       centerBlock.isDestroyed = true;
       affectedBlocks.push(centerBlock);
       destroyedBlocks.push(centerBlock);
+      console.log(`✓ Center block at (${centerX}, ${centerY}) destroyed`);
     }
 
-    for (let y = Math.max(0, centerY - maxDisplacementRadius); y <= Math.min(this.height - 1, centerY + maxDisplacementRadius); y++) {
-      for (let x = Math.max(0, centerX - maxDisplacementRadius); x <= Math.min(this.width - 1, centerX + maxDisplacementRadius); x++) {
+    // Calculate bounds with proper ceiling/floor to ensure we cover all cells
+    const minY = Math.max(0, Math.floor(centerY - maxDisplacementRadius));
+    const maxY = Math.min(this.height - 1, Math.ceil(centerY + maxDisplacementRadius));
+    const minX = Math.max(0, Math.floor(centerX - maxDisplacementRadius));
+    const maxX = Math.min(this.width - 1, Math.ceil(centerX + maxDisplacementRadius));
+
+    console.log(`Scanning area: X[${minX}, ${maxX}], Y[${minY}, ${maxY}]`);
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
         const block = this.getBlockAtGridPos(x, y);
         if (!block || block.isDestroyed) continue;
         if (x === centerX && y === centerY) continue; // Already destroyed center

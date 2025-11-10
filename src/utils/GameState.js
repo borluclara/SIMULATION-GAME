@@ -115,17 +115,18 @@ export class GameState {
     
     if (!grid || blasts.length === 0) {
       console.warn('No grid or blasts available');
-      return { blasts: [], affectedCells: [] };
+      return { blasts: [], affectedCells: [], destroyedCells: [] };
     }
 
     let allAffectedCells = [];
     let allDestroyedCells = [];
     const radius = this.state.blastRadius;
-    const power = 100; // Standard blast power
+    const power = 200; // Increased blast power to ensure destruction
 
     console.log('Processing directional blasts:', {
       blastCount: blasts.length,
       radius: radius,
+      power: power,
       hasDirections: blasts.some(b => b.direction !== undefined)
     });
 
