@@ -327,7 +327,7 @@ function App() {
       setShowBlastSummary(true);
 
       // *** START GSAP ANIMATION SEQUENCE ***
-      const cellSize = 45; // Cell size in pixels (matches OreGridCanvas default)
+      const cellSize = 35; // Cell size in pixels (matches OreGridCanvas default)
       
       // Start blast animation engine
       blastAnimationEngine.animateBlastSequence(
@@ -403,7 +403,7 @@ function App() {
           physicsEngine.start();
           console.log('Physics engine started with boundaries');
 
-          const cellSize = 45; // Cell size (matches OreGridCanvas default)
+          const cellSize = 35; // Cell size (matches OreGridCanvas default)
           
           // Create debris for all destroyed cells with averaged blast center
           if (result.destroyedCells.length > 0) {

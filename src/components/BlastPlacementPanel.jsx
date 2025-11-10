@@ -94,8 +94,8 @@ const BlastPlacementPanel = ({
       // Create debris for each blast
       blastResult.blasts.forEach(blast => {
         const blastCenter = {
-          x: blast.x * 45 + 22.5, // cellSize = 45
-          y: blast.y * 45 + 22.5
+          x: blast.x * 35 + 17.5, // cellSize = 35
+          y: blast.y * 35 + 17.5
         };
 
         // Filter cells affected by this specific blast
@@ -106,7 +106,7 @@ const BlastPlacementPanel = ({
         console.log(`Creating debris for blast at (${blast.x}, ${blast.y}):`, blastCells.length, 'cells');
 
         // Create debris particles with directional support
-        physicsEngine.createDebris(blastCells, 45, blastCenter, blastDirection);
+        physicsEngine.createDebris(blastCells, 35, blastCenter, blastDirection);
       });
 
       // Start physics engine

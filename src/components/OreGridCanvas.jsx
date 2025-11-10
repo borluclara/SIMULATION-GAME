@@ -5,7 +5,7 @@ import { getMaterialTexture, getMovementBehavior } from '../utils/MaterialProper
 const OreGridCanvas = forwardRef(({ 
   grid, 
   onBlockClick = null,
-  cellSize = 45,
+  cellSize = 35,
   showGrid = true,
   showLabels = false,
   className = '',
