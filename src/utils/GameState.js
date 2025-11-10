@@ -12,7 +12,7 @@ export class GameState {
       blasts: [],
       grid: null,
       maxBlasts: 5,
-      blastRadius: 3
+      blastRadius: 5
     };
     
     this.listeners = [];
@@ -58,7 +58,7 @@ export class GameState {
       blasts: [],
       grid: null,
       maxBlasts: 5,
-      blastRadius: 3
+      blastRadius: 5
     };
     this.notifyListeners();
   }

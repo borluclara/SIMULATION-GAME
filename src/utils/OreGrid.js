@@ -503,7 +503,7 @@ export class OreGrid {
     // Pre-calculate decay constants for performance
     const decayConstant = 0.5; // Exponential decay constant (k)
     const linearDecayRate = power / radius; // Linear decay rate
-    const maxDisplacementRadius = radius * 1.2; // Extended radius for displacement effects
+    const maxDisplacementRadius = radius * 1.5; // Extended radius for displacement effects
 
     console.log('Applying blast with decay function:', {
       center: `(${centerX}, ${centerY})`,
