@@ -4,6 +4,7 @@
  */
 
 import { materialPropertyHandler, getMaterialColor } from './MaterialPropertyHandler.js';
+import { oreAnimationEngine } from './OreAnimationEngine.js';
 
 // Utility functions for directional calculations
 /**
@@ -87,6 +88,18 @@ export class OreBlock {
     this.isDestroyed = false;
     this.recentlyDisplaced = false; // Track displacement for visual effects
     this.displacementTimer = null;   // Timer for clearing displacement flag
+    
+    // Animation properties for ore movement
+    this.originalX = x; // Store original position for animation reference
+    this.originalY = y;
+    this.animatedX = x; // Current animated position (starts at original)
+    this.animatedY = y;
+    this.targetX = x;   // Target position for animation
+    this.targetY = y;
+    this.isAnimating = false; // Whether block is currently animating
+    this.animationStartTime = 0; // Timestamp when animation started
+    this.animationDuration = 0; // Duration of current animation in ms
+    this.gsapTween = null; // Reference to GSAP tween for this block
     
     // Material properties integration
     this.materialProperties = materialProperties || materialPropertyHandler.getMaterialProperties(oreType);
@@ -593,6 +606,19 @@ export class OreGrid {
   }
 
   /**
+   * Check if any blocks are currently animating
+   * More efficient than checking all blocks
+   */
+  hasAnimatingBlocks() {
+    for (const block of this.blocks.values()) {
+      if (block && block.isAnimating) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Apply blast effect to an area with optional direction
    * (direction in degrees, or null for omnidirectional)
    */
@@ -1082,48 +1108,80 @@ export class OreGrid {
   }
 
   /**
-   * Apply calculated displacements to the grid
+   * Apply calculated displacements to the grid with animation
    */
   applyDisplacements(displacements) {
+    if (!displacements || displacements.length === 0) {
+      console.log('No displacements to apply');
+      return;
+    }
+
+    console.log(`Applying animated displacements for ${displacements.length} blocks`);
+    
     // Sort by distance to handle closest displacements first
     displacements.sort((a, b) => a.distance - b.distance);
 
-    // First, remove blocks from their original positions
+    // Prepare displacements with collision checking
+    const validDisplacements = [];
+    
+    // First pass: determine valid target positions
     displacements.forEach(displacement => {
+      const { block, newX, newY, originalX, originalY } = displacement;
+      
+      // Check if target position is valid and handle collisions
+      let targetX = newX;
+      let targetY = newY;
+      
+      // If target is occupied by another block, find nearest empty spot
+      const existingBlock = this.getBlockAtGridPos(newX, newY);
+      if (existingBlock && existingBlock !== block) {
+        const nearestEmpty = this.findNearestEmptyPosition(newX, newY);
+        if (nearestEmpty) {
+          targetX = nearestEmpty.x;
+          targetY = nearestEmpty.y;
+        } else {
+          // If no empty spot found, don't move the block
+          targetX = originalX;
+          targetY = originalY;
+        }
+      }
+
+      validDisplacements.push({
+        block,
+        originalX,
+        originalY,
+        newX: targetX,
+        newY: targetY
+      });
+    });
+
+    // Clear original positions in grid (blocks will be repositioned after animation)
+    validDisplacements.forEach(displacement => {
       const { block, originalX, originalY } = displacement;
       this.setBlock(originalX, originalY, null);
     });
 
-    // Then, place blocks at their new positions
-    displacements.forEach(displacement => {
-      const { block, newX, newY } = displacement;
+    // Start animations using the animation engine
+    oreAnimationEngine.animateDisplacements(
+      validDisplacements,
       
-      // Check if target position is empty
-      const existingBlock = this.getBlockAtGridPos(newX, newY);
-      if (!existingBlock) {
-        // Update block coordinates
-        block.x = newX;
-        block.y = newY;
-        this.setBlock(newX, newY, block);
-        
+      // onUpdate callback - called during animation
+      (block) => {
         // Mark as recently displaced for visual effects
         this.markAsDisplaced(block);
-      } else {
-        // If target is occupied, find nearest empty spot
-        const nearestEmpty = this.findNearestEmptyPosition(newX, newY);
-        if (nearestEmpty) {
-          block.x = nearestEmpty.x;
-          block.y = nearestEmpty.y;
-          this.setBlock(nearestEmpty.x, nearestEmpty.y, block);
-          this.markAsDisplaced(block);
-        } else {
-          // If no empty spot found, place back at original position
-          block.x = displacement.originalX;
-          block.y = displacement.originalY;
-          this.setBlock(displacement.originalX, displacement.originalY, block);
-        }
+      },
+      
+      // onComplete callback - called when all animations finish
+      () => {
+        console.log('All displacement animations completed');
+        
+        // Final step: place all blocks at their final positions in the grid
+        validDisplacements.forEach(displacement => {
+          const { block, newX, newY } = displacement;
+          this.setBlock(newX, newY, block);
+        });
       }
-    });
+    );
   }
 
   /**

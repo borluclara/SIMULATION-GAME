@@ -103,6 +103,71 @@ const OreGridCanvas = forwardRef(({
     return colors[material?.toLowerCase()] || '#808080';
   }, []);
 
+  // Helper function to render a block at a specific pixel position
+  const renderBlockAtPosition = useCallback((ctx, block, pixelX, pixelY, cellWidth, cellHeight, scaledCellSize, showLabels) => {
+    if (!block || block.isDestroyed) {
+      // Draw empty space for destroyed blocks
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+      return;
+    }
+
+    // Enhanced material-based rendering
+    const materialTexture = getMaterialTexture(block.oreType);
+    const movementBehavior = getMovementBehavior(block.oreType);
+    
+    // Base color
+    ctx.fillStyle = block.getColor();
+    ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+    
+    // Material-specific visual effects
+    renderMaterialEffects(ctx, pixelX, pixelY, cellWidth, cellHeight, block, materialTexture);
+    
+    // Base gradient for depth
+    const gradient = ctx.createLinearGradient(pixelX, pixelY, pixelX + cellWidth, pixelY + cellHeight);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+    
+    // Crack visualization for damaged blocks
+    if (block.crackLevel > 0 && block.crackPatterns && block.crackPatterns.length > 0) {
+      renderCrackPatterns(ctx, pixelX, pixelY, cellWidth, cellHeight, block);
+    }
+    
+    // Enhanced displacement visual effects with movement behavior
+    if (block.recentlyDisplaced || block.isAnimating) {
+      const displacementColor = movementBehavior.movementColor;
+      ctx.strokeStyle = displacementColor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
+      ctx.setLineDash([]); // Reset line dash
+      
+      // Movement range indicator
+      const alpha = movementBehavior.displacementRange === 'far' ? 0.25 : 
+                   movementBehavior.displacementRange === 'medium' ? 0.15 : 0.08;
+      ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+      ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
+    }
+    
+    if (showLabels && scaledCellSize > 16) {
+      const fontSize = Math.max(8, scaledCellSize / 3.5);
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      const textX = pixelX + cellWidth / 2;
+      const textY = pixelY + cellHeight / 2;
+      const text = block.oreType.charAt(0).toUpperCase();
+      ctx.fillText(text, textX + 1, textY + 1);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, textX, textY);
+    }
+  }, []);
+
   const renderGrid = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -137,81 +202,21 @@ const OreGridCanvas = forwardRef(({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Draw grid cells
+      // First pass: Draw grid background and static (non-animating) blocks
       for (let y = 0; y < grid.height; y++) {
         for (let x = 0; x < grid.width; x++) {
-          const block = grid.getBlockAtGridPos(x, y);
-          
           const pixelX = Math.floor(x * scaledCellSize);
           const pixelY = Math.floor(y * scaledCellSize);
           const cellWidth = Math.ceil(scaledCellSize);
           const cellHeight = Math.ceil(scaledCellSize);
           
-          if (block) {
-            // Skip destroyed blocks (they're now debris!)
-            if (block.isDestroyed) {
-              ctx.fillStyle = '#0a0a0a'; // Empty space
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-              continue;
-            }
-
-            // Enhanced material-based rendering
-            const materialTexture = getMaterialTexture(block.oreType);
-            const movementBehavior = getMovementBehavior(block.oreType);
-            
-            // Base color
-            ctx.fillStyle = block.getColor();
-            ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            
-            // Material-specific visual effects
-            renderMaterialEffects(ctx, pixelX, pixelY, cellWidth, cellHeight, block, materialTexture);
-            
-            // Base gradient for depth
-            const gradient = ctx.createLinearGradient(pixelX, pixelY, pixelX + cellWidth, pixelY + cellHeight);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            
-            // Damage visualization removed (preserve original material colors after blasts)
-            
-            // NEW: Crack visualization for damaged blocks
-            if (block.crackLevel > 0 && block.crackPatterns && block.crackPatterns.length > 0) {
-              renderCrackPatterns(ctx, pixelX, pixelY, cellWidth, cellHeight, block);
-            }
-            
-            // Enhanced displacement visual effects with movement behavior
-            if (block.recentlyDisplaced) {
-              const displacementColor = movementBehavior.movementColor;
-              ctx.strokeStyle = displacementColor;
-              ctx.lineWidth = 2;
-              ctx.setLineDash([4, 4]);
-              ctx.strokeRect(pixelX + 1, pixelY + 1, cellWidth - 2, cellHeight - 2);
-              ctx.setLineDash([]); // Reset line dash
-              
-              // Movement range indicator
-              const alpha = movementBehavior.displacementRange === 'far' ? 0.25 : 
-                           movementBehavior.displacementRange === 'medium' ? 0.15 : 0.08;
-              ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
-              ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
-            }
-            
-            if (showLabels && scaledCellSize > 16) {
-              const fontSize = Math.max(8, scaledCellSize / 3.5);
-              ctx.font = `bold ${fontSize}px Arial`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-              const textX = pixelX + cellWidth / 2;
-              const textY = pixelY + cellHeight / 2;
-              const text = block.oreType.charAt(0).toUpperCase();
-              ctx.fillText(text, textX + 1, textY + 1);
-              
-              ctx.fillStyle = '#ffffff';
-              ctx.fillText(text, textX, textY);
-            }
+          const block = grid.getBlockAtGridPos(x, y);
+          
+          if (block && !block.isAnimating) {
+            // Draw static (non-animating) blocks at their grid positions
+            renderBlockAtPosition(ctx, block, pixelX, pixelY, cellWidth, cellHeight, scaledCellSize, showLabels);
           } else {
+            // Draw empty cell background
             ctx.fillStyle = '#2a2a2a';
             ctx.fillRect(pixelX, pixelY, cellWidth, cellHeight);
           }
@@ -223,6 +228,33 @@ const OreGridCanvas = forwardRef(({
             ctx.strokeStyle = block ? '#666666' : '#444444';
             ctx.lineWidth = scaledCellSize > 20 ? 1 : 0.5;
             ctx.strokeRect(pixelX + 0.5, pixelY + 0.5, cellWidth - 1, cellHeight - 1);
+          }
+        }
+      }
+      
+      // Second pass: Draw animating blocks at their animated positions
+      // This ensures animating blocks render on top of static grid
+      for (let y = 0; y < grid.height; y++) {
+        for (let x = 0; x < grid.width; x++) {
+          const block = grid.getBlockAtGridPos(x, y);
+          
+          if (block && block.isAnimating) {
+            // Use animated position instead of grid position
+            const animPixelX = Math.floor(block.animatedX * scaledCellSize);
+            const animPixelY = Math.floor(block.animatedY * scaledCellSize);
+            const cellWidth = Math.ceil(scaledCellSize);
+            const cellHeight = Math.ceil(scaledCellSize);
+            
+            // Add slight visual effect for animating blocks
+            ctx.save();
+            
+            // Optional: Add glow effect for animating blocks
+            ctx.shadowColor = 'rgba(0, 255, 136, 0.5)';
+            ctx.shadowBlur = 3;
+            
+            renderBlockAtPosition(ctx, block, animPixelX, animPixelY, cellWidth, cellHeight, scaledCellSize, showLabels);
+            
+            ctx.restore();
           }
         }
       }
@@ -616,6 +648,30 @@ const OreGridCanvas = forwardRef(({
   useEffect(() => {
     renderGrid();
   }, [renderGrid]);
+
+  // Animation loop for continuous rendering during ore animations
+  useEffect(() => {
+    let animationLoopId = null;
+    
+    const animationLoop = () => {
+      // Check if there are any animating blocks
+      if (grid && grid.hasAnimatingBlocks()) {
+        renderGrid(); // Re-render to show animation progress
+        animationLoopId = requestAnimationFrame(animationLoop);
+      }
+    };
+    
+    // Start the animation loop if needed
+    if (grid && grid.hasAnimatingBlocks()) {
+      animationLoopId = requestAnimationFrame(animationLoop);
+    }
+    
+    return () => {
+      if (animationLoopId) {
+        cancelAnimationFrame(animationLoopId);
+      }
+    };
+  }, [grid, renderGrid]);
 
   const getBlockFromMouseEvent = (event) => {
     const canvas = canvasRef.current;
