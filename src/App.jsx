@@ -17,6 +17,7 @@ import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
 import { blastAnimationEngine } from './utils/BlastAnimationEngine'
 import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
+import blastHistoryStore from './utils/BlastHistoryStore'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -72,6 +73,13 @@ function App() {
   const [resetMessage, setResetMessage] = useState(null)
   
   const canvasRef = React.useRef(null)
+
+  // Initialize blast history store when player name changes
+  useEffect(() => {
+    if (playerName && playerName.trim().length > 0) {
+      blastHistoryStore.initializeSession(playerName);
+    }
+  }, [playerName]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -235,6 +243,10 @@ function App() {
       blastAnimationEngine.stopAll();
       physicsEngine.destroy();
       
+      // Clear blast history (new session)
+      blastHistoryStore.clearHistory();
+      console.log('Blast history cleared for new session');
+      
       // Update scenario with reset grid
       setCurrentScenario({
         data: originalCsvData,
@@ -340,6 +352,55 @@ function App() {
         wasteMaterials.some(w => (cell.material || '').toLowerCase().includes(w)) ||
         !oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
       );
+
+      // Calculate material value
+      const materialValues = {
+        'gold': 100, 'diamond': 150, 'emerald': 120, 'silver': 80,
+        'iron': 50, 'copper': 60, 'coal': 30,
+        'stone': -5, 'dirt': -3, 'gravel': -4, 'sand': -2
+      };
+
+      let totalValue = 0;
+      const materialBreakdown = {};
+      
+      result.destroyedCells.forEach(cell => {
+        const material = (cell.material || '').toLowerCase();
+        materialBreakdown[material] = (materialBreakdown[material] || 0) + 1;
+        
+        for (const [key, value] of Object.entries(materialValues)) {
+          if (material.includes(key)) {
+            totalValue += value;
+            break;
+          }
+        }
+      });
+
+      // Calculate performance metrics
+      const oresRecovered = recoveredOres.length;
+      const wasteCollected = lostWaste.length;
+      const totalDestroyed = materialsDestroyed;
+      const recovery = totalDestroyed > 0 ? Math.round((oresRecovered / totalDestroyed) * 100) : 0;
+      const dilution = totalDestroyed > 0 ? Math.round((wasteCollected / totalDestroyed) * 100) : 0;
+      const efficiency = Math.max(0, recovery - dilution);
+
+      // Save to blast history store
+      const blastRecord = blastHistoryStore.addBlastRecord({
+        recovery,
+        dilution,
+        efficiency,
+        oresRecovered,
+        wasteCollected: wasteCollected,
+        totalValue: Math.max(0, totalValue),
+        score: scoreIncrease,
+        totalScore: score + scoreIncrease,
+        blastsUsed: result.blasts.length,
+        blastRadius: result.blastRadius || 0,
+        cellsDestroyed: materialsDestroyed,
+        cellsAffected: result.affectedCells?.length || 0,
+        materialBreakdown
+      });
+
+      console.log('📊 Blast record saved:', blastRecord);
       
       // Set highlighted cells for canvas rendering
       setHighlightedCells({

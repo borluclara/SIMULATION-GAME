@@ -6,10 +6,12 @@
  * - Performance rating and detailed statistics
  * - Efficiency metrics with progress bars
  * - Action buttons (Reset, Continue)
+ * - Round number and session statistics
  */
 
 import React, { useState, useEffect } from 'react';
 import './BlastFeedback.css';
+import blastHistoryStore from '../utils/BlastHistoryStore';
 
 const BlastFeedback = ({ 
   blastResults,
@@ -23,10 +25,16 @@ const BlastFeedback = ({
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [sessionStats, setSessionStats] = useState(null);
+  const [currentRound, setCurrentRound] = useState(0);
 
   useEffect(() => {
     if (isVisible) {
       setIsAnimating(true);
+      
+      // Get current round and session stats
+      setCurrentRound(blastHistoryStore.getCurrentRound());
+      setSessionStats(blastHistoryStore.getSessionStats());
     } else {
       setIsAnimating(false);
       setShowDetails(false);
@@ -156,10 +164,13 @@ const BlastFeedback = ({
         {/* Header */}
         <div className="feedback-header">
           <div className="feedback-title-section">
-            <h2 className="feedback-title">
-              <span className="feedback-icon">💥</span>
-              Blast Complete
-            </h2>
+            <div className="title-with-round">
+              <h2 className="feedback-title">
+                <span className="feedback-icon">💥</span>
+                Blast Complete
+              </h2>
+              <span className="round-badge">Round {currentRound}</span>
+            </div>
             <button 
               className="feedback-close-btn" 
               onClick={handleClose}
@@ -271,11 +282,12 @@ const BlastFeedback = ({
             className="details-toggle" 
             onClick={() => setShowDetails(!showDetails)}
           >
-            {showDetails ? '▼' : '▶'} Detailed Breakdown
+            {showDetails ? '▼' : '▶'} Detailed Breakdown & Session Stats
           </button>
           
           {showDetails && (
             <div className="details-content">
+              <h4 className="details-subtitle">This Round</h4>
               <div className="detail-row">
                 <span className="detail-label">Total Cells Destroyed:</span>
                 <span className="detail-value">{metrics.totalDestroyed}</span>
@@ -292,6 +304,34 @@ const BlastFeedback = ({
                 <span className="detail-label">Cells Affected:</span>
                 <span className="detail-value">{blastResults?.affectedCells?.length || 0}</span>
               </div>
+
+              {sessionStats && sessionStats.totalRounds > 1 && (
+                <>
+                  <h4 className="details-subtitle session-stats-title">Session Statistics</h4>
+                  <div className="detail-row">
+                    <span className="detail-label">Total Rounds:</span>
+                    <span className="detail-value">{sessionStats.totalRounds}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Average Recovery:</span>
+                    <span className="detail-value">{sessionStats.averageRecovery}%</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Average Efficiency:</span>
+                    <span className="detail-value">{sessionStats.averageEfficiency}%</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Total Ores Recovered:</span>
+                    <span className="detail-value">{sessionStats.totalOresRecovered}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Best Round:</span>
+                    <span className="detail-value highlight-best">
+                      Round {sessionStats.bestRound?.round} ({sessionStats.bestRound?.efficiency}% efficiency)
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
