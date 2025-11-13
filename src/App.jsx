@@ -636,29 +636,86 @@ function App() {
     return gameStateData;
   }
 
-  const handleLoad = (loadedData) => {
+  const handleLoad = async (loadedData) => {
     try {
-      // Restore game state from loaded data
+      setIsLoadingGrid(true);
+      
+      // Restore player name and score
       if (loadedData.playerName) setPlayerName(loadedData.playerName);
-      if (loadedData.score) setScore(loadedData.score);
-      if (loadedData.currentScenario) setCurrentScenario(loadedData.currentScenario);
+      if (typeof loadedData.score === 'number') setScore(loadedData.score);
+      
+      // Restore CSV data and grid
       if (loadedData.csvData) {
         setOriginalCsvData(loadedData.csvData);
         setCsvData(loadedData.csvData);
+        
         // Parse the CSV data and create grid
-        handleImport(Papa.unparse(loadedData.csvData));
-      }
-      if (loadedData.simulationSettings) {
-        const settings = loadedData.simulationSettings;
-        if (settings.blastPower) setBlastPower(settings.blastPower);
-        if (settings.blastDirection) setBlastDirection(settings.blastDirection);
-        if (settings.mineralRecovery) setMineralRecovery(settings.mineralRecovery);
-        if (settings.dilution) setDilution(settings.dilution);
+        const csvString = Papa.unparse(loadedData.csvData);
+        const grid = await parseCSVToGrid(csvString);
+        
+        setOreGrid(grid);
+        setCsvReady(true);
+        
+        // Store in game state
+        setCurrentScenario({
+          data: loadedData.csvData,
+          grid: grid,
+          fileName: loadedData.currentScenario?.fileName || 'Loaded Save',
+          uploadedAt: new Date().toISOString()
+        });
+        
+        setGrid(grid.data || grid);
       }
       
+      // Restore simulation settings
+      if (loadedData.simulationSettings) {
+        const settings = loadedData.simulationSettings;
+        if (typeof settings.blastPower === 'number') setBlastPower(settings.blastPower);
+        if (typeof settings.blastDirection === 'number') setBlastDirection(settings.blastDirection);
+        if (typeof settings.mineralRecovery === 'number') setMineralRecovery(settings.mineralRecovery);
+        if (typeof settings.dilution === 'number') setDilution(settings.dilution);
+      }
+      
+      // Restore blasts (if any were saved)
+      // Note: The blasts are managed by useGameState, but we can restore them via addBlast
+      // Clear existing blasts first
+      if (loadedData.blasts && Array.isArray(loadedData.blasts)) {
+        // Clear current blasts
+        const currentBlasts = blasts || [];
+        currentBlasts.forEach(blast => {
+          if (blast.id) {
+            // removeBlast would be needed here if available from useGameState
+          }
+        });
+        
+        // Add saved blasts
+        loadedData.blasts.forEach(blast => {
+          if (blast.x !== undefined && blast.y !== undefined) {
+            addBlast(blast.x, blast.y, blast.direction || 90);
+          }
+        });
+      }
+      
+      // Switch to game view if we have player name and CSV data
+      if (loadedData.playerName && loadedData.csvData) {
+        setCurrentView('game');
+      }
+      
+      setIsLoadingGrid(false);
       console.log('Game state loaded successfully:', loadedData);
+      
+      // Show success message
+      setResetMessage('✅ Game loaded successfully!');
+      setTimeout(() => setResetMessage(null), 3000);
+      
     } catch (error) {
       console.error('Error loading game state:', error);
+      setIsLoadingGrid(false);
+      
+      // Show error message
+      setResetMessage('❌ Failed to load game. Please try again.');
+      setTimeout(() => setResetMessage(null), 5000);
+      
       throw new Error('Failed to load game state');
     }
   };

@@ -3,8 +3,10 @@
  * Unified panel for save, load, and export functionality with collapsible interface
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './SaveLoadPanel.css';
+import SavedSessionsModal from './SavedSessionsModal';
+import { saveLoadManager } from '../utils/SaveLoadManager';
 
 const SaveLoadPanel = ({ 
   onSave,
@@ -20,6 +22,21 @@ const SaveLoadPanel = ({
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [savedSessions, setSavedSessions] = useState([]);
+
+  // Load saved sessions on mount and when visibility changes
+  useEffect(() => {
+    if (isVisible) {
+      loadSavedSessions();
+    }
+  }, [isVisible]);
+
+  // Function to refresh saved sessions list
+  const loadSavedSessions = () => {
+    const sessions = saveLoadManager.getAllSaves();
+    setSavedSessions(sessions);
+  };
 
   // Handle save functionality
   const handleSave = async () => {
@@ -30,26 +47,19 @@ const SaveLoadPanel = ({
 
     try {
       setIsLoading(true);
-      const saveData = {
-        ...gameState,
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      };
-
-      // Create downloadable JSON file
-      const dataStr = JSON.stringify(saveData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       
-      const exportFileDefaultName = `blastsim-save-${Date.now()}.json`;
+      // Save to localStorage using SaveLoadManager
+      const saveName = `${gameState.playerName || 'Player'} - ${new Date().toLocaleString()}`;
+      const result = saveLoadManager.saveGame(gameState, saveName);
       
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-
-      showFeedback('Game saved successfully!', 'success');
-      
-      if (onSave) onSave(saveData);
+      if (result.success) {
+        showFeedback('Game saved to browser storage!', 'success');
+        loadSavedSessions(); // Refresh the list
+        
+        if (onSave) onSave(gameState);
+      } else {
+        showFeedback(result.error || 'Failed to save game', 'error');
+      }
     } catch (error) {
       console.error('Save error:', error);
       showFeedback('Failed to save game', 'error');
@@ -58,9 +68,85 @@ const SaveLoadPanel = ({
     }
   };
 
-  // Handle load functionality
+  // Handle load functionality - Show saved sessions modal
   const handleLoad = () => {
-    fileInputRef.current?.click();
+    loadSavedSessions();
+    setShowLoadModal(true);
+  };
+
+  // Handle loading a specific save from modal
+  const handleLoadSave = (saveId) => {
+    try {
+      setIsLoading(true);
+      const result = saveLoadManager.loadGame(saveId);
+      
+      if (result.success) {
+        // Call the onLoad callback with the loaded game state
+        if (onLoad) {
+          onLoad(result.gameState);
+        }
+        showFeedback(`Loaded: ${result.metadata.saveName}`, 'success');
+        setShowLoadModal(false);
+      } else {
+        showFeedback(result.error || 'Failed to load game', 'error');
+      }
+    } catch (error) {
+      console.error('Load error:', error);
+      showFeedback('Failed to load game', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle deleting a save from modal
+  const handleDeleteSave = (saveId) => {
+    try {
+      const success = saveLoadManager.deleteSave(saveId);
+      if (success) {
+        loadSavedSessions(); // Refresh the list
+        showFeedback('Save deleted successfully', 'success');
+      } else {
+        showFeedback('Failed to delete save', 'error');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      showFeedback('Failed to delete save', 'error');
+    }
+  };
+
+  // Handle exporting a save from modal
+  const handleExportSave = (saveId) => {
+    try {
+      const result = saveLoadManager.exportSave(saveId);
+      if (result.success) {
+        showFeedback('Save exported successfully!', 'success');
+      } else {
+        showFeedback(result.error || 'Failed to export save', 'error');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      showFeedback('Failed to export save', 'error');
+    }
+  };
+
+  // Handle importing a save file
+  const handleImportSave = async (file) => {
+    try {
+      setIsLoading(true);
+      const result = await saveLoadManager.importSave(file);
+      
+      if (result.success) {
+        loadSavedSessions(); // Refresh the list
+        showFeedback(`Imported: ${result.saveName}`, 'success');
+      } else {
+        showFeedback(result.error || 'Failed to import save', 'error');
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      showFeedback('Failed to import save', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle file selection for loading
@@ -77,16 +163,8 @@ const SaveLoadPanel = ({
       setIsLoading(true);
       
       if (file.type === 'application/json' || file.name.endsWith('.json')) {
-        // Load game save file
-        const text = await file.text();
-        const saveData = JSON.parse(text);
-        
-        if (saveData.version && onLoad) {
-          onLoad(saveData);
-          showFeedback('Game loaded successfully!', 'success');
-        } else {
-          showFeedback('Invalid save file format', 'error');
-        }
+        // Check if it's a save file (import to localStorage) or direct load
+        await handleImportSave(file);
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
         // Load CSV ore data
         const text = await file.text();
@@ -200,7 +278,18 @@ const SaveLoadPanel = ({
   if (!isVisible) return null;
 
   return (
-    <div className={`save-load-panel ${position} ${isCollapsed ? 'collapsed' : 'expanded'}`}>
+    <>
+      {/* Saved Sessions Modal */}
+      <SavedSessionsModal
+        isVisible={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+        onLoadSave={handleLoadSave}
+        onDeleteSave={handleDeleteSave}
+        onExportSave={handleExportSave}
+        savedSessions={savedSessions}
+      />
+
+      <div className={`save-load-panel ${position} ${isCollapsed ? 'collapsed' : 'expanded'}`}>
       {/* Toggle Button */}
       <button 
         className="panel-toggle"
@@ -311,6 +400,7 @@ const SaveLoadPanel = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
