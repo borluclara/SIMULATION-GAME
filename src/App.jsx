@@ -11,6 +11,7 @@ import BlastSummaryPanel from './components/BlastSummaryPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
+import SaveLoadPanel from './components/SaveLoadPanel'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
@@ -547,17 +548,152 @@ function App() {
     handleCloseFeedback();
   };
 
-  const handleSave = () => {
-    const results = {
-      power: blastPower,
-      direction: blastDirection,
-      recovery: mineralRecovery,
-      dilution: dilution,
-      timestamp: new Date().toISOString()
-    }
-    console.log('Saving simulation results:', results)
-    // Add save functionality here
+  const handleSave = (saveData) => {
+    const gameStateData = {
+      playerName,
+      score,
+      currentScenario,
+      blasts,
+      csvData: originalCsvData,
+      gridState: oreGrid ? {
+        width: oreGrid.width,
+        height: oreGrid.height,
+        blocks: oreGrid.getAllBlocks()
+      } : null,
+      simulationSettings: {
+        blastPower,
+        blastDirection,
+        mineralRecovery,
+        dilution
+      },
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    };
+    
+    console.log('Game state saved:', gameStateData);
+    // The SaveLoadPanel handles the actual file download
+    return gameStateData;
   }
+
+  const handleLoad = (loadedData) => {
+    try {
+      // Restore game state from loaded data
+      if (loadedData.playerName) setPlayerName(loadedData.playerName);
+      if (loadedData.score) setScore(loadedData.score);
+      if (loadedData.currentScenario) setCurrentScenario(loadedData.currentScenario);
+      if (loadedData.csvData) {
+        setOriginalCsvData(loadedData.csvData);
+        setCsvData(loadedData.csvData);
+        // Parse the CSV data and create grid
+        handleImport(Papa.unparse(loadedData.csvData));
+      }
+      if (loadedData.simulationSettings) {
+        const settings = loadedData.simulationSettings;
+        if (settings.blastPower) setBlastPower(settings.blastPower);
+        if (settings.blastDirection) setBlastDirection(settings.blastDirection);
+        if (settings.mineralRecovery) setMineralRecovery(settings.mineralRecovery);
+        if (settings.dilution) setDilution(settings.dilution);
+      }
+      
+      console.log('Game state loaded successfully:', loadedData);
+    } catch (error) {
+      console.error('Error loading game state:', error);
+      throw new Error('Failed to load game state');
+    }
+  };
+
+  const handleExport = (csvData) => {
+    console.log('Grid data exported as CSV:', csvData);
+    // The SaveLoadPanel handles the actual file download
+    return csvData;
+  };
+
+  const handleImport = async (csvData) => {
+    try {
+      setCsvError(null);
+      setIsLoadingGrid(true);
+      
+      // Parse the CSV string using Papa Parse
+      Papa.parse(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          console.log("Parsed imported CSV:", results.data);
+          
+          // Validate columns like in handleFileUpload
+          const requiredColumns = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole'];
+          const playerColumns = (results.meta.fields || []).map(h => h.toLowerCase().trim());
+          
+          const missingColumns = requiredColumns.filter(reqCol => {
+            return !playerColumns.some(playerCol => 
+              playerCol === reqCol || 
+              playerCol.replace(/[_\s]/g, '') === reqCol.replace(/[_\s]/g, '')
+            );
+          });
+          
+          if (missingColumns.length > 0) {
+            const errorMessage = `Missing required columns: ${missingColumns.join(', ')}`;
+            setCsvError({
+              type: 'validation',
+              message: errorMessage
+            });
+            setIsLoadingGrid(false);
+            throw new Error(errorMessage);
+          }
+          
+          try {
+            // Create grid from the parsed data
+            const grid = await parseCSVToGrid(csvData);
+            
+            // Update all states
+            setCsvData(results.data);
+            setOriginalCsvData(results.data);
+            setOreGrid(grid);
+            setCsvReady(true);
+            setIsLoadingGrid(false);
+            
+            // Store in game state
+            setCurrentScenario({
+              data: results.data,
+              grid: grid,
+              fileName: 'imported-data.csv',
+              uploadedAt: new Date().toISOString()
+            });
+            
+            setGrid(grid.data || grid);
+            console.log('CSV data imported successfully');
+            
+            // Switch to game view if not already there
+            if (hasPlayerName()) {
+              setCurrentView('game');
+            }
+          } catch (gridError) {
+            console.error("Grid creation error during import:", gridError);
+            setCsvError({
+              type: 'grid_creation',
+              message: 'Failed to create grid from imported CSV data',
+              details: gridError.message
+            });
+            setIsLoadingGrid(false);
+            throw new Error('Failed to create grid from imported data');
+          }
+        },
+        error: (err) => {
+          console.error("CSV Parse Error during import:", err);
+          setCsvError({
+            type: 'parse',
+            message: 'Failed to parse imported CSV data',
+            details: err.message
+          });
+          setIsLoadingGrid(false);
+          throw new Error('Failed to parse imported CSV data');
+        }
+      });
+    } catch (error) {
+      console.error('Error importing CSV data:', error);
+      throw new Error('Failed to import CSV data');
+    }
+  };
 
   const handleReplay = () => {
     console.log('Replaying last simulation...')
@@ -746,6 +882,30 @@ function App() {
       
       {/* Material Legend - only show in game view */}
       <MaterialLegend grid={oreGrid} />
+      
+      {/* Save/Load Panel - only show in game view */}
+      <SaveLoadPanel
+        onSave={handleSave}
+        onLoad={handleLoad}
+        onExport={handleExport}
+        onImport={handleImport}
+        gameState={{
+          playerName,
+          score,
+          currentScenario,
+          blasts,
+          csvData: originalCsvData,
+          grid: oreGrid,
+          simulationSettings: {
+            blastPower,
+            blastDirection,
+            mineralRecovery,
+            dilution
+          }
+        }}
+        isVisible={csvData && oreGrid}
+        position="right"
+      />
     </div>
   )
 
