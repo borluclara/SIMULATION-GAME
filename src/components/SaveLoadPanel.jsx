@@ -15,7 +15,7 @@ const SaveLoadPanel = ({
   isVisible = true,
   position = 'right' // 'left', 'right', 'top'
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const fileInputRef = useRef(null);
@@ -208,7 +208,7 @@ const SaveLoadPanel = ({
         title={isCollapsed ? 'Expand Save/Load Panel' : 'Collapse Save/Load Panel'}
       >
         <span className="material-symbols-outlined">
-          {isCollapsed ? (position === 'right' ? 'chevron_left' : 'chevron_right') : 'menu'}
+          {isCollapsed ? 'add' : 'chevron_right'}
         </span>
       </button>
 
