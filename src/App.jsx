@@ -12,12 +12,14 @@ import ScoreFeedback from './components/ScoreFeedback'
 import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
 import SaveLoadPanel from './components/SaveLoadPanel'
+import SaveToast from './components/SaveToast'
 import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
 import { blastAnimationEngine } from './utils/BlastAnimationEngine'
 import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
+import simulationStorage from './utils/SimulationStorage'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -71,6 +73,10 @@ function App() {
   
   // Reset feedback state
   const [resetMessage, setResetMessage] = useState(null)
+  
+  // Save simulation state
+  const [saveToast, setSaveToast] = useState({ show: false, message: '', type: 'success', simulationId: null })
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
   
   const canvasRef = React.useRef(null)
 
@@ -586,6 +592,13 @@ function App() {
           console.error('❌ Physics simulation error:', error);
         }
       }
+      
+      // Auto-save after significant blast
+      if (result.blasts.length > 0) {
+        setTimeout(() => {
+          handleAutoSave();
+        }, 2000); // Auto-save 2 seconds after blast completes
+      }
     }
   }
 
@@ -635,6 +648,133 @@ function App() {
     // The SaveLoadPanel handles the actual file download
     return gameStateData;
   }
+
+  // New Save Simulation functionality
+  const handleSaveSimulation = async (customName = null) => {
+    try {
+      setIsAutoSaving(true);
+      
+      // Collect comprehensive game state
+      const gameData = {
+        playerName,
+        score,
+        currentScenario,
+        blasts,
+        originalCsvData,
+        oreGrid,
+        blastPower,
+        blastDirection,
+        mineralRecovery,
+        dilution,
+        simulationResults,
+        currentView,
+        isComplete: false, // Could be enhanced to detect completion
+        saveReason: customName ? 'manual' : 'auto'
+      };
+
+      // Save to persistent storage
+      const result = await simulationStorage.saveSimulation(gameData, customName);
+      
+      if (result.success) {
+        setSaveToast({
+          show: true,
+          message: result.message,
+          type: 'success',
+          simulationId: result.simulationId
+        });
+        
+        console.log('Simulation saved successfully:', result);
+        return result;
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Error saving simulation:', error);
+      setSaveToast({
+        show: true,
+        message: 'Failed to save simulation: ' + error.message,
+        type: 'error',
+        simulationId: null
+      });
+      throw error;
+    } finally {
+      setIsAutoSaving(false);
+    }
+  };
+
+  // Load simulation from storage
+  const handleLoadSimulation = async (simulationId) => {
+    try {
+      setIsLoadingGrid(true);
+      
+      const simulation = await simulationStorage.loadSimulation(simulationId);
+      
+      // Restore game state
+      if (simulation.player.name) setPlayerName(simulation.player.name);
+      if (simulation.player.score) setScore(simulation.player.score);
+      if (simulation.scenario) {
+        setCurrentScenario(simulation.scenario);
+        if (simulation.scenario.originalCsvData) {
+          setOriginalCsvData(simulation.scenario.originalCsvData);
+          setCsvData(simulation.scenario.data);
+        }
+        if (simulation.scenario.grid) {
+          setOreGrid(simulation.scenario.grid);
+          setGrid(simulation.scenario.grid.data || simulation.scenario.grid);
+        }
+      }
+      if (simulation.blasts) {
+        // Restore blasts if needed via useGameState
+      }
+      if (simulation.settings) {
+        setBlastPower(simulation.settings.blastPower || 500);
+        setBlastDirection(simulation.settings.blastDirection || 180);
+        setMineralRecovery(simulation.settings.mineralRecovery || 100);
+        setDilution(simulation.settings.dilution || 0);
+      }
+      
+      setCsvReady(true);
+      setCurrentView('game');
+      
+      setSaveToast({
+        show: true,
+        message: `Simulation loaded: ${simulation.scenario?.name || 'Unknown'}`,
+        type: 'success',
+        simulationId: simulation.id
+      });
+      
+      console.log('Simulation loaded successfully:', simulation);
+      return simulation;
+    } catch (error) {
+      console.error('Error loading simulation:', error);
+      setSaveToast({
+        show: true,
+        message: 'Failed to load simulation: ' + error.message,
+        type: 'error',
+        simulationId: null
+      });
+      throw error;
+    } finally {
+      setIsLoadingGrid(false);
+    }
+  };
+
+  // Auto-save functionality (can be called after significant game events)
+  const handleAutoSave = async () => {
+    if (csvReady && playerName && oreGrid) {
+      try {
+        await handleSaveSimulation(); // Auto-save without custom name
+      } catch (error) {
+        // Auto-save failures should not interrupt gameplay
+        console.warn('Auto-save failed:', error);
+      }
+    }
+  };
+
+  // Close toast notification
+  const handleCloseToast = () => {
+    setSaveToast(prev => ({ ...prev, show: false }));
+  };
 
   const handleLoad = (loadedData) => {
     try {
@@ -950,6 +1090,8 @@ function App() {
         onLoad={handleLoad}
         onExport={handleExport}
         onImport={handleImport}
+        onSaveSimulation={handleSaveSimulation}
+        onLoadSimulation={handleLoadSimulation}
         gameState={{
           playerName,
           score,
@@ -1013,6 +1155,16 @@ function App() {
         playerScore={score}
         previousScore={previousScore}
         grid={oreGrid}
+      />
+
+      {/* Save Simulation Toast Notification */}
+      <SaveToast 
+        message={saveToast.message}
+        type={saveToast.type}
+        isVisible={saveToast.show}
+        onClose={handleCloseToast}
+        simulationId={saveToast.simulationId}
+        duration={4000}
       />
     </div>
   )
