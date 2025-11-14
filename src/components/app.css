@@ -263,9 +263,11 @@
   gap: 12px;
 }
 
-/* Bottom Row: Single full-width panel */
+/* Bottom Row: Two panels side by side */
 .controls-bottom-row {
-  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 /* Canvas Section - Centered Grid */

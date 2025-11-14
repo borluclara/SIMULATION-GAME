@@ -897,7 +897,7 @@ function App() {
                     />
                   </div>
                   
-                  {/* Bottom Row: Single full-width panel */}
+                  {/* Bottom Row: Two panels side by side */}
                   <div className="controls-bottom-row">
                     <BlastPlacementPanel
                       onPlacementModeChange={handlePlacementModeChange}
@@ -906,6 +906,8 @@ function App() {
                       canvasRef={canvasRef}
                       blastDirection={blastDirection}
                     />
+                    
+                    <MaterialLegend grid={oreGrid} />
                   </div>
                 </div>
                 
@@ -940,9 +942,6 @@ function App() {
           )}
         </main>
       </div>
-      
-      {/* Material Legend - only show in game view */}
-      <MaterialLegend grid={oreGrid} />
       
       {/* Save/Load Panel - only show in game view */}
       <SaveLoadPanel

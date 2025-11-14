@@ -1,15 +1,13 @@
 .material-legend {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
+  position: relative;
   background: rgba(26, 26, 26, 0.95);
   border: 2px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 12px 16px;
-  min-width: 180px;
+  width: 100%;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
-  z-index: 1000;
+  z-index: 1;
 }
 
 .legend-title {
