@@ -4,8 +4,8 @@
  */
 
 .save-load-panel {
-  position: fixed;
-  z-index: 1000;
+  position: absolute;
+  z-index: 9999;
   background: rgba(20, 25, 35, 0.95);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -23,7 +23,7 @@
 
 /* Position Variants */
 .save-load-panel.right {
-  top: 120px;
+  top: 20px;
   right: 20px;
   transform-origin: top right;
 }
