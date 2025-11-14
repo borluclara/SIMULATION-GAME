@@ -5,9 +5,12 @@
   border-radius: 8px;
   padding: 12px 16px;
   width: 100%;
+  height: 320px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   z-index: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .legend-title {
@@ -26,13 +29,35 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar styling */
+.legend-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.legend-items::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.legend-items::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.legend-items::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 0;
+  padding: 3px 0;
   transition: transform 0.2s ease;
 }
 
