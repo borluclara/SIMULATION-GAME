@@ -928,11 +928,6 @@ function App() {
                       showBlastDirection={true}
                       highlightedCells={highlightedCells}
                     />
-                    <p className="canvas-instruction">
-                      {placementMode 
-                        ? "Click on grid cells to place explosives with directional blast" 
-                        : "Enable placement mode to add explosives, then trigger directional blasts"}
-                    </p>
                   </div>
                 </div>
               </div>
