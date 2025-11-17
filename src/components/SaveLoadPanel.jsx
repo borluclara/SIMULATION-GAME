@@ -3,14 +3,17 @@
  * Unified panel for save, load, and export functionality with collapsible interface
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './SaveLoadPanel.css';
+import simulationStorage from '../utils/SimulationStorage';
 
 const SaveLoadPanel = ({ 
   onSave,
   onLoad,
   onExport,
   onImport,
+  onSaveSimulation, // New: Save to persistent storage
+  onLoadSimulation, // New: Load from persistent storage
   gameState,
   isVisible = true,
   position = 'right' // 'left', 'right', 'top'
@@ -18,11 +21,42 @@ const SaveLoadPanel = ({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState({ message: '', type: '' });
+  const [savedSimulations, setSavedSimulations] = useState([]);
+  const [showSimulationsList, setShowSimulationsList] = useState(false);
+  const [saveMode, setSaveMode] = useState('persistent'); // 'persistent' or 'download'
+  const [showSaveOptions, setShowSaveOptions] = useState(false);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Handle save functionality
-  const handleSave = async () => {
+  // Load saved simulations on mount
+  useEffect(() => {
+    loadSavedSimulations();
+  }, []);
+
+  // Load saved simulations list
+  const loadSavedSimulations = async () => {
+    try {
+      const simulations = await simulationStorage.getAllSimulations();
+      setSavedSimulations(simulations);
+    } catch (error) {
+      console.error('Error loading saved simulations:', error);
+    }
+  };
+
+  // Close save options when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSaveOptions && !event.target.closest('.save-button-group') && !event.target.closest('.save-options')) {
+        setShowSaveOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSaveOptions]);
+
+  // Handle save functionality - now supports both file download and persistent storage
+  const handleSave = async (saveType = 'persistent') => {
     if (!gameState) {
       showFeedback('No game state to save', 'error');
       return;
@@ -30,26 +64,32 @@ const SaveLoadPanel = ({
 
     try {
       setIsLoading(true);
-      const saveData = {
-        ...gameState,
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      };
+      
+      if (saveType === 'persistent') {
+        // Save to persistent storage (new functionality)
+        await handleSaveSimulation();
+      } else if (saveType === 'download') {
+        // Original file download functionality
+        const saveData = {
+          ...gameState,
+          timestamp: new Date().toISOString(),
+          version: '1.0.0'
+        };
 
-      // Create downloadable JSON file
-      const dataStr = JSON.stringify(saveData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `blastsim-save-${Date.now()}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
+        const dataStr = JSON.stringify(saveData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
+        const exportFileDefaultName = `blastsim-save-${Date.now()}.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
 
-      showFeedback('Game saved successfully!', 'success');
-      
-      if (onSave) onSave(saveData);
+        showFeedback('Game file downloaded!', 'success');
+        
+        if (onSave) onSave(saveData);
+      }
     } catch (error) {
       console.error('Save error:', error);
       showFeedback('Failed to save game', 'error');
@@ -162,6 +202,67 @@ const SaveLoadPanel = ({
     return csvRows.join('\n');
   };
 
+  // Handle save simulation to persistent storage
+  const handleSaveSimulation = async () => {
+    if (!onSaveSimulation) {
+      showFeedback('Save simulation not available', 'error');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await onSaveSimulation();
+      await loadSavedSimulations(); // Refresh the list
+      showFeedback('Simulation saved to storage!', 'success');
+    } catch (error) {
+      console.error('Save simulation error:', error);
+      showFeedback('Failed to save simulation', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle load simulation from persistent storage
+  const handleLoadSimulation = async (simulationId) => {
+    if (!onLoadSimulation) {
+      showFeedback('Load simulation not available', 'error');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await onLoadSimulation(simulationId);
+      showFeedback('Simulation loaded successfully!', 'success');
+      setShowSimulationsList(false);
+    } catch (error) {
+      console.error('Load simulation error:', error);
+      showFeedback('Failed to load simulation', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle delete simulation
+  const handleDeleteSimulation = async (simulationId) => {
+    try {
+      await simulationStorage.deleteSimulation(simulationId);
+      await loadSavedSimulations(); // Refresh the list
+      showFeedback('Simulation deleted', 'info');
+    } catch (error) {
+      console.error('Delete simulation error:', error);
+      showFeedback('Failed to delete simulation', 'error');
+    }
+  };
+
+  // Format date for display
+  const formatDate = (timestamp) => {
+    try {
+      return new Date(timestamp).toLocaleString();
+    } catch (error) {
+      return 'Unknown';
+    }
+  };
+
   // Show feedback message
   const showFeedback = (message, type) => {
     setFeedback({ message, type });
@@ -224,16 +325,80 @@ const SaveLoadPanel = ({
 
         {/* Action Buttons */}
         <div className="panel-actions">
-          {/* Save Button */}
-          <button 
-            className="action-button save"
-            onClick={handleSave}
-            disabled={isLoading || !gameState}
-            title="Save current game state as JSON file"
-          >
-            <span className="material-symbols-outlined">save</span>
-            <span className="action-text">Save Game</span>
-          </button>
+          {/* Enhanced Save Button with Options */}
+          <div className="save-button-group">
+            <button 
+              className="action-button save"
+              onClick={() => handleSave(saveMode)}
+              disabled={isLoading || !gameState}
+              title={saveMode === 'persistent' ? 'Save simulation to storage' : 'Download save file'}
+            >
+              <span className="material-symbols-outlined">
+                {saveMode === 'persistent' ? 'bookmark_add' : 'save'}
+              </span>
+              <span className="action-text">
+                {saveMode === 'persistent' ? 'Save Simulation' : 'Save File'}
+              </span>
+            </button>
+            
+            <button 
+              className={`save-mode-toggle ${showSaveOptions ? 'expanded' : ''}`}
+              onClick={() => setShowSaveOptions(!showSaveOptions)}
+              disabled={isLoading}
+              title="Save options"
+            >
+              <span className="material-symbols-outlined">expand_more</span>
+            </button>
+          </div>
+
+          {/* Save Options Dropdown */}
+          {showSaveOptions && (
+            <div className="save-options">
+              <button 
+                className={`save-option ${saveMode === 'persistent' ? 'active' : ''}`}
+                onClick={() => {
+                  setSaveMode('persistent');
+                  setShowSaveOptions(false);
+                }}
+              >
+                <span className="material-symbols-outlined">bookmark_add</span>
+                <div className="option-text">
+                  <div>Save to Storage</div>
+                  <small>Persistent, auto-managed</small>
+                </div>
+              </button>
+              
+              <button 
+                className={`save-option ${saveMode === 'download' ? 'active' : ''}`}
+                onClick={() => {
+                  setSaveMode('download');
+                  setShowSaveOptions(false);
+                }}
+              >
+                <span className="material-symbols-outlined">save</span>
+                <div className="option-text">
+                  <div>Download File</div>
+                  <small>JSON file export</small>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* View Saved Simulations Button */}
+          {onLoadSimulation && (
+            <button 
+              className="action-button load-sim"
+              onClick={() => {
+                setShowSimulationsList(!showSimulationsList);
+                loadSavedSimulations();
+              }}
+              disabled={isLoading}
+              title="View and load saved simulations"
+            >
+              <span className="material-symbols-outlined">history</span>
+              <span className="action-text">Saved Sims ({savedSimulations.length})</span>
+            </button>
+          )}
 
           {/* Load Button */}
           <button 
@@ -257,6 +422,56 @@ const SaveLoadPanel = ({
             <span className="action-text">Export CSV</span>
           </button>
         </div>
+
+        {/* Saved Simulations List */}
+        {showSimulationsList && (
+          <div className="simulations-list">
+            <div className="simulations-header">
+              <h4>Saved Simulations</h4>
+              <span className="simulations-count">{savedSimulations.length}/{10} slots</span>
+            </div>
+            <div className="simulations-container">
+              {savedSimulations.length === 0 ? (
+                <div className="no-simulations">
+                  <span className="material-symbols-outlined">inventory_2</span>
+                  <p>No saved simulations yet</p>
+                </div>
+              ) : (
+                savedSimulations.map(sim => (
+                  <div key={sim.id} className="simulation-item">
+                    <div className="simulation-info">
+                      <div className="simulation-name">
+                        {sim.customName || sim.scenario?.name || 'Unnamed Simulation'}
+                      </div>
+                      <div className="simulation-meta">
+                        <span className="simulation-date">{formatDate(sim.timestamp)}</span>
+                        <span className="simulation-score">Score: {sim.player?.score || 0}</span>
+                      </div>
+                    </div>
+                    <div className="simulation-actions">
+                      <button
+                        className="sim-action-btn load-btn"
+                        onClick={() => handleLoadSimulation(sim.id)}
+                        disabled={isLoading}
+                        title="Load this simulation"
+                      >
+                        <span className="material-symbols-outlined">play_arrow</span>
+                      </button>
+                      <button
+                        className="sim-action-btn delete-btn"
+                        onClick={() => handleDeleteSimulation(sim.id)}
+                        disabled={isLoading}
+                        title="Delete this simulation"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Drop Zone */}
         <div 

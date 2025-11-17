@@ -499,6 +499,292 @@
   }
 }
 
+/* Enhanced Save Button Group */
+.save-button-group {
+  display: flex;
+  position: relative;
+}
+
+.save-button-group .action-button.save {
+  flex: 1;
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.save-mode-toggle {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.save-mode-toggle:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+}
+
+.save-mode-toggle .material-symbols-outlined {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+}
+
+.save-mode-toggle.expanded .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+/* Save Options Dropdown */
+.save-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(20, 25, 35, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.save-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.save-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.save-option.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-left: 3px solid #10b981;
+}
+
+.save-option .material-symbols-outlined {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.option-text small {
+  font-size: 9px;
+  color: #94a3b8;
+  line-height: 1.2;
+}
+
+/* Simulation Save/Load Styles */
+
+.action-button.load-sim {
+  border-left: 3px solid #06b6d4;
+}
+
+.action-button.load-sim:hover {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(6, 182, 212, 0.1));
+}
+
+/* Simulations List */
+.simulations-list {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+}
+
+.simulations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.simulations-header h4 {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.simulations-count {
+  font-size: 9px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.simulations-container {
+  max-height: 120px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.simulations-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.simulations-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.simulations-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.no-simulations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  color: #64748b;
+  text-align: center;
+}
+
+.no-simulations .material-symbols-outlined {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.no-simulations p {
+  font-size: 10px;
+  margin: 0;
+}
+
+/* Simulation Item */
+.simulation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.simulation-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.simulation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.simulation-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.simulation-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.simulation-date,
+.simulation-score {
+  font-size: 8px;
+  color: #94a3b8;
+}
+
+.simulation-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.sim-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 3px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.sim-action-btn .material-symbols-outlined {
+  font-size: 12px;
+}
+
+.sim-action-btn.load-btn:hover {
+  background: rgba(6, 182, 212, 0.3);
+}
+
+.sim-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.sim-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact Mobile Styles for Simulations */
+@media (max-width: 480px) {
+  .simulations-container {
+    max-height: 100px;
+  }
+  
+  .simulation-item {
+    padding: 4px 6px;
+  }
+  
+  .simulation-name {
+    font-size: 9px;
+  }
+  
+  .simulation-date,
+  .simulation-score {
+    font-size: 7px;
+  }
+  
+  .sim-action-btn {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .sim-action-btn .material-symbols-outlined {
+    font-size: 10px;
+  }
+}
+
 /* Print Styles */
 @media print {
   .save-load-panel {
