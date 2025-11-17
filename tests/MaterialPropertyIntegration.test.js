@@ -176,7 +176,7 @@ describe('Material Property Integration', () => {
   });
 
   describe('Visual Distinctions', () => {
-    it('should provide different textures for different material types', () => {
+    it('should provide different textures for different material types', async () => {
       const { getMaterialTexture } = await import('../src/utils/MaterialPropertyHandler.js');
       
       const hardTexture = getMaterialTexture('diamond');
@@ -192,7 +192,7 @@ describe('Material Property Integration', () => {
       expect(fragmentTexture.showCracks).toBe(true);
     });
 
-    it('should provide movement behavior indicators', () => {
+    it('should provide movement behavior indicators', async () => {
       const { getMovementBehavior } = await import('../src/utils/MaterialPropertyHandler.js');
       
       const lightMovement = getMovementBehavior('soil/overburden');
@@ -202,7 +202,7 @@ describe('Material Property Integration', () => {
       expect(heavyMovement.displacementRange).toBe('minimal');
     });
 
-    it('should use distinct colors for different materials', () => {
+    it('should use distinct colors for different materials', async () => {
       const { getMaterialColor } = await import('../src/utils/MaterialPropertyHandler.js');
       
       const goldColor = getMaterialColor('gold');
@@ -294,7 +294,7 @@ describe('Material Property Integration', () => {
       expect(particleSize).toBeGreaterThan(0);
     });
 
-    it('✅ Visual distinction exists for different material types', () => {
+    it('✅ Visual distinction exists for different material types', async () => {
       const { getMaterialTexture, getMaterialColor } = await import('../src/utils/MaterialPropertyHandler.js');
       
       const goldTexture = getMaterialTexture('gold');
