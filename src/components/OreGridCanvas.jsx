@@ -497,137 +497,21 @@ const OreGridCanvas = forwardRef(({
             // Dense materials: strong metallic glow, spark effects
             ctx.shadowColor = baseColor;
             ctx.shadowBlur = 8 + (speed * 0.5);
-            
-            // Sparks for high-speed dense materials
-            if (speed > 3) {
-              ctx.fillStyle = 'rgba(255, 255, 150, 0.8)';
-              for (let i = 0; i < 3; i++) {
-                const sparkAngle = (i * Math.PI * 2 / 3) + rotation;
-                const sparkDistance = effectiveSize * 1.5;
-                ctx.beginPath();
-                ctx.arc(
-                  Math.cos(sparkAngle) * sparkDistance, 
-                  Math.sin(sparkAngle) * sparkDistance, 
-                  1, 0, Math.PI * 2
-                );
-                ctx.fill();
-              }
-            }
           } else if (density < 2.0) {
-            // Light materials: floating, wispy effects
-            ctx.shadowColor = 'rgba(200, 220, 255, 0.6)';
-            ctx.shadowBlur = 12;
-            
-            // Dust trail for light materials
-            if (speed > 0.5) {
-              ctx.fillStyle = `rgba(180, 180, 200, ${Math.min(speed * 0.2, 0.4)})`;
-              for (let i = 1; i <= 3; i++) {
-                const dustSize = effectiveSize * (0.3 / i);
-                ctx.beginPath();
-                ctx.arc(-i * 5, (Math.random() - 0.5) * 4, dustSize, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
+            // Light materials: no special effects
           } else {
-            // Medium density: standard effects with bounce enhancement
-            ctx.shadowColor = baseColor;
-            ctx.shadowBlur = 6 + (bounceCount * 2); // Glow increases with bounces
+            // Medium density: no special effects
           }
           
-          // Main particle with enhanced shape based on material
-          ctx.fillStyle = baseColor;
+          // Main particle - simple solid dark gray/brown color for realistic debris
+          ctx.fillStyle = 'rgba(60, 50, 45, 0.9)'; // Dark gray-brown, looks like rock
           
-          if (hardness >= 7) {
-            // Hard materials: angular, crystalline shapes
-            ctx.beginPath();
-            const sides = 6;
-            for (let i = 0; i < sides; i++) {
-              const angle = (i * Math.PI * 2 / sides);
-              const x = Math.cos(angle) * effectiveSize;
-              const y = Math.sin(angle) * effectiveSize;
-              if (i === 0) ctx.moveTo(x, y);
-              else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.fill();
-          } else if (fragmentation > 0.7) {
-            // High fragmentation: irregular shapes
-            ctx.beginPath();
-            const irregularity = fragmentation * 0.3;
-            for (let i = 0; i < 8; i++) {
-              const angle = (i * Math.PI * 2 / 8);
-              const variation = 1 + (Math.sin(angle * 3 + rotation) * irregularity);
-              const x = Math.cos(angle) * effectiveSize * variation;
-              const y = Math.sin(angle) * effectiveSize * variation;
-              if (i === 0) ctx.moveTo(x, y);
-              else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.fill();
-          } else {
-            // Standard materials: circular particles
-            ctx.beginPath();
-            ctx.arc(0, 0, effectiveSize, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          // Simple square debris (no fancy shapes)
+          ctx.beginPath();
+          ctx.rect(-effectiveSize, -effectiveSize, effectiveSize * 2, effectiveSize * 2);
+          ctx.fill();
           
-          // Enhanced material-specific additional effects
-          ctx.shadowBlur = 0;
-          
-          // Hardness indicator with enhanced sparkle effects for falling debris
-          if (hardness >= 7) {
-            // Bright highlight spot
-            ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + (speed * 0.1)})`;
-            ctx.beginPath();
-            ctx.arc(-effectiveSize * 0.3, -effectiveSize * 0.3, effectiveSize * 0.25, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Enhanced sparkle pattern for very hard materials with rotation
-            if (hardness >= 9) {
-              ctx.strokeStyle = `rgba(200, 255, 255, ${0.5 + (speed * 0.2)})`;
-              ctx.lineWidth = Math.max(1, effectiveSize * 0.1);
-              ctx.beginPath();
-              // Rotating cross pattern
-              ctx.moveTo(-effectiveSize * 0.8, 0);
-              ctx.lineTo(effectiveSize * 0.8, 0);
-              ctx.moveTo(0, -effectiveSize * 0.8);
-              ctx.lineTo(0, effectiveSize * 0.8);
-              // Diagonal cross
-              ctx.moveTo(-effectiveSize * 0.6, -effectiveSize * 0.6);
-              ctx.lineTo(effectiveSize * 0.6, effectiveSize * 0.6);
-              ctx.moveTo(effectiveSize * 0.6, -effectiveSize * 0.6);
-              ctx.lineTo(-effectiveSize * 0.6, effectiveSize * 0.6);
-              ctx.stroke();
-            }
-          }
-          
-          // Enhanced valuable materials with dynamic shimmer based on movement
-          const economicValue = materialProps.economic_value || 1;
-          if (economicValue >= 5) {
-            const shimmerIntensity = 0.3 + (speed * 0.1) + (Math.sin(Date.now() * 0.01) * 0.2);
-            ctx.fillStyle = `rgba(255, 215, 0, ${shimmerIntensity})`;
-            ctx.beginPath();
-            ctx.arc(effectiveSize * 0.4, -effectiveSize * 0.4, effectiveSize * 0.2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Extra sparkle for very valuable materials
-            if (economicValue >= 10) {
-              ctx.fillStyle = `rgba(255, 255, 150, ${shimmerIntensity * 0.8})`;
-              ctx.beginPath();
-              ctx.arc(-effectiveSize * 0.2, effectiveSize * 0.3, effectiveSize * 0.1, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-          
-          // Bounce effect indicator
-          if (bounceCount > 0 && bounceCount < 5) {
-            const bounceGlow = Math.max(0, 1 - (age / 2000)); // Fade over 2 seconds
-            ctx.strokeStyle = `rgba(255, 100, 100, ${bounceGlow * 0.5})`;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(0, 0, effectiveSize * 1.5, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          // No additional effects - keep it simple and realistic
 
           ctx.restore();
         });
