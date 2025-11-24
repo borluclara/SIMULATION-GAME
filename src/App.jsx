@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Papa from 'papaparse'
 import './components/app.css'
 import GridManager from './components/GridManager'
@@ -809,6 +809,87 @@ function App() {
     return csvData;
   };
 
+  const handleExportSessionData = useCallback(() => {
+    if (!oreGrid) {
+      console.warn('Export aborted: grid not ready');
+      return;
+    }
+
+    try {
+      const timestamp = new Date();
+      const isoTimestamp = timestamp.toISOString();
+
+      const blockData = (() => {
+        if (!oreGrid) return [];
+        if (typeof oreGrid.getAllBlocks === 'function') {
+          return oreGrid.getAllBlocks();
+        }
+        if (Array.isArray(oreGrid.blocks)) {
+          return oreGrid.blocks;
+        }
+        if (Array.isArray(oreGrid.data)) {
+          return oreGrid.data;
+        }
+        return [];
+      })();
+
+      const gridSnapshot = {
+        width: oreGrid.width ?? null,
+        height: oreGrid.height ?? null,
+        blocks: blockData
+      };
+
+      const exportPayload = {
+        metadata: {
+          exportedAt: isoTimestamp,
+          fileVersion: '1.0.0',
+          playerName: playerName || 'Unknown Player',
+          sessionId: blastHistoryStore.sessionId
+        },
+        scenario: currentScenario ? {
+          fileName: currentScenario.fileName,
+          uploadedAt: currentScenario.uploadedAt,
+          source: currentScenario.source || null
+        } : null,
+        grid: gridSnapshot,
+        blasts: {
+          activeBlasts: blasts,
+          lastBlastResult: blastResults,
+          sessionHistory: blastHistoryStore.exportSessionData()
+        },
+        scores: {
+          currentScore: score,
+          previousScore,
+          lastScoreGain: Math.max(0, score - (previousScore || 0)),
+          mineralRecovery,
+          dilution
+        },
+        simulationSettings: {
+          blastPower,
+          blastDirection
+        },
+        rawData: {
+          simulationResults,
+          csvData: originalCsvData
+        }
+      };
+
+      const fileContents = JSON.stringify(exportPayload, null, 2);
+      const blob = new Blob([fileContents], { type: 'application/json' });
+      const fileName = `simulation_${isoTimestamp.replace(/[:]/g, '-').split('.')[0]}.json`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export session data:', error);
+    }
+  }, [oreGrid, playerName, currentScenario, blasts, blastResults, score, previousScore, mineralRecovery, dilution, blastPower, blastDirection, simulationResults, originalCsvData, blastHistoryStore]);
+
   const handleImport = async (csvData) => {
     try {
       setCsvError(null);
@@ -1086,6 +1167,8 @@ function App() {
         onImport={handleImport}
         onSaveSimulation={handleSaveSimulation}
         onLoadSimulation={handleLoadSimulation}
+        onExportSession={handleExportSessionData}
+        canExportSession={Boolean(oreGrid)}
         gameState={{
           playerName,
           score,

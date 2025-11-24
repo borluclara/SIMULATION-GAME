@@ -14,6 +14,8 @@ const SaveLoadPanel = ({
   onImport,
   onSaveSimulation, // New: Save to persistent storage
   onLoadSimulation, // New: Load from persistent storage
+  onExportSession,
+  canExportSession = true,
   gameState,
   isVisible = true,
   position = 'right' // 'left', 'right', 'top'
@@ -181,6 +183,24 @@ const SaveLoadPanel = ({
     } catch (error) {
       console.error('Export error:', error);
       showFeedback('Failed to export data', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportSession = async () => {
+    if (!onExportSession) {
+      showFeedback('Export data not available', 'error');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await onExportSession();
+      showFeedback('Session data exported!', 'success');
+    } catch (error) {
+      console.error('Session export error:', error);
+      showFeedback('Failed to export session data', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -421,6 +441,18 @@ const SaveLoadPanel = ({
             <span className="material-symbols-outlined">file_download</span>
             <span className="action-text">Export CSV</span>
           </button>
+
+          {onExportSession && (
+            <button 
+              className="action-button export-json"
+              onClick={handleExportSession}
+              disabled={isLoading || !gameState || !canExportSession}
+              title="Export session data as JSON"
+            >
+              <span className="material-symbols-outlined">data_object</span>
+              <span className="action-text">Export Data</span>
+            </button>
+          )}
         </div>
 
         {/* Saved Simulations List */}
