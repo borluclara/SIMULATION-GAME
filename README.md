@@ -1,155 +1,145 @@
 # AI Blast Simulation Game 💥
 
-A sophisticated 2D blast simulation game built with React and JavaScript, featuring realistic explosion physics, particle systems, and interactive controls.
+A sophisticated 2D blast simulation built with React and JavaScript. Combine realistic blast physics, density-aware material behavior, and a polished save/load workflow to plan, detonate, and analyze every round like a pro engineer.
 
 ## Features
 
 ### 🎮 Core Gameplay
-- **Interactive Grid System**: Visual ore grid with CSV data loading
-- **Realistic Blast Physics**: Material-based displacement using density and hardness properties
-- **Strategic Placement**: Place blast markers with directional control
-- **Score & Feedback**: Real-time evaluation of mineral recovery and dilution
-- **Save/Load System**: Persistent game state with session management
+- **Interactive Grid System** – Load CSV ore data, inspect materials, and place directional blast markers with precision.
+- **Realistic Blast Physics** – Material density, hardness, and blast resistance drive displacement, fragmentation, and scoring.
+- **Interactive Explosions** – Canvas-based particle effects, shockwaves, and debris fields for every detonation.
+- **Strategic Feedback Loop** – Real-time score, recovery, and dilution metrics highlight each blast’s efficiency.
 
 ### ⚙️ Material Property System ✨ NEW
-- **Material-Based Physics**: Each material (gold, iron, coal, etc.) behaves differently based on real geological properties
-- **Density Effects**: Dense materials (gold 19.3 g/cm³) barely move, light materials (soil 1.3 g/cm³) fly far
-- **Hardness Integration**: Soft materials (coal, hardness 2) fragment easily, hard materials (diamond, hardness 10) resist
-- **Fragmentation Index**: Controls particle count - limestone (0.8) shatters into 18+ pieces, granite (0.3) creates 11 chunks
-- **Blast Resistance**: Materials resist damage differently - granite (0.7) absorbs 70% damage, soil (0.1) only 10%
-- **CSV Loading**: Load material properties from CSV with density, hardness, fragmentation_index, blast_resistance columns
+- **Material-Based Physics** – Gold, iron, coal, limestone, etc. each carry real geological properties (density, hardness, fragmentation_index, blast_resistance).
+- **Density Effects** – Dense materials (gold 19.3 g/cm³) barely move, while light materials (soil 1.3 g/cm³) fly far.
+- **Fragmentation Logic** – Fragile rock (limestone 0.8) shatters into 18+ particles; granite (0.3) breaks into dense chunks.
+- **CSV Driven** – Extend behavior instantly by uploading enhanced CSVs with physical properties.
+
+### 💾 Save & Load System (NEW!)
+- **Persistent Saves** – One-click browser storage (IndexedDB/localStorage fallback) with metadata and versioning.
+- **Saved Sessions Modal** – Search, sort, and filter saves by name, score, or date in a dedicated UI.
+- **Export/Import** – Download saves as JSON or restore from external files.
+- **Auto-Saves** – Automatic “Auto-Save – Round N” entries keep the last three rounds without interrupting gameplay.
+- **Auto-Recovery** – Resume exactly where you stopped thanks to complete state restoration, including blasts and settings.
+- **Error Handling** – Corruption and compatibility checks warn players before loading questionable data.
+
+### ⚙️ Simulation Controls
+- **Blast Parameters** – Adjust power, radius, and direction in real time.
+- **Physics Tweaks** – Tune gravity, friction, and time scale for experimentation.
+- **Preset Modes** – Quickly flip between simulation profiles.
+- **Full Session Control** – Start, pause, resume, and reset at any time.
 
 ### 🎨 Visual Design
-- **Material-Specific Colors**: Each material has distinct colors (gold=#FFD700, diamond=#B9F2FF, coal=#2F2F2F)
-- **Texture Effects**: Visual indicators for hardness (metallic shine), density (border thickness), fragmentation (grain patterns)
-- **Type Markers**: Gold corners for ore, gray corners for waste materials
-- **Responsive Grid**: Optimized rendering for large grids with 60fps target
-- **Dark Theme**: Professional interface with green scoring theme
+- **Material-Specific Colors** – Gold (#FFD700), diamond (#B9F2FF), coal (#2F2F2F), etc. for instant recognition.
+- **Texture & Border Indicators** – Metallic shine for very hard materials, dashed borders for light materials, grain textures for soft waste.
+- **Type Markers** – Gold corner tags for ore, gray for waste.
+- **Responsive Canvas** – Optimized for large grids with a 60 FPS target and reduced overdraw.
+- **Dark Theme** – High-contrast layout with green scoring cues keeps long play sessions comfortable.
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (version 14 or higher)
-- npm or yarn package manager
+- Node.js 16+
+- npm or yarn
 
 ### Installation
-
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-3. **Open your browser**
-   Navigate to `http://localhost:3000` to see the application
+```bash
+npm install
+npm run dev
+```
+Visit `http://localhost:5173` (Vite default) to start playing.
 
 ### Available Scripts
-
-- `npm start` - Runs the app in development mode
-- `npm build` - Builds the app for production
-- `npm test` - Launches the test runner
-- `npm run preview` - Serves the production build locally
+- `npm run dev` – Run the Vite development server
+- `npm run build` – Production build
+- `npm run preview` – Preview the prod bundle locally
+- `npm test` – Execute the Jest test suite
 
 ## How to Play
+1. **Start the Simulation** – Launch the app and enter your player name.
+2. **Load CSV Data** – Upload `enhanced_ore_data.csv` or your own CSV.
+3. **Place Explosives** – Enter placement mode and click cells to queue directional blasts.
+4. **Configure Settings** – Adjust blast power, radius, and direction.
+5. **Trigger Blasts** – Detonate all placements and watch GSAP + Matter.js animations.
+6. **Observe Physics** – Dense ore barely moves, light soil flies, fragile rock shatters.
+7. **Review Metrics** – Recovery %, dilution %, efficiency, and material breakdowns update instantly.
+8. **Save Progress** – Manual saves or automatic “Round N” saves keep your session safe.
+9. **Load / Export** – Resume from any save or export data for reports.
 
-1. **Load CSV Data**: Upload a CSV file with ore grid data (or use sample data)
-2. **Place Blast Markers**: Click on grid to place explosives, set power and direction
-3. **Trigger Blast**: Click "Trigger Blast" to simulate explosion
-4. **Observe Physics**: Watch materials behave differently:
-   - Dense materials (gold, iron) barely move
-   - Light materials (soil, coal) fly far
-   - Fragile materials (limestone) shatter into many pieces
-   - Hard materials (granite, diamond) resist fragmentation
-5. **Review Results**: Check mineral recovery rate, dilution percentage, and score
-6. **Save Progress**: Use Save/Load panel to preserve your simulation state
+### Material Behavior Cheat Sheet
+- **Gold** – 19.3 g/cm³, minimal displacement, high value.
+- **Iron/Hematite** – 5.3 g/cm³, moderate movement, balanced fragmentation.
+- **Coal** – 1.3 g/cm³, long travel distance, many particles.
+- **Limestone** – Frag. 0.8, shatters into 18+ pieces.
+- **Granite** – Blast resistance 0.7, absorbs ~70 % damage.
+- **Diamond** – Hardness 10, barely fractures.
 
-### Material Behavior Guide
-- **Gold** (density 19.3): Minimal displacement, large chunks, high value
-- **Iron** (density 5.3): Moderate movement, balanced fragmentation
-- **Coal** (density 1.3): Flies far, creates many small particles
-- **Limestone** (frag 0.8): Shatters easily into 18+ fragments
-- **Granite** (blast_res 0.7): Resists 70% of blast damage
-- **Diamond** (hardness 10): Extremely resistant, barely fragments
-
-See `docs/MATERIAL_PROPERTIES_GUIDE.md` for complete material reference.
+### Save/Load Quick Actions
+- **Quick Save** – Single click to browser storage.
+- **Browse Saves** – Modal lists manual vs auto-saves with badges.
+- **Search & Sort** – Find sessions fast by name, round, or score.
+- **Export/Import** – JSON backup + restore.
+- **Auto-Pruned** – Last three auto-saves retained automatically.
 
 ## Project Structure
-
 ```
 src/
 ├── components/
-│   ├── OreGridCanvas.jsx          # Main grid rendering with material effects
-│   ├── BlastToolPanel.jsx         # Blast controls and settings
-│   ├── BlastPlacementPanel.jsx    # Marker placement interface
-│   ├── ScoreFeedback.jsx          # Recovery and dilution metrics
-│   ├── MaterialLegend.jsx         # Material type reference
-│   └── SaveLoadPanel.jsx          # Save/load game state
-├── utils/
-│   ├── MaterialPropertyHandler.js # ⭐ Material property system (NEW)
-│   ├── PhysicsEngine.js           # ⭐ Material-based blast physics (ENHANCED)
-│   ├── OreGrid.js                 # Grid data and block management
-│   ├── BlastEvaluator.js          # Scoring system
-│   ├── BlastAnimationEngine.js    # GSAP-based animations
-│   ├── BlastHistoryStore.js       # Blast history tracking
-│   └── SaveLoadManager.js         # Session persistence
+│   ├── App.jsx                     # Root UI
+│   ├── BlastPlacementPanel.jsx
+│   ├── BlastToolPanel.jsx
+│   ├── MaterialLegend.jsx
+│   ├── OreGridCanvas.jsx
+│   ├── SaveLoadPanel.jsx
+│   ├── SavedSessionsModal.jsx      # NEW save browser
+│   └── ScoreFeedback.jsx
 ├── hooks/
-│   ├── useGameState.js            # Global game state
-│   ├── useOreGrid.js              # Grid state management
-│   └── useBlastHistory.js         # History management
+│   ├── useBlastHistory.js
+│   ├── useGameState.js
+│   └── useOreGrid.js
+├── utils/
+│   ├── BlastAnimationEngine.js
+│   ├── BlastEvaluator.js
+│   ├── BlastHistoryStore.js
+│   ├── MaterialPropertyHandler.js
+│   ├── OreGrid.js
+│   ├── PhysicsEngine.js
+│   ├── SaveLoadManager.js
+│   └── SimulationStorage.js
 ├── public/
-│   ├── enhanced_ore_data.csv      # ⭐ Sample CSV with material properties
-│   └── sample_ore_data.csv        # Basic sample data
+│   ├── enhanced_ore_data.csv       # Sample with density/frag columns
+│   └── sample_ore_data.csv
 └── docs/
-    ├── MATERIAL_PROPERTIES_GUIDE.md    # ⭐ User guide for materials
-    └── MATERIAL_PROPERTY_IMPLEMENTATION.md # ⭐ Technical documentation
+   ├── MATERIAL_PROPERTIES_GUIDE.md
+   ├── MATERIAL_PROPERTY_IMPLEMENTATION.md
+   ├── LOAD_SIMULATION_USER_GUIDE.md
+   ├── LOAD_SIMULATION_VISUAL_GUIDE.md
+   └── QUICK_REFERENCE.md
 ```
-
-⭐ = Material Property System files (NEW)
 
 ## Technical Implementation
 
-### Material Property System 🆕
-- **CSV Integration**: Loads density, hardness, fragmentation_index, blast_resistance from CSV
-- **Physics Coefficients**: Density factor (3.0/√density), hardness factor ((12-h)/8), fragmentation multiplier
-- **Displacement Calculation**: Light materials move 4.8x farther than dense materials
-- **Particle Generation**: Fragile materials create 18+ particles, hard materials create 8-11 particles
-- **Visual Rendering**: Material-specific colors, textures, borders based on properties
-- **Performance**: <0.1ms per block, deterministic calculations, cached lookups
+### Material Property System
+- CSV parsing auto-loads density, hardness, fragmentation_index, blast_resistance.
+- Density factor ≈ `(1 / (density / 2.7))^1.2` gives dramatic displacement contrast.
+- Fragmentation and blast resistance adjust debris count, direction spread, and force.
+- Color/texture helpers expose hardness, density, and frag levels for rendering.
 
-### Blast Physics Engine
-- **Matter.js Integration**: Realistic particle physics with gravity, friction, collision
-- **Material-Based Forces**: Force calculations modified by density, hardness, fragmentation
-- **Directional Blasts**: Configurable blast direction (N/S/E/W)
-- **Decay Models**: Hybrid exponential-linear force decay with distance
-- **Particle Systems**: Dynamic debris with rotation, bounce, settling behavior
+### Save/Load Platform
+- IndexedDB primary storage with localStorage fallback.
+- Metadata includes `saveReason`, `autoSaveRound`, and label text for UI.
+- Auto-saves triggered at the end of every blast animation (Round N) and trimmed to the three latest entries.
+- Modal integrates search, sorting, load, delete, export/import, and JSON validation.
+- Versioned payloads with integrity checks guard against incompatible or corrupted saves.
 
-### Scoring System
-- **Recovery Rate**: Percentage of ore successfully collected (count-based and value-weighted)
-- **Dilution Rate**: Percentage of waste contamination in collection zone
-- **Multi-Ore Support**: Tracks gold, chalcopyrite, hematite, magnetite separately
-- **Letter Grades**: A/B/C/D/F based on weighted score formula
-- **Performance**: <3ms evaluation time for 1000+ blocks
-
-### Save/Load System
-- **LocalStorage Persistence**: Browser-based save system with version control
-- **Session Management**: Search, sort, filter saved games by date/score/name
-- **Export/Import**: JSON file export for sharing simulations
-- **State Recovery**: Complete restoration of grid, blasts, scores, history
+### Engine & Physics
+- GSAP handles shockwaves, debris displacement, and screen shake.
+- Matter.js simulates debris, gravity, collisions, and settling.
+- Directional blasts bias force vectors; omnidirectional mode falls back to radial.
+- Scoring blends recovery vs dilution with ore/waste categorization for each blast history record.
 
 ## CSV Format
-
-### Basic Format (Backward Compatible)
-```csv
-x,y,ore_type,hardness,value
-0,0,gold,3,100
-1,0,iron,6,50
-```
-
-### Enhanced Format with Material Properties 🆕
 ```csv
 x,y,ore_type,hardness,value,density,fragmentation_index,blast_resistance
 0,0,gold,3,100,19.3,0.7,0.3
@@ -157,35 +147,21 @@ x,y,ore_type,hardness,value,density,fragmentation_index,blast_resistance
 2,0,coal,2,15,1.3,0.8,0.2
 3,0,granite,6,0,2.6,0.3,0.7
 ```
+Required columns: `x`, `y`, `ore_type`. Optional: `hardness`, `value`, `density`, `fragmentation_index`, `blast_resistance`. See `public/enhanced_ore_data.csv` for the complete template.
 
-### Column Definitions
-- **x, y**: Grid coordinates (required)
-- **ore_type**: Material name - gold, iron, coal, granite, etc. (required)
-- **hardness**: Mohs hardness scale 0-10 (optional, default: 5)
-- **value**: Economic value 0-500 (optional, default: varies by type)
-- **density**: Density in g/cm³, range 1-25 (optional, default: 2.7)
-- **fragmentation_index**: Fragmentation tendency 0-1 (optional, default: 0.5)
-- **blast_resistance**: Damage resistance 0-1 (optional, default: 0.5)
+## Documentation & Guides
+- **Material Reference** – `docs/MATERIAL_PROPERTIES_GUIDE.md`
+- **Implementation Details** – `MATERIAL_PROPERTY_IMPLEMENTATION.md` & `MATERIAL_PROPERTY_FEATURE_SUMMARY.md`
+- **Save/Load User Guide** – `docs/LOAD_SIMULATION_USER_GUIDE.md`
+- **Visual Workflow Guide** – `docs/LOAD_SIMULATION_VISUAL_GUIDE.md`
+- **Quick Reference** – `QUICK_REFERENCE.md`
 
-See `public/enhanced_ore_data.csv` for complete example.
-
----
-
-## Documentation
-
-### Quick References
-- **Material Properties Guide**: `docs/MATERIAL_PROPERTIES_GUIDE.md` - User-friendly material reference
-- **Implementation Details**: `MATERIAL_PROPERTY_IMPLEMENTATION.md` - Technical documentation
-- **Feature Summary**: `MATERIAL_PROPERTY_FEATURE_SUMMARY.md` - Executive overview
-- **Blast System**: `BLAST_ANIMATION_SYSTEM.md` - Animation and physics details
-- **Scoring Guide**: `docs/SCORING_SYSTEM_GUIDE.md` - Evaluation metrics
-
----
+## Browser Compatibility
+- ✅ Chrome / Edge (v90+)
+- ✅ Firefox (v88+)
+- ✅ Safari (v14+)
+- ✅ Opera (v76+)
+- ⚠️ Requires IndexedDB/localStorage for persistence
 
 ## License
-
-This project is licensed under the MIT License.
-
----
-
-**Enjoy realistic blast physics with material properties!** 💥⛏️🪨
+MIT License. Enjoy realistic blast engineering with material-aware physics! 💥⛏️🪨
