@@ -12,13 +12,20 @@ const SavedSessionsModal = ({
   onLoadSave, 
   onDeleteSave,
   onExportSave,
-  savedSessions 
+  savedSessions,
+  simulationSessions = [],
+  onLoadSimulation,
+  onDeleteSimulation,
+  onExportSimulation
 }) => {
   const [selectedSaveId, setSelectedSaveId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('timestamp'); // 'timestamp', 'score', 'name'
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  const hasSimulationSessions = Array.isArray(simulationSessions) && simulationSessions.length > 0;
+  const baseSessions = hasSimulationSessions ? simulationSessions : (savedSessions || []);
   
   // Close modal on escape key
   useEffect(() => {
@@ -40,14 +47,17 @@ const SavedSessionsModal = ({
   }, [isVisible]);
 
   // Filter and sort sessions
-  const filteredSessions = savedSessions
+  const filteredSessions = baseSessions
     .filter(session => {
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
+      const saveName = (session.saveName || session.customName || '').toLowerCase();
+      const playerName = (session.playerName || '').toLowerCase();
+      const timestampStr = new Date(session.timestamp).toLocaleString().toLowerCase();
       return (
-        session.saveName.toLowerCase().includes(query) ||
-        session.playerName.toLowerCase().includes(query) ||
-        new Date(session.timestamp).toLocaleString().toLowerCase().includes(query)
+        saveName.includes(query) ||
+        playerName.includes(query) ||
+        timestampStr.includes(query)
       );
     })
     .sort((a, b) => {
@@ -62,9 +72,9 @@ const SavedSessionsModal = ({
       }
     });
 
-  const handleLoadClick = (saveId) => {
+  const handleLoadClick = async (saveId) => {
     try {
-      const session = savedSessions.find(s => s.id === saveId);
+      const session = baseSessions.find(s => s.id === saveId);
       
       // Check for compatibility issues
       if (session?.isCorrupted) {
@@ -77,7 +87,11 @@ const SavedSessionsModal = ({
         return;
       }
       
-      onLoadSave(saveId);
+      if (session?.source === 'simulation' && onLoadSimulation) {
+        await onLoadSimulation(saveId);
+      } else if (onLoadSave) {
+        onLoadSave(saveId);
+      }
       onClose();
     } catch (error) {
       console.error('Error loading save:', error);
@@ -85,13 +99,21 @@ const SavedSessionsModal = ({
     }
   };
 
-  const handleDeleteClick = (saveId, saveName) => {
-    setConfirmDelete({ saveId, saveName });
+  const handleDeleteClick = (session) => {
+    setConfirmDelete({ 
+      saveId: session.id, 
+      saveName: session.saveName,
+      source: session.source || 'legacy'
+    });
   };
 
   const handleConfirmDelete = () => {
     if (confirmDelete) {
-      onDeleteSave(confirmDelete.saveId);
+      if (confirmDelete.source === 'simulation' && onDeleteSimulation) {
+        onDeleteSimulation(confirmDelete.saveId);
+      } else if (onDeleteSave) {
+        onDeleteSave(confirmDelete.saveId);
+      }
       setConfirmDelete(null);
     }
   };
@@ -100,8 +122,12 @@ const SavedSessionsModal = ({
     setConfirmDelete(null);
   };
 
-  const handleExportClick = (saveId) => {
-    onExportSave(saveId);
+  const handleExportClick = (session) => {
+    if (session?.source === 'simulation' && onExportSimulation) {
+      onExportSimulation(session.id);
+    } else if (onExportSave) {
+      onExportSave(session.id);
+    }
   };
 
   const formatTimestamp = (timestamp) => {
@@ -272,9 +298,9 @@ const SavedSessionsModal = ({
                     className="action-btn export-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleExportClick(session.id);
+                      handleExportClick(session);
                     }}
-                    disabled={session.isCorrupted}
+                    disabled={session.isCorrupted || (session.source === 'simulation' && !onExportSimulation)}
                     title="Export save to file"
                   >
                     <span className="material-symbols-outlined">file_download</span>
@@ -284,7 +310,7 @@ const SavedSessionsModal = ({
                     className="action-btn delete-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteClick(session.id, session.saveName);
+                      handleDeleteClick(session);
                     }}
                     title="Delete this save"
                   >
@@ -302,7 +328,7 @@ const SavedSessionsModal = ({
             <div className="footer-info">
               <span className="info-text">
                 {filteredSessions.length} save{filteredSessions.length !== 1 ? 's' : ''} 
-                {searchQuery && ` (filtered from ${savedSessions.length})`}
+                {searchQuery && ` (filtered from ${baseSessions.length})`}
               </span>
             </div>
           </div>

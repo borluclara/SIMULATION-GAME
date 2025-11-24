@@ -13,7 +13,7 @@ import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
 import SaveLoadPanel from './components/SaveLoadPanel'
 import SaveToast from './components/SaveToast'
-import { parseCSVToGrid, OreGrid as OreGridClass } from './utils/OreGrid'
+import { parseCSVToGrid, OreGrid as OreGridClass, OreBlock } from './utils/OreGrid'
 import { useGameState } from './hooks/useGameState'
 import { physicsEngine } from './utils/PhysicsEngine'
 import { blastAnimationEngine } from './utils/BlastAnimationEngine'
@@ -36,7 +36,8 @@ function App() {
     addBlast,
     triggerBlasts,
     hasPlayerName,
-    reset: resetGameState
+    reset: resetGameState,
+    clearBlasts
   } = useGameState();
 
   const [currentView, setCurrentView] = useState('home') // 'home', 'game', 'leaderboard', 'help'
@@ -79,6 +80,60 @@ function App() {
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   
   const canvasRef = React.useRef(null)
+
+  const rebuildGridFromSnapshot = useCallback(async (scenarioSnapshot) => {
+    if (!scenarioSnapshot) {
+      throw new Error('Simulation is missing scenario information.');
+    }
+
+    const snapshot = scenarioSnapshot.grid || scenarioSnapshot.gridSnapshot;
+    const blockSnapshots = snapshot?.blocks || snapshot?.data;
+
+    if (Array.isArray(blockSnapshots) && blockSnapshots.length > 0) {
+      const inferredWidth = snapshot?.width ?? (Math.max(...blockSnapshots.map(block => block?.x ?? 0)) + 1);
+      const inferredHeight = snapshot?.height ?? (Math.max(...blockSnapshots.map(block => block?.y ?? 0)) + 1);
+      const width = Math.max(1, inferredWidth || 0);
+      const height = Math.max(1, inferredHeight || 0);
+
+      const restoredGrid = new OreGridClass(width, height);
+      restoredGrid.grid = Array.from({ length: height }, () => Array(width).fill(null));
+
+      blockSnapshots.forEach((blockData) => {
+        if (typeof blockData?.x !== 'number' || typeof blockData?.y !== 'number') return;
+
+        const oreType = blockData.oreType || blockData.material || blockData.type || 'stone';
+        const hardness = blockData.maxHealth ?? blockData.hardness ?? blockData.hardness_mohs ?? 100;
+        const value = blockData.value ?? blockData.game_value ?? 10;
+        const materialProps = materialPropertyHandler.getMaterialProperties(oreType);
+
+        const oreBlock = new OreBlock(blockData.x, blockData.y, oreType, hardness, value, materialProps);
+        oreBlock.maxHealth = blockData.maxHealth ?? hardness;
+        oreBlock.health = blockData.health ?? oreBlock.maxHealth;
+        oreBlock.damage = blockData.damage ?? (oreBlock.maxHealth - oreBlock.health);
+        oreBlock.isDestroyed = Boolean(blockData.isDestroyed);
+        oreBlock.recentlyDisplaced = Boolean(blockData.recentlyDisplaced);
+        oreBlock.isDisplaced = Boolean(blockData.isDisplaced);
+        oreBlock.isBlasted = Boolean(blockData.isBlasted);
+        oreBlock.animatedX = blockData.animatedX ?? oreBlock.x;
+        oreBlock.animatedY = blockData.animatedY ?? oreBlock.y;
+        oreBlock.crackLevel = blockData.crackLevel ?? oreBlock.crackLevel;
+        oreBlock.crackPatterns = blockData.crackPatterns || oreBlock.crackPatterns;
+        oreBlock.fragmentationData = blockData.fragmentationData || null;
+
+        restoredGrid.setBlock(oreBlock.x, oreBlock.y, oreBlock);
+      });
+
+      return restoredGrid;
+    }
+
+    const csvSource = scenarioSnapshot.data || scenarioSnapshot.originalCsvData;
+    if (csvSource && csvSource.length > 0) {
+      const csvString = Array.isArray(csvSource) ? Papa.unparse(csvSource) : csvSource;
+      return await parseCSVToGrid(csvString);
+    }
+
+    throw new Error('No grid snapshot found for the selected simulation.');
+  }, []);
 
   // Initialize blast history store when player name changes
   useEffect(() => {
@@ -708,33 +763,64 @@ function App() {
       setIsLoadingGrid(true);
       
       const simulation = await simulationStorage.loadSimulation(simulationId);
+      const restoredGrid = await rebuildGridFromSnapshot(simulation.scenario);
       
       // Restore game state
-      if (simulation.player.name) setPlayerName(simulation.player.name);
-      if (simulation.player.score) setScore(simulation.player.score);
-      if (simulation.scenario) {
-        setCurrentScenario(simulation.scenario);
-        if (simulation.scenario.originalCsvData) {
-          setOriginalCsvData(simulation.scenario.originalCsvData);
-          setCsvData(simulation.scenario.data);
-        }
-        if (simulation.scenario.grid) {
-          setOreGrid(simulation.scenario.grid);
-          setGrid(simulation.scenario.grid.data || simulation.scenario.grid);
-        }
+      if (simulation.player?.name) {
+        setPlayerName(simulation.player.name);
+        blastHistoryStore.initializeSession(simulation.player.name);
       }
-      if (simulation.blasts) {
-        // Restore blasts if needed via useGameState
+      setScore(simulation.player?.score ?? 0);
+
+      const scenarioData = simulation.scenario?.data || simulation.scenario?.originalCsvData || null;
+      if (scenarioData) {
+        setCsvData(scenarioData);
+        setOriginalCsvData(simulation.scenario?.originalCsvData || scenarioData);
       }
+
+      setCurrentScenario({
+        ...simulation.scenario,
+        grid: restoredGrid,
+        uploadedAt: simulation.scenario?.uploadedAt || new Date().toISOString()
+      });
+      setOreGrid(restoredGrid);
+      setGrid(restoredGrid);
+
       if (simulation.settings) {
         setBlastPower(simulation.settings.blastPower || 500);
         setBlastDirection(simulation.settings.blastDirection || 180);
-        setMineralRecovery(simulation.settings.mineralRecovery || 100);
-        setDilution(simulation.settings.dilution || 0);
+        setMineralRecovery(simulation.settings.mineralRecovery ?? mineralRecovery);
+        setDilution(simulation.settings.dilution ?? dilution);
+      } else if (simulation.blasts) {
+        setBlastPower(simulation.blasts.currentPower || blastPower);
+        setBlastDirection(simulation.blasts.currentDirection || blastDirection);
       }
+
+      // Restore blasts via game state
+      clearBlasts();
+      const savedBlasts = (simulation.blasts?.placements?.length ? simulation.blasts.placements : simulation.blasts?.history) || [];
+      savedBlasts.forEach((blast) => {
+        if (typeof blast?.x === 'number' && typeof blast?.y === 'number') {
+          addBlast(blast.x, blast.y, blast.direction ?? simulation.blasts?.currentDirection ?? 180);
+        }
+      });
+
+      // Restore progress-driven UI state
+      setSimulationResults(simulation.progress?.simulationResults || null);
+      setBlastResults(simulation.progress?.simulationResults || null);
+      setShowBlastSummary(false);
+      setShowBlastFeedback(false);
+      setFeedbackResults(null);
+      setHighlightedCells({ recovered: [], lost: [] });
+      setCameraShake({ x: 0, y: 0 });
+      setAnimationState(null);
+      setPhysicsDebris([]);
+      setPlacementMode(false);
+      setExplosionAnimations([]);
+      setResetMessage(null);
       
       setCsvReady(true);
-      setCurrentView('game');
+      setCurrentView(simulation.progress?.currentView || 'game');
       
       setSaveToast({
         show: true,
@@ -820,15 +906,7 @@ function App() {
       // Note: The blasts are managed by useGameState, but we can restore them via addBlast
       // Clear existing blasts first
       if (loadedData.blasts && Array.isArray(loadedData.blasts)) {
-        // Clear current blasts
-        const currentBlasts = blasts || [];
-        currentBlasts.forEach(blast => {
-          if (blast.id) {
-            // removeBlast would be needed here if available from useGameState
-          }
-        });
-        
-        // Add saved blasts
+        clearBlasts();
         loadedData.blasts.forEach(blast => {
           if (blast.x !== undefined && blast.y !== undefined) {
             addBlast(blast.x, blast.y, blast.direction || 90);

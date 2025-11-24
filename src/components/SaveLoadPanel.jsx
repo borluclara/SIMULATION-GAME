@@ -3,7 +3,7 @@
  * Unified panel for save, load, and export functionality with collapsible interface
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './SaveLoadPanel.css';
 import simulationStorage from '../utils/SimulationStorage';
 import SavedSessionsModal from './SavedSessionsModal';
@@ -26,7 +26,6 @@ const SaveLoadPanel = ({
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const [savedSimulations, setSavedSimulations] = useState([]);
-  const [showSimulationsList, setShowSimulationsList] = useState(false);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
@@ -54,9 +53,17 @@ const SaveLoadPanel = ({
   const loadSavedSimulations = async () => {
     try {
       const simulations = await simulationStorage.getAllSimulations();
-      setSavedSimulations(simulations);
+      const compatibleSimulations = simulations.filter(sim => !sim.isCorrupted && sim.isCompatible !== false);
+
+      if (simulations.length > compatibleSimulations.length) {
+        console.warn('Ignored incompatible or corrupted saves during load simulation list.');
+        showFeedback('Some outdated saves were skipped due to version mismatch.', 'info');
+      }
+
+      setSavedSimulations(compatibleSimulations);
     } catch (error) {
       console.error('Error loading saved simulations:', error);
+      showFeedback('Failed to read saved simulations', 'error');
     }
   };
 
@@ -116,9 +123,27 @@ const SaveLoadPanel = ({
     }
   };
 
+  // Create simulation entries formatted for modal display
+  const simulationSessions = useMemo(() => {
+    return (savedSimulations || []).map((sim) => ({
+      id: sim.id,
+      saveName: sim.customName || sim.scenario?.name || 'Saved Simulation',
+      playerName: sim.player?.name || sim.player?.playerName || 'Unknown Miner',
+      timestamp: sim.timestamp,
+      score: sim.player?.score ?? 0,
+      blastCount: sim.metadata?.totalBlasts ?? sim.blasts?.history?.length ?? 0,
+      isCorrupted: sim.isCorrupted,
+      isCompatible: sim.isCompatible,
+      version: sim.version,
+      summary: sim.summary,
+      source: 'simulation'
+    }));
+  }, [savedSimulations]);
+
   // Handle load functionality - Show saved sessions modal
   const handleLoad = () => {
     loadSavedSessions();
+    loadSavedSimulations();
     setShowLoadModal(true);
   };
 
@@ -337,12 +362,37 @@ const SaveLoadPanel = ({
       setIsLoading(true);
       await onLoadSimulation(simulationId);
       showFeedback('Simulation loaded successfully!', 'success');
-      setShowSimulationsList(false);
     } catch (error) {
       console.error('Load simulation error:', error);
       showFeedback('Failed to load simulation', 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExportSimulation = async (simulationId) => {
+    try {
+      const simulation = savedSimulations.find((sim) => sim.id === simulationId)
+        || await simulationStorage.loadSimulation(simulationId);
+
+      if (!simulation) {
+        showFeedback('Simulation not found for export', 'error');
+        return;
+      }
+
+      const dataStr = JSON.stringify(simulation, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${simulation.customName || simulation.scenario?.name || 'blastsim-simulation'}-${simulationId}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      showFeedback('Simulation exported successfully', 'success');
+    } catch (error) {
+      console.error('Export simulation error:', error);
+      showFeedback('Failed to export simulation', 'error');
     }
   };
 
@@ -414,6 +464,10 @@ const SaveLoadPanel = ({
         onDeleteSave={handleDeleteSave}
         onExportSave={handleExportSave}
         savedSessions={savedSessions}
+        simulationSessions={simulationSessions}
+        onLoadSimulation={handleLoadSimulation}
+        onDeleteSimulation={handleDeleteSimulation}
+        onExportSimulation={handleExportSimulation}
       />
 
       <div className={`save-load-panel ${position} ${isCollapsed ? 'collapsed' : 'expanded'}`}>
@@ -449,22 +503,6 @@ const SaveLoadPanel = ({
             <span className="material-symbols-outlined">bookmark_add</span>
             <span className="action-text">Save Simulation</span>
           </button>
-
-          {/* View Saved Simulations Button */}
-          {onLoadSimulation && (
-            <button 
-              className="action-button load-sim"
-              onClick={() => {
-                setShowSimulationsList(!showSimulationsList);
-                loadSavedSimulations();
-              }}
-              disabled={isLoading}
-              title="View and load saved simulations"
-            >
-              <span className="material-symbols-outlined">history</span>
-              <span className="action-text">Saved Sims ({savedSimulations.length})</span>
-            </button>
-          )}
 
           {/* Load Button */}
           <button 
@@ -502,11 +540,21 @@ const SaveLoadPanel = ({
         </div>
 
         {/* Saved Simulations List */}
-        {showSimulationsList && (
+        {onLoadSimulation && (
           <div className="simulations-list">
             <div className="simulations-header">
               <h4>Saved Simulations</h4>
-              <span className="simulations-count">{savedSimulations.length}/{10} slots</span>
+              <div className="simulations-actions-inline">
+                <span className="simulations-count">{savedSimulations.length}/{10} slots</span>
+                <button
+                  className="sim-refresh"
+                  onClick={loadSavedSimulations}
+                  disabled={isLoading}
+                  title="Refresh saved simulations"
+                >
+                  <span className="material-symbols-outlined">refresh</span>
+                </button>
+              </div>
             </div>
             <div className="simulations-container">
               {savedSimulations.length === 0 ? (
@@ -525,6 +573,9 @@ const SaveLoadPanel = ({
                         <span className="simulation-date">{formatDate(sim.timestamp)}</span>
                         <span className="simulation-score">Score: {sim.player?.score || 0}</span>
                       </div>
+                      <p className="simulation-summary-text">
+                        {sim.summary || `${sim.metadata?.totalBlasts || 0} blasts • ${sim.metadata?.gridSize?.totalBlocks || 0} cells`}
+                      </p>
                     </div>
                     <div className="simulation-actions">
                       <button
