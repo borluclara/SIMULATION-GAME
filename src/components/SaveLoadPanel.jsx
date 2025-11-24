@@ -539,69 +539,6 @@ const SaveLoadPanel = ({
           )}
         </div>
 
-        {/* Saved Simulations List */}
-        {onLoadSimulation && (
-          <div className="simulations-list">
-            <div className="simulations-header">
-              <h4>Saved Simulations</h4>
-              <div className="simulations-actions-inline">
-                <span className="simulations-count">{savedSimulations.length}/{10} slots</span>
-                <button
-                  className="sim-refresh"
-                  onClick={loadSavedSimulations}
-                  disabled={isLoading}
-                  title="Refresh saved simulations"
-                >
-                  <span className="material-symbols-outlined">refresh</span>
-                </button>
-              </div>
-            </div>
-            <div className="simulations-container">
-              {savedSimulations.length === 0 ? (
-                <div className="no-simulations">
-                  <span className="material-symbols-outlined">inventory_2</span>
-                  <p>No saved simulations yet</p>
-                </div>
-              ) : (
-                savedSimulations.map(sim => (
-                  <div key={sim.id} className="simulation-item">
-                    <div className="simulation-info">
-                      <div className="simulation-name">
-                        {sim.customName || sim.scenario?.name || 'Unnamed Simulation'}
-                      </div>
-                      <div className="simulation-meta">
-                        <span className="simulation-date">{formatDate(sim.timestamp)}</span>
-                        <span className="simulation-score">Score: {sim.player?.score || 0}</span>
-                      </div>
-                      <p className="simulation-summary-text">
-                        {sim.summary || `${sim.metadata?.totalBlasts || 0} blasts • ${sim.metadata?.gridSize?.totalBlocks || 0} cells`}
-                      </p>
-                    </div>
-                    <div className="simulation-actions">
-                      <button
-                        className="sim-action-btn load-btn"
-                        onClick={() => handleLoadSimulation(sim.id)}
-                        disabled={isLoading}
-                        title="Load this simulation"
-                      >
-                        <span className="material-symbols-outlined">play_arrow</span>
-                      </button>
-                      <button
-                        className="sim-action-btn delete-btn"
-                        onClick={() => handleDeleteSimulation(sim.id)}
-                        disabled={isLoading}
-                        title="Delete this simulation"
-                      >
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Drop Zone */}
         <div 
           className={`drop-zone ${dragActive ? 'active' : ''}`}
