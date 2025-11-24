@@ -3,7 +3,7 @@
  * Unified panel for save, load, and export functionality with collapsible interface
  */
 
-import React, { useState, useRef, useEffect, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './SaveLoadPanel.css';
 import simulationStorage from '../utils/SimulationStorage';
 import SavedSessionsModal from './SavedSessionsModal';
