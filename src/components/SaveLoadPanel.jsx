@@ -25,8 +25,6 @@ const SaveLoadPanel = ({
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const [savedSimulations, setSavedSimulations] = useState([]);
   const [showSimulationsList, setShowSimulationsList] = useState(false);
-  const [saveMode, setSaveMode] = useState('persistent'); // 'persistent' or 'download'
-  const [showSaveOptions, setShowSaveOptions] = useState(false);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -44,18 +42,6 @@ const SaveLoadPanel = ({
       console.error('Error loading saved simulations:', error);
     }
   };
-
-  // Close save options when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showSaveOptions && !event.target.closest('.save-button-group') && !event.target.closest('.save-options')) {
-        setShowSaveOptions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showSaveOptions]);
 
   // Handle save functionality - now supports both file download and persistent storage
   const handleSave = async (saveType = 'persistent') => {
@@ -345,64 +331,15 @@ const SaveLoadPanel = ({
 
         {/* Action Buttons */}
         <div className="panel-actions">
-          {/* Enhanced Save Button with Options */}
-          <div className="save-button-group">
-            <button 
-              className="action-button save"
-              onClick={() => handleSave(saveMode)}
-              disabled={isLoading || !gameState}
-              title={saveMode === 'persistent' ? 'Save simulation to storage' : 'Download save file'}
-            >
-              <span className="material-symbols-outlined">
-                {saveMode === 'persistent' ? 'bookmark_add' : 'save'}
-              </span>
-              <span className="action-text">
-                {saveMode === 'persistent' ? 'Save Simulation' : 'Save File'}
-              </span>
-            </button>
-            
-            <button 
-              className={`save-mode-toggle ${showSaveOptions ? 'expanded' : ''}`}
-              onClick={() => setShowSaveOptions(!showSaveOptions)}
-              disabled={isLoading}
-              title="Save options"
-            >
-              <span className="material-symbols-outlined">expand_more</span>
-            </button>
-          </div>
-
-          {/* Save Options Dropdown */}
-          {showSaveOptions && (
-            <div className="save-options">
-              <button 
-                className={`save-option ${saveMode === 'persistent' ? 'active' : ''}`}
-                onClick={() => {
-                  setSaveMode('persistent');
-                  setShowSaveOptions(false);
-                }}
-              >
-                <span className="material-symbols-outlined">bookmark_add</span>
-                <div className="option-text">
-                  <div>Save to Storage</div>
-                  <small>Persistent, auto-managed</small>
-                </div>
-              </button>
-              
-              <button 
-                className={`save-option ${saveMode === 'download' ? 'active' : ''}`}
-                onClick={() => {
-                  setSaveMode('download');
-                  setShowSaveOptions(false);
-                }}
-              >
-                <span className="material-symbols-outlined">save</span>
-                <div className="option-text">
-                  <div>Download File</div>
-                  <small>JSON file export</small>
-                </div>
-              </button>
-            </div>
-          )}
+          <button 
+            className="action-button save"
+            onClick={handleSave}
+            disabled={isLoading || !gameState}
+            title="Save simulation to storage"
+          >
+            <span className="material-symbols-outlined">bookmark_add</span>
+            <span className="action-text">Save Simulation</span>
+          </button>
 
           {/* View Saved Simulations Button */}
           {onLoadSimulation && (
