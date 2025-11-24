@@ -686,6 +686,11 @@
   transition: all 0.2s ease;
 }
 
+.simulation-item.auto-save {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
 .simulation-item:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.1);
@@ -710,6 +715,27 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.simulation-round {
+  font-size: 8px;
+  color: #4ade80;
+}
+
+.simulation-badge {
+  margin-left: 6px;
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.simulation-badge.auto {
+  background: rgba(16, 185, 129, 0.2);
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 .simulation-date,

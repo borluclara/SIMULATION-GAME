@@ -437,37 +437,49 @@ const SaveLoadPanel = ({
                   <p>No saved simulations yet</p>
                 </div>
               ) : (
-                savedSimulations.map(sim => (
-                  <div key={sim.id} className="simulation-item">
-                    <div className="simulation-info">
-                      <div className="simulation-name">
-                        {sim.customName || sim.scenario?.name || 'Unnamed Simulation'}
+                savedSimulations.map(sim => {
+                  const isAutoSave = sim.metadata?.saveReason === 'auto';
+                  const displayName = sim.customName || sim.metadata?.autoSaveLabel || sim.scenario?.name || 'Unnamed Simulation';
+                  const roundLabel = sim.metadata?.autoSaveRound ? `Round ${sim.metadata.autoSaveRound}` : null;
+
+                  return (
+                    <div key={sim.id} className={`simulation-item ${isAutoSave ? 'auto-save' : ''}`}>
+                      <div className="simulation-info">
+                        <div className="simulation-name">
+                          {displayName}
+                          {isAutoSave && (
+                            <span className="simulation-badge auto">Auto</span>
+                          )}
+                        </div>
+                        <div className="simulation-meta">
+                          <span className="simulation-date">{formatDate(sim.timestamp)}</span>
+                          {roundLabel && (
+                            <span className="simulation-round">{roundLabel}</span>
+                          )}
+                          <span className="simulation-score">Score: {sim.player?.score || 0}</span>
+                        </div>
                       </div>
-                      <div className="simulation-meta">
-                        <span className="simulation-date">{formatDate(sim.timestamp)}</span>
-                        <span className="simulation-score">Score: {sim.player?.score || 0}</span>
+                      <div className="simulation-actions">
+                        <button
+                          className="sim-action-btn load-btn"
+                          onClick={() => handleLoadSimulation(sim.id)}
+                          disabled={isLoading}
+                          title="Load this simulation"
+                        >
+                          <span className="material-symbols-outlined">play_arrow</span>
+                        </button>
+                        <button
+                          className="sim-action-btn delete-btn"
+                          onClick={() => handleDeleteSimulation(sim.id)}
+                          disabled={isLoading}
+                          title="Delete this simulation"
+                        >
+                          <span className="material-symbols-outlined">delete</span>
+                        </button>
                       </div>
                     </div>
-                    <div className="simulation-actions">
-                      <button
-                        className="sim-action-btn load-btn"
-                        onClick={() => handleLoadSimulation(sim.id)}
-                        disabled={isLoading}
-                        title="Load this simulation"
-                      >
-                        <span className="material-symbols-outlined">play_arrow</span>
-                      </button>
-                      <button
-                        className="sim-action-btn delete-btn"
-                        onClick={() => handleDeleteSimulation(sim.id)}
-                        disabled={isLoading}
-                        title="Delete this simulation"
-                      >
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
