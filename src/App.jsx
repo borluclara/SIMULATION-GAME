@@ -461,6 +461,8 @@ function App() {
         materialBreakdown
       });
 
+      const roundNumberForAutoSave = blastRecord?.round || blastHistoryStore.getCurrentRound();
+
       console.log('📊 Blast record saved:', blastRecord);
       
       // Set highlighted cells for canvas rendering
@@ -514,6 +516,9 @@ function App() {
               setFeedbackResults(result);
               setShowBlastFeedback(true);
             }, 500);
+
+            // Trigger immediate auto-save once the blast fully completes
+            handleAutoSave(roundNumberForAutoSave);
           }
         }
       );
@@ -648,12 +653,6 @@ function App() {
         }
       }
       
-      // Auto-save after significant blast
-      if (result.blasts.length > 0) {
-        setTimeout(() => {
-          handleAutoSave();
-        }, 2000); // Auto-save 2 seconds after blast completes
-      }
     }
   }
 
@@ -705,7 +704,14 @@ function App() {
   }
 
   // New Save Simulation functionality
-  const handleSaveSimulation = async (customName = null) => {
+  const handleSaveSimulation = async (customName = null, options = {}) => {
+    const {
+      reason = 'manual',
+      silent = false,
+      autoSaveRound = null,
+      autoSaveLabel = customName
+    } = options;
+
     try {
       setIsAutoSaving(true);
       
@@ -724,19 +730,23 @@ function App() {
         simulationResults,
         currentView,
         isComplete: false, // Could be enhanced to detect completion
-        saveReason: customName ? 'manual' : 'auto'
+        saveReason: reason,
+        autoSaveRound,
+        autoSaveLabel
       };
 
       // Save to persistent storage
       const result = await simulationStorage.saveSimulation(gameData, customName);
       
       if (result.success) {
-        setSaveToast({
-          show: true,
-          message: result.message,
-          type: 'success',
-          simulationId: result.simulationId
-        });
+        if (!silent) {
+          setSaveToast({
+            show: true,
+            message: result.message,
+            type: 'success',
+            simulationId: result.simulationId
+          });
+        }
         
         console.log('Simulation saved successfully:', result);
         return result;
@@ -745,12 +755,14 @@ function App() {
       }
     } catch (error) {
       console.error('Error saving simulation:', error);
-      setSaveToast({
-        show: true,
-        message: 'Failed to save simulation: ' + error.message,
-        type: 'error',
-        simulationId: null
-      });
+      if (!silent) {
+        setSaveToast({
+          show: true,
+          message: 'Failed to save simulation: ' + error.message,
+          type: 'error',
+          simulationId: null
+        });
+      }
       throw error;
     } finally {
       setIsAutoSaving(false);
@@ -846,10 +858,19 @@ function App() {
   };
 
   // Auto-save functionality (can be called after significant game events)
-  const handleAutoSave = async () => {
+  const handleAutoSave = async (roundNumber = null) => {
     if (csvReady && playerName && oreGrid) {
+      const autoSaveLabel = roundNumber
+        ? `Auto-Save – Round ${roundNumber}`
+        : `Auto-Save – ${new Date().toLocaleTimeString()}`;
+
       try {
-        await handleSaveSimulation(); // Auto-save without custom name
+        await handleSaveSimulation(autoSaveLabel, {
+          reason: 'auto',
+          silent: true,
+          autoSaveRound: roundNumber,
+          autoSaveLabel
+        });
       } catch (error) {
         // Auto-save failures should not interrupt gameplay
         console.warn('Auto-save failed:', error);

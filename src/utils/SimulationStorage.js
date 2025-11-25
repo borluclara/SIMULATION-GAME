@@ -124,7 +124,9 @@ class SimulationStorage {
       metadata: {
         gridSize: this.calculateGridSize(gameData.oreGrid),
         totalBlasts: (gameData.blasts || []).length,
-        saveReason: gameData.saveReason || 'manual'
+        saveReason: gameData.saveReason || 'manual',
+        autoSaveRound: gameData.autoSaveRound || null,
+        autoSaveLabel: gameData.autoSaveLabel || null
       }
     };
   }
@@ -223,6 +225,7 @@ class SimulationStorage {
 
       // Auto-cleanup old saves
       await this.cleanupOldSaves();
+      await this.pruneAutoSaves();
 
       return {
         success: true,
@@ -238,6 +241,31 @@ class SimulationStorage {
         error: error.message,
         message: 'Failed to save simulation'
       };
+    }
+  }
+
+  /**
+   * Ensure only the most recent auto-saves are retained
+   */
+  async pruneAutoSaves(limit = 3) {
+    try {
+      const allSimulations = await this.getAllSimulations();
+      const autoSaves = allSimulations.filter(sim => sim.metadata?.saveReason === 'auto');
+
+      if (autoSaves.length > limit) {
+        const sortedAuto = autoSaves.sort((a, b) => b.timestamp - a.timestamp);
+        const toDelete = sortedAuto.slice(limit);
+
+        for (const sim of toDelete) {
+          await this.deleteSimulation(sim.id);
+        }
+
+        if (toDelete.length > 0) {
+          console.log(`Pruned ${toDelete.length} auto-saves (limit ${limit})`);
+        }
+      }
+    } catch (error) {
+      console.error('Error pruning auto-saves:', error);
     }
   }
 

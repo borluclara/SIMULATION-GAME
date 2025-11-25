@@ -408,15 +408,6 @@ const SaveLoadPanel = ({
     }
   };
 
-  // Format date for display
-  const formatDate = (timestamp) => {
-    try {
-      return new Date(timestamp).toLocaleString();
-    } catch (error) {
-      return 'Unknown';
-    }
-  };
-
   // Show feedback message
   const showFeedback = (message, type) => {
     setFeedback({ message, type });
