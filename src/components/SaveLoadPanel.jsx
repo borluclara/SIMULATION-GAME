@@ -526,8 +526,8 @@ const SaveLoadPanel = ({
               title="Export extended session analytics as JSON"
               aria-label="Export session JSON"
             >
-              <span className="menu-icon material-symbols-outlined">data_object</span>
-              <span className="menu-label">Data</span>
+              <span className="menu-icon material-symbols-outlined">system_update_alt</span>
+              <span className="menu-label">⬇ Export Data</span>
             </button>
           )}
         </div>
