@@ -648,15 +648,42 @@ export class OreGrid {
       gridSize: `${this.width}x${this.height}`
     });
 
-    // GUARANTEED CENTER DESTRUCTION: ensure placed explosive always destroys its cell
+    // Lightly affect center and immediate neighbors before other effects
     const centerBlock = this.getBlockAtGridPos(centerX, centerY);
     if (centerBlock && !centerBlock.isDestroyed) {
-      centerBlock.health = 0;
-      centerBlock.damage = centerBlock.maxHealth;
-      centerBlock.isDestroyed = true;
+      const centerDamage = power * 0.15;
+      const centerDestroyed = centerBlock.takeDamage(centerDamage);
       affectedBlocks.push(centerBlock);
-      destroyedBlocks.push(centerBlock);
-      console.log(`✓ Center block at (${centerX}, ${centerY}) destroyed`);
+      if (centerDestroyed) {
+        destroyedBlocks.push(centerBlock);
+      }
+
+      // Apply mild splash to neighboring cells for more realistic core impact
+      const neighborCells = this.getNeighborCoords(centerX, centerY);
+      neighborCells.forEach(({ x: nx, y: ny }) => {
+        const neighbor = this.getBlockAtGridPos(nx, ny);
+        if (!neighbor || neighbor.isDestroyed) return;
+        const splashDestroyed = neighbor.takeDamage(power * 0.07);
+        affectedBlocks.push(neighbor);
+        if (splashDestroyed) {
+          destroyedBlocks.push(neighbor);
+        }
+      });
+    }
+
+    // Apply directional path damage before radial sweep to ensure UI direction is honored
+    let directionalPathSet = new Set();
+    if (direction !== null) {
+      const pathCells = this.getDirectionalPathCells(centerX, centerY, radius, direction);
+      if (pathCells.length > 0) {
+        directionalPathSet = this.applyDirectionalPathDamage(pathCells, power, affectedBlocks, destroyedBlocks);
+        console.log('Directional path applied', {
+          pathLength: pathCells.length,
+          direction,
+          firstCell: pathCells[0],
+          lastCell: pathCells[pathCells.length - 1]
+        });
+      }
     }
 
     // Calculate bounds with proper ceiling/floor to ensure we cover all cells
@@ -672,6 +699,8 @@ export class OreGrid {
         const block = this.getBlockAtGridPos(x, y);
         if (!block || block.isDestroyed) continue;
         if (x === centerX && y === centerY) continue; // Already destroyed center
+        const directionalKey = `${x},${y}`;
+        const wasDirectionalHit = directionalPathSet.has(directionalKey);
 
         // Pre-calculate distance once for performance
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
@@ -683,6 +712,11 @@ export class OreGrid {
           // Apply damage within the main blast radius
           if (distance <= radius) {
             let damageFactor = 1 - (distance / radius);
+
+            // When a direction is chosen, reduce general blast intensity
+            if (direction !== null) {
+              damageFactor *= 0.4;
+            }
             
             // Apply directional bias to damage if direction is specified
             if (direction !== null) {
@@ -710,12 +744,15 @@ export class OreGrid {
               }
             }
             
-            const damage = decayedPower * damageFactor;
-            const wasDestroyed = block.takeDamage(damage);
-            affectedBlocks.push(block);
-            
-            if (wasDestroyed) {
-              destroyedBlocks.push(block);
+            let wasDestroyed = block.isDestroyed;
+            if (!wasDirectionalHit) {
+              const damage = decayedPower * damageFactor;
+              wasDestroyed = block.takeDamage(damage);
+              affectedBlocks.push(block);
+              
+              if (wasDestroyed) {
+                destroyedBlocks.push(block);
+              }
             }
 
             // Calculate displacement if block survives
@@ -778,6 +815,159 @@ export class OreGrid {
       totalDamage: affectedBlocks.reduce((sum, block) => sum + block.damage, 0),
       direction: direction // Include direction in result for physics engine
     };
+  }
+
+  /**
+   * Calculate a list of cells that represent the directional blast path
+   * Ensures UI-selected direction produces a tangible effect line in the grid
+   */
+  getDirectionalPathCells(centerX, centerY, radius, direction) {
+    const directionVector = this.getDirectionalVector(direction);
+    if (!directionVector) return [];
+
+    const steps = Math.min(2, Math.max(1, Math.floor(radius * 0.6)));
+    const visited = new Set();
+    const cells = [];
+    let currentX = centerX;
+    let currentY = centerY;
+
+    for (let i = 1; i <= steps; i++) {
+      currentX += directionVector.x;
+      currentY += directionVector.y;
+
+      const gridX = Math.round(currentX);
+      const gridY = Math.round(currentY);
+
+      if (!this.isWithinGrid(gridX, gridY)) break;
+
+      const key = `${gridX},${gridY}`;
+      if (visited.has(key)) continue;
+
+      visited.add(key);
+      cells.push({
+        x: gridX,
+        y: gridY,
+        distance: i,
+        directionVector
+      });
+    }
+
+    return cells;
+  }
+
+  /**
+   * Apply heavy damage along the directional path and lightly affect adjacent cells
+   */
+  applyDirectionalPathDamage(pathCells, power, affectedBlocks, destroyedBlocks) {
+    const handledCells = new Set();
+    if (!Array.isArray(pathCells) || pathCells.length === 0) {
+      return handledCells;
+    }
+
+    const totalSteps = pathCells.length;
+    pathCells.forEach((cell, index) => {
+      const block = this.getBlockAtGridPos(cell.x, cell.y);
+      if (!block || block.isDestroyed) return;
+
+      const key = `${cell.x},${cell.y}`;
+      if (handledCells.has(key)) return;
+
+      const progress = index / Math.max(1, totalSteps - 1);
+      // Quickly taper intensity so path does not travel unrealistically far
+      const intensityFalloff = 1 - Math.pow(progress, 1.6);
+      const intensity = Math.max(0.15, intensityFalloff);
+      const damage = power * 0.95 * intensity;
+      const wasDestroyed = block.takeDamage(damage);
+      affectedBlocks.push(block);
+      if (wasDestroyed) {
+        destroyedBlocks.push(block);
+      }
+      handledCells.add(key);
+
+      // Light splash to adjacent cells to widen the path impression
+      const splashCells = this.getPathSplashCells(cell.x, cell.y, cell.directionVector);
+      splashCells.forEach(({ x, y, weight }) => {
+        if (!this.isWithinGrid(x, y)) return;
+        const splashBlock = this.getBlockAtGridPos(x, y);
+        if (!splashBlock || splashBlock.isDestroyed) return;
+        const splashKey = `${x},${y}`;
+        if (handledCells.has(splashKey)) return;
+        const splashDamage = damage * weight * 0.45;
+        const splashDestroyed = splashBlock.takeDamage(splashDamage);
+        affectedBlocks.push(splashBlock);
+        if (splashDestroyed) {
+          destroyedBlocks.push(splashBlock);
+        }
+        handledCells.add(splashKey);
+      });
+    });
+
+    return handledCells;
+  }
+
+  /**
+   * Determine adjacent cells to include alongside the primary directional path
+   */
+  getPathSplashCells(x, y, directionVector) {
+    if (!directionVector) return [];
+
+    const perpX = -directionVector.y;
+    const perpY = directionVector.x;
+
+    const normalizeOffset = (value) => {
+      if (Math.abs(value) < 0.33) return 0;
+      return value > 0 ? 1 : -1;
+    };
+
+    const offsetA = { dx: normalizeOffset(perpX), dy: normalizeOffset(perpY) };
+    const offsetB = { dx: -offsetA.dx, dy: -offsetA.dy };
+
+    const forwardOffset = {
+      dx: normalizeOffset(directionVector.x),
+      dy: normalizeOffset(directionVector.y)
+    };
+
+    const offsets = [offsetA, offsetB, forwardOffset].filter(offset => offset.dx !== 0 || offset.dy !== 0);
+
+    return offsets.map(offset => ({
+      x: x + offset.dx,
+      y: y + offset.dy,
+      weight: offset === forwardOffset ? 0.6 : 0.4
+    }));
+  }
+
+  /**
+   * Convert UI direction (0° = North) into a normalized vector
+   */
+  getDirectionalVector(direction) {
+    if (typeof direction !== 'number' || Number.isNaN(direction)) return null;
+    const radians = (direction * Math.PI) / 180;
+    const x = Math.sin(radians);
+    const y = -Math.cos(radians); // UI 0° points North (negative Y)
+    const magnitude = Math.sqrt(x * x + y * y) || 1;
+    return {
+      x: x / magnitude,
+      y: y / magnitude
+    };
+  }
+
+  getNeighborCoords(x, y) {
+    const neighbors = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (this.isWithinGrid(nx, ny)) {
+          neighbors.push({ x: nx, y: ny });
+        }
+      }
+    }
+    return neighbors;
+  }
+
+  isWithinGrid(x, y) {
+    return x >= 0 && x < this.width && y >= 0 && y < this.height;
   }
 
   /**
