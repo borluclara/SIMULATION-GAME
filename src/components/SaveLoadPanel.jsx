@@ -483,49 +483,51 @@ const SaveLoadPanel = ({
           </h3>
         </div>
 
-        {/* Action Buttons */}
-        <div className="panel-actions">
+        {/* Unified Action Menu */}
+        <div className="action-menu" role="toolbar" aria-label="Simulation save and load actions">
           <button 
-            className="action-button save"
+            className="menu-button save"
             onClick={handleSave}
             disabled={isLoading || !gameState}
-            title="Save simulation to storage"
+            title="Save current simulation to browser and persistent storage"
+            aria-label="Save simulation"
           >
-            <span className="material-symbols-outlined">bookmark_add</span>
-            <span className="action-text">Save Simulation</span>
+            <span className="menu-icon material-symbols-outlined">bookmark_add</span>
+            <span className="menu-label">Save</span>
           </button>
 
-          {/* Load Button */}
           <button 
-            className="action-button load"
+            className="menu-button load"
             onClick={handleLoad}
             disabled={isLoading}
-            title="Load game state or import CSV data"
+            title="Load previous simulations or import CSV data"
+            aria-label="Load or import data"
           >
-            <span className="material-symbols-outlined">folder_open</span>
-            <span className="action-text">Load/Import</span>
+            <span className="menu-icon material-symbols-outlined">folder_open</span>
+            <span className="menu-label">Load</span>
           </button>
 
-          {/* Export Button */}
           <button 
-            className="action-button export"
+            className="menu-button export"
             onClick={handleExport}
             disabled={isLoading || !gameState}
-            title="Export grid data as CSV file"
+            title="Export the current grid as CSV"
+            aria-label="Export grid CSV"
           >
-            <span className="material-symbols-outlined">file_download</span>
-            <span className="action-text">Export CSV</span>
+            <span className="menu-icon material-symbols-outlined">file_download</span>
+            <span className="menu-label">CSV</span>
           </button>
 
           {onExportSession && (
             <button 
-              className="action-button export-json"
+              className="menu-button export-json"
               onClick={handleExportSession}
               disabled={isLoading || !gameState || !canExportSession}
-              title="Export session data as JSON"
+              title="Export extended session analytics as JSON"
+              aria-label="Export session JSON"
             >
-              <span className="material-symbols-outlined">data_object</span>
-              <span className="action-text">Export Data</span>
+              <span className="menu-icon material-symbols-outlined">data_object</span>
+              <span className="menu-label">Data</span>
             </button>
           )}
         </div>
