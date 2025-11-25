@@ -854,8 +854,11 @@ export class OreGrid {
     const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
     
     // Calculate base direction vector from blast center to block (radial outward)
-    let dirX = (block.x - centerX) / distance;
-    let dirY = (block.y - centerY) / distance;
+    const radialDirX = (block.x - centerX) / distance;
+    const radialDirY = (block.y - centerY) / distance;
+    let dirX = radialDirX;
+    let dirY = radialDirY;
+    let directionalForceMultiplier = 1;
     
     // Apply directional bias if blast direction is specified
     if (direction !== null) {
@@ -863,10 +866,6 @@ export class OreGrid {
       const directionRadians = (direction * Math.PI) / 180;
       const blastDirX = Math.sin(directionRadians); // 0° = North = -Y, but sin gives us X component
       const blastDirY = -Math.cos(directionRadians); // -cos gives us proper Y component for 0° = North
-      
-      // Calculate the angle between natural radial direction and blast direction
-      const naturalAngle = Math.atan2(dirY, dirX);
-      const blastAngle = Math.atan2(blastDirY, blastDirX);
       
       // Determine how much to bias toward blast direction (stronger bias for closer blocks)
       const maxBiasDistance = maxRadius * 0.7; // Bias affects blocks within 70% of max radius
@@ -881,13 +880,19 @@ export class OreGrid {
       const combinedMagnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
       dirX /= combinedMagnitude;
       dirY /= combinedMagnitude;
+
+      // Calculate alignment between radial direction and blast vector for force scaling
+      const alignment = (radialDirX * blastDirX) + (radialDirY * blastDirY);
+      directionalForceMultiplier = this.calculateDirectionalAlignmentMultiplier(alignment, distance, maxRadius);
       
       console.log(`Directional displacement for block at (${block.x}, ${block.y}):`, {
         blastDirection: direction,
         distance: distance.toFixed(2),
         biasStrength: biasStrength.toFixed(3),
         directionWeight: directionWeight.toFixed(3),
-        originalDir: `(${((block.x - centerX) / distance).toFixed(3)}, ${((block.y - centerY) / distance).toFixed(3)})`,
+        alignment: alignment.toFixed(3),
+        directionalForceMultiplier: directionalForceMultiplier.toFixed(3),
+        originalDir: `(${radialDirX.toFixed(3)}, ${radialDirY.toFixed(3)})`,
         blastDir: `(${blastDirX.toFixed(3)}, ${blastDirY.toFixed(3)})`,
         finalDir: `(${dirX.toFixed(3)}, ${dirY.toFixed(3)})`
       });
@@ -918,7 +923,7 @@ export class OreGrid {
     const fragmentationFactor = this.calculateFragmentationFactor(fragmentationIndex);
     
     // Apply all material factors to force
-    effectiveForce = effectiveForce * materialResistance * fragmentationFactor;
+    effectiveForce = effectiveForce * materialResistance * fragmentationFactor * directionalForceMultiplier;
     
     console.log(`Material displacement analysis for ${block.oreType}:`, {
       density: density,
@@ -1025,6 +1030,17 @@ export class OreGrid {
     const factor = 1.2 - (normalizedFragmentation * 0.8);
     
     return Math.max(0.4, factor);
+  }
+
+  /**
+   * Determine force multiplier based on how aligned a block is with the blast direction
+   */
+  calculateDirectionalAlignmentMultiplier(alignment, distance, maxRadius) {
+    const clampedAlignment = Math.max(-1, Math.min(1, alignment));
+    const alignmentFactor = (clampedAlignment + 1) / 2; // 0 = opposite, 1 = same direction
+    const forwardBoost = 0.2 + (alignmentFactor * 1.1); // Range ~0.2 - 1.3
+    const distanceInfluence = Math.max(0.35, 1 - (distance / Math.max(1, maxRadius))); // Diminish far from center
+    return forwardBoost * distanceInfluence;
   }
 
   /**
