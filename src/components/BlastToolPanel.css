@@ -13,10 +13,12 @@
   max-width: 100%;
   min-width: auto;
   height: 320px;
+  min-height: 320px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .panel-title {
@@ -42,9 +44,9 @@
   justify-content: space-between;
   align-items: center;
   color: #FFFFFF;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
@@ -69,23 +71,6 @@
 }
 
 .slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #00FF00, #32CD32);
-  cursor: pointer;
-  border: 2px solid #FFFFFF;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: all 0.3s ease;
-}
-
-.slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 255, 0, 0.5);
-}
-
-.slider::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -100,21 +85,17 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-}
-
-.button-row {
-  display: flex;
-  gap: 0.4rem;
+  flex-shrink: 0;
 }
 
 .blast-button {
-  padding: 0.5rem 0.6rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid #00FF00;
   border-radius: 4px;
   background: linear-gradient(135deg, #228B22, #32CD32);
   color: #FFFFFF;
   font-weight: bold;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
@@ -122,56 +103,14 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   min-height: 28px;
-  max-height: 28px;
+  max-height: 34px;
   flex: 1;
 }
 
 .blast-button:hover {
   background: linear-gradient(135deg, #32CD32, #7FFF00);
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 255, 0, 0.4);
-}
-
-.blast-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-.run-simulation {
-  background: linear-gradient(135deg, #00AA00, #00FF00);
-  font-size: 0.7rem;
-  padding: 0.5rem 0.7rem;
-  animation: pulse 2s infinite;
-  min-height: 32px;
-  max-height: 32px;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
-  50% { box-shadow: 0 5px 15px rgba(0, 255, 0, 0.6); }
-  100% { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
-}
-
-.reset {
-  flex: 1;
-  background: linear-gradient(135deg, #8B0000, #DC143C);
-  border-color: #FF4444;
-}
-
-.reset:hover {
-  background: linear-gradient(135deg, #DC143C, #FF6B6B);
   box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
-}
-
-.save {
-  flex: 1;
-  background: linear-gradient(135deg, #4169E1, #6495ED);
-  border-color: #87CEEB;
-}
-
-.save:hover {
-  background: linear-gradient(135deg, #6495ED, #87CEEB);
-  box-shadow: 0 5px 15px rgba(100, 149, 237, 0.4);
 }
 
 .replay {
@@ -202,73 +141,36 @@
   
   .blast-button {
     padding: 0.4rem 0.5rem;
-    font-size: 0.6rem;
-    min-height: 26px;
+    border: 1px solid #00FF00;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #228B22, #32CD32);
+    color: #FFFFFF;
     max-height: 26px;
   }
   
-  .run-simulation {
-    padding: 0.5rem 0.6rem;
-    font-size: 0.6rem;
-    min-height: 28px;
-    max-height: 28px;
-  }
+  
 }
 
-/* Direction Compass Styles */
-.direction-compass {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0.8rem auto;
-  border: 2px solid #00FF00;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(34, 139, 34, 0.2), rgba(0, 0, 0, 0.4));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.compass-center {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 255, 0, 0.1);
-  border: 1px solid #00FF00;
-  border-radius: 50%;
-}
-
-.direction-arrow {
-  position: absolute;
-  font-size: 24px;
-  color: #FF4444;
-  font-weight: bold;
-  text-shadow: 0 0 4px rgba(255, 68, 68, 0.8);
-  transition: transform 0.3s ease;
-  z-index: 2;
-}
-
-.blast-icon {
-  font-size: 16px;
-  opacity: 0.7;
-  z-index: 1;
+/* Direction Grid Styles */
+.direction-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 29px);
+  gap: 3px;
+  margin: 0.35rem auto 0;
+  width: 95px;
 }
 
 .direction-btn {
-  position: absolute;
-  width: 32px;
-  height: 32px;
+  width: 29px;
+  height: 29px;
   border: 1px solid #00FF00;
-  background: rgba(34, 139, 34, 0.3);
+  background: rgba(34, 139, 34, 0.25);
   color: #00FF00;
-  border-radius: 50%;
-  font-size: 16px;
+  border-radius: 8px;
+  font-size: 0.7rem;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -276,29 +178,35 @@
 }
 
 .direction-btn:hover {
-  background: rgba(0, 255, 0, 0.4);
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
-  transform: scale(1.1);
+  background: rgba(0, 255, 0, 0.35);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
 }
 
 .direction-btn:active {
-  transform: scale(0.95);
-  background: rgba(0, 255, 0, 0.6);
+  transform: scale(0.96);
+  background: rgba(0, 255, 0, 0.45);
 }
 
-/* Position direction buttons around the compass */
-.direction-btn.north { top: -16px; left: 50%; transform: translateX(-50%); }
-.direction-btn.northeast { top: 8px; right: 8px; }
-.direction-btn.east { right: -16px; top: 50%; transform: translateY(-50%); }
-.direction-btn.southeast { bottom: 8px; right: 8px; }
-.direction-btn.south { bottom: -16px; left: 50%; transform: translateX(-50%); }
-.direction-btn.southwest { bottom: 8px; left: 8px; }
-.direction-btn.west { left: -16px; top: 50%; transform: translateY(-50%); }
-.direction-btn.northwest { top: 8px; left: 8px; }
+.direction-btn.active {
+  background: linear-gradient(135deg, #00AA00, #00FF00);
+  color: #0a0a0a;
+  border-color: #7CFC00;
+  box-shadow: 0 0 6px rgba(0, 255, 0, 0.5);
+}
 
-.direction-slider {
-  margin-top: 0.5rem;
-  background: linear-gradient(to right, #FF4444, #FFAA44, #44FF44, #44AAFF, #FF4444);
+.direction-center {
+  width: 29px;
+  height: 29px;
+  border: 1px dashed rgba(0, 255, 0, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.direction-center .material-symbols-outlined {
+  font-size: 0.9rem;
 }
 
 @media (max-width: 480px) {
@@ -321,10 +229,5 @@
     max-height: 24px;
   }
   
-  .run-simulation {
-    padding: 0.4rem 0.5rem;
-    font-size: 0.6rem;
-    min-height: 26px;
-    max-height: 26px;
-  }
+  
 }

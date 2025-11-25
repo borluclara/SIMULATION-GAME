@@ -9,6 +9,24 @@ const BlastToolPanel = ({
   onSimulate, 
   onReset 
 }) => {
+  const directionGrid = [
+    [
+      { angle: 315, label: '↖', name: 'Northwest' },
+      { angle: 0, label: '↑', name: 'North' },
+      { angle: 45, label: '↗', name: 'Northeast' }
+    ],
+    [
+      { angle: 270, label: '←', name: 'West' },
+      { center: true },
+      { angle: 90, label: '→', name: 'East' }
+    ],
+    [
+      { angle: 225, label: '↙', name: 'Southwest' },
+      { angle: 180, label: '↓', name: 'South' },
+      { angle: 135, label: '↘', name: 'Southeast' }
+    ]
+  ];
+
   // Helper function to get precise direction name following real-world bearing conventions
   const getDirectionName = (degrees) => {
     const normalized = ((degrees % 360) + 360) % 360;
@@ -50,29 +68,39 @@ const BlastToolPanel = ({
         />
       </div>
 
-      <div className="slider-container">
+      <div className="direction-container">
         <div className="slider-label">
           <span>Blast Direction</span>
           <span className="slider-value">{blastDirection}° ({getDirectionName(blastDirection)})</span>
         </div>
-        <input
-          id="blast-direction"
-          type="range"
-          min="0"
-          max="360"
-          value={blastDirection}
-          onChange={(e) => setBlastDirection(Number(e.target.value))}
-          className="slider"
-        />
+        <div className="direction-grid" role="group" aria-label="Select blast direction">
+          {directionGrid.flat().map((cell, index) => {
+            if (cell.center) {
+              return (
+                <div key={`center-${index}`} className="direction-center" aria-hidden="true">
+                  <span className="material-symbols-outlined">explosion</span>
+                </div>
+              );
+            }
+
+            const isActive = blastDirection === cell.angle;
+            return (
+              <button
+                key={`${cell.name}-${cell.angle}`}
+                type="button"
+                className={`direction-btn ${isActive ? 'active' : ''}`}
+                onClick={() => handleDirectionClick(cell.angle)}
+                title={`${cell.name} (${cell.angle}°)`}
+                aria-label={`${cell.name} direction`}
+              >
+                {cell.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="control-buttons">
-        <button 
-          className="blast-button run-simulation"
-          onClick={onSimulate}
-        >
-          Run Simulation
-        </button>
         <div className="button-row">
           <button 
             className="blast-button reset"
@@ -81,18 +109,12 @@ const BlastToolPanel = ({
             Reset
           </button>
           <button 
-            className="blast-button save"
-            onClick={() => console.log('Save functionality')}
+            className="blast-button replay"
+            onClick={() => console.log('Replay functionality')}
           >
-            Save
+            Replay
           </button>
         </div>
-        <button 
-          className="blast-button replay"
-          onClick={() => console.log('Replay functionality')}
-        >
-          Replay
-        </button>
       </div>
     </div>
   )
