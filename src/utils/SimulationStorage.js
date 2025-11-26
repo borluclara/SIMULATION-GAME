@@ -127,7 +127,10 @@ class SimulationStorage {
         saveReason: gameData.saveReason || 'manual',
         autoSaveRound: gameData.autoSaveRound || null,
         autoSaveLabel: gameData.autoSaveLabel || null
-      }
+      },
+
+      // Deterministic replay payload
+      replay: gameData.replay || null
     };
   }
 

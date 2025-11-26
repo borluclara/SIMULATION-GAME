@@ -121,6 +121,13 @@
   box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
 }
 
+.blast-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .reset {
   background: linear-gradient(135deg, #8B0000, #DC143C);
   border-color: #FF4D4D;
@@ -142,6 +149,33 @@
 .replay:hover {
   background: linear-gradient(135deg, #1b8c1b, #66FF66);
   box-shadow: 0 5px 15px rgba(46, 139, 87, 0.4);
+}
+
+.replay-controls-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.replay-controls-inline .mini-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.replay-progress {
+  height: 4px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.replay-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #32CD32, #7CFC00);
+  width: 0;
+  transition: width 0.2s ease;
 }
 
 /* Responsive design */

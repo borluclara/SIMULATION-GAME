@@ -1,3 +1,4 @@
+import { serializeGrid } from './GridSerializer';
 /**
  * Global Game State Management - FIXED
  * Properly handles OreGrid object structure
@@ -112,6 +113,7 @@ export class GameState {
   triggerBlasts() {
     const blasts = [...this.state.blasts];
     const grid = this.state.grid;
+    const gridBeforeSnapshot = grid ? serializeGrid(grid) : null;
     
     if (!grid || blasts.length === 0) {
       console.warn('No grid or blasts available');
@@ -175,11 +177,15 @@ export class GameState {
     // Clear blasts after detonation
     this.clearBlasts();
     
+    const gridAfterSnapshot = grid ? serializeGrid(grid) : null;
+
     return { 
       blasts: blastsWithRadius, 
       affectedCells: allAffectedCells, 
       destroyedCells: allDestroyedCells,
-      blastRadius: radius
+      blastRadius: radius,
+      gridBeforeSnapshot,
+      gridAfterSnapshot
     };
   }
 

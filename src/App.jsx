@@ -14,12 +14,15 @@ import MaterialLegend from './components/MaterialLegend'
 import SaveLoadPanel from './components/SaveLoadPanel'
 import SaveToast from './components/SaveToast'
 import { parseCSVToGrid, OreGrid as OreGridClass, OreBlock } from './utils/OreGrid'
+import { serializeGrid } from './utils/GridSerializer'
 import { useGameState } from './hooks/useGameState'
+import { useReplayController } from './hooks/useReplayController'
 import { physicsEngine } from './utils/PhysicsEngine'
 import { blastAnimationEngine } from './utils/BlastAnimationEngine'
 import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
+import replayManager from './utils/ReplayManager'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -70,7 +73,11 @@ function App() {
   // Blast feedback state
   const [showBlastFeedback, setShowBlastFeedback] = useState(false)
   const [feedbackResults, setFeedbackResults] = useState(null)
-  const [highlightedCells, setHighlightedCells] = useState({ recovered: [], lost: [] })
+  const [highlightedCells, setHighlightedCells] = useState({ recovered: [], lost: [] });
+  const [replayGrid, setReplayGrid] = useState(null);
+  const [replayBlastMarkers, setReplayBlastMarkers] = useState(null);
+  const preReplayHighlightRef = React.useRef(highlightedCells);
+  const replayOverlayActiveRef = React.useRef(false);
   
   // Reset feedback state
   const [resetMessage, setResetMessage] = useState(null)
@@ -135,10 +142,36 @@ function App() {
     throw new Error('No grid snapshot found for the selected simulation.');
   }, []);
 
+  const {
+    status: replayStatus,
+    progress: replayProgress,
+    canReplay: canReplaySimulation,
+    startReplay,
+    pauseReplay,
+    resumeReplay,
+    stepReplay,
+    stopReplay,
+    currentEvent: activeReplayEvent
+  } = useReplayController({
+    rebuildGridFromSnapshot,
+    setReplayGrid,
+    setAnimationState,
+    setPhysicsDebris,
+    setCameraShake
+  });
+  const isReplayActive = replayStatus !== 'idle';
+
   // Initialize blast history store when player name changes
   useEffect(() => {
-    if (playerName && playerName.trim().length > 0) {
-      blastHistoryStore.initializeSession(playerName);
+    const trimmedName = playerName?.trim();
+    if (trimmedName && trimmedName.length > 0) {
+      blastHistoryStore.initializeSession(trimmedName);
+      if (!replayManager.hasLoadedReplay()) {
+        replayManager.startSession({
+          playerName: trimmedName,
+          sessionId: blastHistoryStore.sessionId
+        });
+      }
     }
   }, [playerName]);
 
@@ -157,6 +190,36 @@ function App() {
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [currentView, originalCsvData, isLoadingGrid]);
+  
+  useEffect(() => {
+    if (!replayOverlayActiveRef.current) {
+      preReplayHighlightRef.current = highlightedCells;
+    }
+  }, [highlightedCells]);
+
+  useEffect(() => {
+    if (replayStatus !== 'idle') {
+      replayOverlayActiveRef.current = true;
+      if (activeReplayEvent) {
+        setReplayBlastMarkers(activeReplayEvent.blasts || []);
+        if (activeReplayEvent.highlights) {
+          setHighlightedCells(activeReplayEvent.highlights);
+        } else {
+          setHighlightedCells({ recovered: [], lost: [] });
+        }
+      }
+    } else if (replayOverlayActiveRef.current) {
+      setReplayBlastMarkers(null);
+      setHighlightedCells(preReplayHighlightRef.current || { recovered: [], lost: [] });
+      replayOverlayActiveRef.current = false;
+    }
+  }, [replayStatus, activeReplayEvent]);
+
+  useEffect(() => {
+    if (oreGrid) {
+      replayManager.setInitialGrid(oreGrid);
+    }
+  }, [oreGrid]);
 
   // Cleanup animations on unmount
   useEffect(() => {
@@ -267,6 +330,10 @@ function App() {
 
     try {
       setIsLoadingGrid(true);
+
+      if (replayStatus !== 'idle') {
+        stopReplay();
+      }
       
       // Reset game state (keep player name, reset score and blasts)
       resetGameState(true); // true = keep player name
@@ -306,6 +373,11 @@ function App() {
       
       // Clear blast history (new session)
       blastHistoryStore.clearHistory();
+      replayManager.startSession({
+        playerName: playerName?.trim() || 'Player',
+        sessionId: blastHistoryStore.sessionId
+      });
+      replayManager.setInitialGrid(grid);
       console.log('Blast history cleared for new session');
       
       // Update scenario with reset grid
@@ -368,10 +440,36 @@ function App() {
 
   // Blast placement handlers
   const handlePlacementModeChange = (mode) => {
+    if (isReplayActive) {
+      console.warn('Cannot modify placement mode while replay is running.');
+      return;
+    }
     setPlacementMode(mode)
   }
 
+  const activeBlastMarkers = replayBlastMarkers ?? blasts
+  const displayMineralRecovery = isReplayActive && typeof activeReplayEvent?.blastResultSummary?.recovery === 'number'
+    ? activeReplayEvent.blastResultSummary.recovery
+    : mineralRecovery
+  const displayDilution = isReplayActive && typeof activeReplayEvent?.blastResultSummary?.dilution === 'number'
+    ? activeReplayEvent.blastResultSummary.dilution
+    : dilution
+  const displayScore = isReplayActive && activeReplayEvent
+    ? (
+        typeof activeReplayEvent.scoreAfter === 'number'
+          ? activeReplayEvent.scoreAfter
+          : (typeof activeReplayEvent.scoreBefore === 'number' ? activeReplayEvent.scoreBefore : score)
+      )
+    : score
+  const displayPreviousScore = isReplayActive && typeof activeReplayEvent?.scoreBefore === 'number'
+    ? activeReplayEvent.scoreBefore
+    : previousScore
+
   const handleBlockClick = (block, position) => {
+    if (isReplayActive) {
+      console.warn('Replay in progress: grid interactions are disabled.');
+      return;
+    }
     // Close blast summary panel when new action begins
     if (showBlastSummary) {
       handleCloseBlastSummary();
@@ -390,6 +488,10 @@ function App() {
   }
 
   const handleTriggerBlasts = async (result) => {
+    if (isReplayActive) {
+      console.warn('Cannot trigger blasts during replay playback.');
+      return;
+    }
     if (result.blasts.length > 0) {
       // Store previous score before blast
       setPreviousScore(score);
@@ -399,6 +501,7 @@ function App() {
       // Calculate score increase based on materials destroyed
       const materialsDestroyed = result.destroyedCells?.length || 0;
       const scoreIncrease = materialsDestroyed * 10; // 10 points per material destroyed
+      const totalScoreAfterBlast = score + scoreIncrease;
       addScore(scoreIncrease);
       
       // Calculate highlighted cells for visual feedback
@@ -453,7 +556,7 @@ function App() {
         wasteCollected: wasteCollected,
         totalValue: Math.max(0, totalValue),
         score: scoreIncrease,
-        totalScore: score + scoreIncrease,
+        totalScore: totalScoreAfterBlast,
         blastsUsed: result.blasts.length,
         blastRadius: result.blastRadius || 0,
         cellsDestroyed: materialsDestroyed,
@@ -475,6 +578,44 @@ function App() {
       setBlastResults(result);
       setShowBlastSummary(true);
 
+      const highlightSnapshot = {
+        recovered: recoveredOres.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' })),
+        lost: lostWaste.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' }))
+      };
+
+      const replayEvent = replayManager.beginEvent({
+        blastPower,
+        blastDirection,
+        blasts: result.blasts,
+        scoreBefore: score,
+        gridSnapshotBefore: result.gridBeforeSnapshot || (oreGrid ? serializeGrid(oreGrid) : null),
+        blastResultSummary: {
+          recovery,
+          dilution,
+          efficiency,
+          materialsDestroyed
+        },
+        highlights: highlightSnapshot,
+        autoSaveRound: roundNumberForAutoSave
+      });
+
+      let replayFinalized = false;
+      const finalizeReplayEvent = () => {
+        if (!replayEvent || replayFinalized) return;
+        replayFinalized = true;
+        replayManager.endEvent({
+          eventRef: replayEvent,
+          scoreAfter: totalScoreAfterBlast,
+          gridSnapshotAfter: result.gridAfterSnapshot || (oreGrid ? serializeGrid(oreGrid) : null),
+          summary: {
+            blastRecord,
+            totalValue,
+            highlightSnapshot
+          },
+          autoSaveReference: roundNumberForAutoSave
+        });
+      };
+
       // *** START GSAP ANIMATION SEQUENCE ***
       const cellSize = 35; // Cell size in pixels (matches OreGridCanvas default)
       
@@ -493,15 +634,19 @@ function App() {
             setAnimationState(animState);
             
             // Apply screen shake effect
+            let nextCameraShake = { x: 0, y: 0 };
             if (animState.animations) {
               const shakeAnim = animState.animations.find(a => a.type === 'shake');
               if (shakeAnim) {
                 const shakeX = (Math.random() - 0.5) * shakeAnim.intensity;
                 const shakeY = (Math.random() - 0.5) * shakeAnim.intensity;
-                setCameraShake({ x: shakeX, y: shakeY });
-              } else {
-                setCameraShake({ x: 0, y: 0 });
+                nextCameraShake = { x: shakeX, y: shakeY };
               }
+            }
+
+            setCameraShake(nextCameraShake);
+            if (replayEvent) {
+              replayManager.recordAnimationFrame(animState, nextCameraShake, replayEvent);
             }
           },
           onComplete: () => {
@@ -519,6 +664,11 @@ function App() {
 
             // Trigger immediate auto-save once the blast fully completes
             handleAutoSave(roundNumberForAutoSave);
+
+            // If physics is not running, finalize replay immediately
+            if (!result.destroyedCells?.length || !canvasRef.current) {
+              finalizeReplayEvent();
+            }
           }
         }
       );
@@ -596,6 +746,9 @@ function App() {
             // Force initial debris state update
             if (debris.length > 0) {
               setPhysicsDebris([...debris]);
+              if (replayEvent) {
+                replayManager.recordPhysicsFrame(debris, replayEvent);
+              }
               console.log('Initial physics debris state set with', debris.length, 'particles');
               
               // Debug: Check first few particle positions
@@ -618,6 +771,9 @@ function App() {
                 material: 'test'
               }];
               setPhysicsDebris(testDebris);
+              if (replayEvent) {
+                replayManager.recordPhysicsFrame(testDebris, replayEvent);
+              }
             }
           }
 
@@ -627,6 +783,9 @@ function App() {
               physicsEngine.update();
               const debris = physicsEngine.getDebris();
               setPhysicsDebris([...debris]);
+              if (replayEvent) {
+                replayManager.recordPhysicsFrame(debris, replayEvent);
+              }
               
               // More detailed debugging
               if (debris.length > 0) {
@@ -642,6 +801,7 @@ function App() {
               setTimeout(() => {
                 physicsEngine.destroy();
                 setPhysicsDebris([]);
+                finalizeReplayEvent();
               }, 1000);
             }
           };
@@ -650,6 +810,7 @@ function App() {
           
         } catch (error) {
           console.error('❌ Physics simulation error:', error);
+          finalizeReplayEvent();
         }
       }
       
@@ -732,7 +893,8 @@ function App() {
         isComplete: false, // Could be enhanced to detect completion
         saveReason: reason,
         autoSaveRound,
-        autoSaveLabel
+        autoSaveLabel,
+        replay: replayManager.exportReplayData()
       };
 
       // Save to persistent storage
@@ -773,6 +935,10 @@ function App() {
   const handleLoadSimulation = async (simulationId) => {
     try {
       setIsLoadingGrid(true);
+
+      if (replayStatus !== 'idle') {
+        stopReplay();
+      }
       
       const simulation = await simulationStorage.loadSimulation(simulationId);
       const restoredGrid = await rebuildGridFromSnapshot(simulation.scenario);
@@ -797,6 +963,16 @@ function App() {
       });
       setOreGrid(restoredGrid);
       setGrid(restoredGrid);
+
+      if (simulation.replay) {
+        replayManager.loadReplay(simulation.replay);
+      } else {
+        replayManager.startSession({
+          playerName: simulation.player?.name || playerName || 'Loaded Player',
+          sessionId: simulation.id
+        });
+        replayManager.setInitialGrid(restoredGrid);
+      }
 
       if (simulation.settings) {
         setBlastPower(simulation.settings.blastPower || 500);
@@ -886,6 +1062,10 @@ function App() {
   const handleLoad = async (loadedData) => {
     try {
       setIsLoadingGrid(true);
+
+      if (replayStatus !== 'idle') {
+        stopReplay();
+      }
       
       // Restore player name and score
       if (loadedData.playerName) setPlayerName(loadedData.playerName);
@@ -912,6 +1092,11 @@ function App() {
         });
         
         setGrid(grid.data || grid);
+        replayManager.startSession({
+          playerName: loadedData.playerName || playerName || 'Loaded Player',
+          sessionId: `manual_${Date.now()}`
+        });
+        replayManager.setInitialGrid(grid);
       }
       
       // Restore simulation settings
@@ -1133,10 +1318,21 @@ function App() {
     }
   };
 
-  const handleReplay = () => {
-    console.log('Replaying last simulation...')
-    handleRunSimulation()
-  }
+  const handleReplay = useCallback(async () => {
+    if (!canReplaySimulation) {
+      console.warn('Replay data not available yet');
+      return;
+    }
+
+    try {
+      const started = await startReplay();
+      if (started && placementMode) {
+        setPlacementMode(false);
+      }
+    } catch (error) {
+      console.error('Failed to start replay:', error);
+    }
+  }, [canReplaySimulation, startReplay, placementMode, setPlacementMode]);
 
   // Home View (UPLOAD-CSV Interface)
   const renderHomeView = () => (
@@ -1214,7 +1410,7 @@ function App() {
             <div className="size-10"></div>
           </div>
           <p className="text-lg font-medium text-white dark:text-white mt-4">
-            Welcome, {playerName}! | Score: {score}
+            Welcome, {playerName}! | Score: {displayScore}
           </p>
         </header>
 
@@ -1266,11 +1462,18 @@ function App() {
                       setBlastDirection={setBlastDirection}
                       onSimulate={handleRunSimulation}
                       onReset={handleReset}
+                      onReplay={handleReplay}
+                      onReplayPause={pauseReplay}
+                      onReplayResume={resumeReplay}
+                      onReplayStep={() => stepReplay()}
+                      replayStatus={replayStatus}
+                      replayProgress={replayProgress}
+                      canReplay={canReplaySimulation}
                     />
                     
                     <ScoreFeedback
-                      mineralRecovery={mineralRecovery}
-                      dilution={dilution}
+                      mineralRecovery={displayMineralRecovery}
+                      dilution={displayDilution}
                     />
                   </div>
                   
@@ -1282,6 +1485,7 @@ function App() {
                       placementMode={placementMode}
                       canvasRef={canvasRef}
                       blastDirection={blastDirection}
+                      isReplayActive={isReplayActive}
                     />
                     
                     <MaterialLegend grid={oreGrid} />
@@ -1293,10 +1497,10 @@ function App() {
                   <div className="canvas-container">
                     <OreGridCanvas 
                       ref={canvasRef}
-                      grid={oreGrid} 
+                      grid={replayGrid || oreGrid} 
                       onBlockClick={handleBlockClick}
                       placementMode={placementMode}
-                      blastMarkers={blasts}
+                      blastMarkers={activeBlastMarkers}
                       explosionAnimations={explosionAnimations}
                       physicsDebris={physicsDebris}
                       animationState={animationState}
@@ -1373,8 +1577,8 @@ function App() {
         blastResults={blastResults}
         isVisible={showBlastSummary}
         onClose={handleCloseBlastSummary}
-        playerScore={score}
-        previousScore={previousScore}
+        playerScore={displayScore}
+        previousScore={displayPreviousScore}
         grid={oreGrid}
       />
 
@@ -1385,8 +1589,8 @@ function App() {
         onClose={handleCloseFeedback}
         onReset={handleFeedbackReset}
         onContinue={handleFeedbackContinue}
-        playerScore={score}
-        previousScore={previousScore}
+        playerScore={displayScore}
+        previousScore={displayPreviousScore}
         grid={oreGrid}
       />
 

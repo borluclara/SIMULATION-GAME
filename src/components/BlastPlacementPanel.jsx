@@ -9,7 +9,8 @@ const BlastPlacementPanel = ({
   onPhysicsUpdate = () => {}, // NEW: callback to update physics debris
   placementMode = false,
   canvasRef = null,
-  blastDirection = 90 // NEW: blast direction support
+  blastDirection = 90, // NEW: blast direction support
+  isReplayActive = false
 }) => {
   const {
     blasts,
@@ -24,15 +25,29 @@ const BlastPlacementPanel = ({
   const [physicsActive, setPhysicsActive] = useState(false);
 
   const handleTogglePlacementMode = () => {
+    if (isReplayActive) {
+      console.warn('Replay running: placement mode locked.');
+      return;
+    }
+
     const newMode = !placementMode;
     onPlacementModeChange(newMode);
   };
 
   const handleClearBlasts = () => {
+    if (isReplayActive) {
+      console.warn('Replay running: cannot clear blasts.');
+      return;
+    }
     clearBlasts();
   };
 
   const handleTriggerBlasts = async () => {
+    if (isReplayActive) {
+      console.warn('Replay running: detonations disabled.');
+      return;
+    }
+
     if (blasts.length === 0) {
       alert('No blasts to detonate! Place some explosives first.');
       return;
@@ -226,8 +241,9 @@ const BlastPlacementPanel = ({
             className={`control-button trigger-button ${isExploding ? 'exploding' : ''}`}
             onClick={handleTriggerBlasts}
             disabled={blasts.length === 0 || isExploding}
+            disabled={isExploding || isReplayActive}
           >
-            {isExploding ? '💥 EXPLODING!' : '🧨 Trigger Blast'}
+            {isReplayActive ? 'Replay Locked' : isExploding ? '💥 EXPLODING!' : '🧨 Trigger Blast'}
           </button>
         </div>
 

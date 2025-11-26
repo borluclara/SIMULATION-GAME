@@ -7,7 +7,14 @@ const BlastToolPanel = ({
   blastDirection, 
   setBlastDirection, 
   onSimulate, 
-  onReset 
+  onReset,
+  onReplay = () => {},
+  onReplayPause = () => {},
+  onReplayResume = () => {},
+  onReplayStep = () => {},
+  replayStatus = 'idle',
+  replayProgress = 0,
+  canReplay = false
 }) => {
   const directionGrid = [
     [
@@ -47,6 +54,8 @@ const BlastToolPanel = ({
   const handleDirectionClick = (angle) => {
     setBlastDirection(angle);
   };
+
+  const isReplaying = replayStatus === 'playing' || replayStatus === 'preparing';
 
   return (
     <div className="blast-tool-panel">
@@ -110,11 +119,45 @@ const BlastToolPanel = ({
           </button>
           <button 
             className="blast-button replay"
-            onClick={() => console.log('Replay functionality')}
+            onClick={onReplay}
+            disabled={!canReplay || isReplaying}
           >
-            Replay
+            {isReplaying ? 'Replaying…' : 'Replay'}
           </button>
         </div>
+
+        {replayStatus !== 'idle' && (
+          <div className="replay-controls-inline">
+            <div className="mini-buttons">
+              {isReplaying ? (
+                <button className="blast-button" onClick={onReplayPause}>
+                  Pause
+                </button>
+              ) : (
+                <button
+                  className="blast-button"
+                  onClick={onReplayResume}
+                  disabled={replayStatus === 'idle'}
+                >
+                  Resume
+                </button>
+              )}
+              <button
+                className="blast-button"
+                onClick={onReplayStep}
+                disabled={isReplaying}
+              >
+                Step
+              </button>
+            </div>
+            <div className="replay-progress">
+              <div
+                className="replay-progress-bar"
+                style={{ width: `${Math.min(100, Math.max(0, (replayProgress || 0) * 100))}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
