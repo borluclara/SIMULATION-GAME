@@ -450,40 +450,44 @@ const OreGridCanvas = forwardRef(({
 
       // *** ENHANCED: Draw falling physics debris with realistic effects ***
       if (physicsDebris && physicsDebris.length > 0) {
-        console.log('Canvas: Drawing', physicsDebris.length, 'enhanced falling debris particles');
         physicsDebris.forEach(debris => {
-          const pos = debris.body.position;
-          const velocity = debris.body.velocity;
-          const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-          const rotation = debris.body.angle;
-          
+          if (!debris) {
+            return;
+          }
+
+          const hasBody = Boolean(debris.body);
+          const position = hasBody
+            ? debris.body.position
+            : { x: debris.x ?? 0, y: debris.y ?? 0 };
+          const velocity = hasBody
+            ? debris.body.velocity
+            : { x: debris.vx ?? debris.velocity?.x ?? 0, y: debris.vy ?? debris.velocity?.y ?? 0 };
+          const speed = Math.sqrt((velocity.x || 0) ** 2 + (velocity.y || 0) ** 2);
+          const rotation = hasBody ? debris.body.angle : (debris.angle ?? 0);
+
           ctx.save();
-          
+
           // Material-based particle rendering with enhanced effects
           const materialProps = debris.materialProps || {};
           const density = materialProps.density || 2.5;
-          const hardness = materialProps.hardness || 5;
           const fragmentation = materialProps.fragmentation_index || 0.5;
-          const bounceCount = debris.bounceCount || 0;
-          
+
           // Enhanced particle size based on fragmentation and age
-          const age = Date.now() - debris.createdAt;
+          const createdAt = typeof debris.createdAt === 'number' ? debris.createdAt : Date.now();
+          const age = Math.max(0, Date.now() - createdAt);
           const ageFactor = Math.max(0.7, 1 - (age / 15000)); // Slowly shrink over 15s
-          const effectiveSize = debris.size * (0.4 + fragmentation * 0.6) * ageFactor;
-          
+          const baseSize = typeof debris.size === 'number' ? debris.size : 6;
+          const effectiveSize = baseSize * (0.4 + fragmentation * 0.6) * ageFactor;
+
           // Rotation-based visual effects for falling debris
-          ctx.translate(pos.x, pos.y);
+          ctx.translate(position.x, position.y);
           ctx.rotate(rotation);
-          
-          // Base particle color with brightness based on speed
-          const speedBrightness = Math.min(1, 0.6 + (speed * 0.1));
-          const baseColor = debris.color;
-          
-          // Enhanced motion trails for falling particles
+
+          // Enhanced motion trails for falling particles (use recorded direction if available)
           if (speed > 1) {
             const trailLength = Math.min(speed * 3, 20);
             const trailOpacity = Math.min(speed * 0.15, 0.7);
-            
+
             ctx.strokeStyle = `rgba(255, 150, 50, ${trailOpacity})`;
             ctx.lineWidth = effectiveSize * 0.3;
             ctx.beginPath();
@@ -491,28 +495,16 @@ const OreGridCanvas = forwardRef(({
             ctx.lineTo(0, 0);
             ctx.stroke();
           }
-          
-          // Material-specific enhanced visual effects
+
           if (density > 4.0) {
-            // Dense materials: strong metallic glow, spark effects
-            ctx.shadowColor = baseColor;
+            ctx.shadowColor = debris.color || '#ffaa66';
             ctx.shadowBlur = 8 + (speed * 0.5);
-          } else if (density < 2.0) {
-            // Light materials: no special effects
-          } else {
-            // Medium density: no special effects
           }
-          
-          // Main particle - simple solid dark gray/brown color for realistic debris
-          ctx.fillStyle = 'rgba(60, 50, 45, 0.9)'; // Dark gray-brown, looks like rock
-          
-          // Simple square debris (no fancy shapes)
+
+          ctx.fillStyle = 'rgba(60, 50, 45, 0.9)';
           ctx.beginPath();
           ctx.rect(-effectiveSize, -effectiveSize, effectiveSize * 2, effectiveSize * 2);
           ctx.fill();
-          
-          // No additional effects - keep it simple and realistic
-
           ctx.restore();
         });
       }
