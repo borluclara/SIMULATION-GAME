@@ -9,6 +9,73 @@ import simulationStorage from '../utils/SimulationStorage';
 import SavedSessionsModal from './SavedSessionsModal';
 import { saveLoadManager } from '../utils/SaveLoadManager';
 
+const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole'];
+
+const normalizeHeaderValue = (value = '') => value
+  .toLowerCase()
+  .replace(/(^"|"$)/g, '')
+  .replace(/[\s_-]/g, '');
+
+const validateCsvStructure = (fileText) => {
+  if (!fileText || typeof fileText !== 'string') {
+    return { valid: false, error: 'The CSV file is empty.' };
+  }
+
+  const firstLine = fileText.split(/\r?\n/).find(Boolean);
+  if (!firstLine) {
+    return { valid: false, error: 'The CSV file has no header row.' };
+  }
+
+  const headers = firstLine.split(',').map(normalizeHeaderValue);
+  const missing = REQUIRED_CSV_HEADERS.filter((required) => {
+    const normalized = normalizeHeaderValue(required);
+    return !headers.some((header) => header === normalized);
+  });
+
+  if (missing.length > 0) {
+    return {
+      valid: false,
+      error: `Missing required columns: ${missing.join(', ')}`
+    };
+  }
+
+  return { valid: true };
+};
+
+const validateJsonSaveFile = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') {
+    return { valid: false, error: 'The JSON file is empty.' };
+  }
+
+  try {
+    const parsed = JSON.parse(rawText);
+    if (!parsed || typeof parsed !== 'object') {
+      return { valid: false, error: 'Save data must be a JSON object.' };
+    }
+
+    const payload = parsed.gameState || parsed;
+    if (!payload || typeof payload !== 'object') {
+      return { valid: false, error: 'Missing gameState information in save file.' };
+    }
+
+    if (!payload.playerName || typeof payload.playerName !== 'string') {
+      return { valid: false, error: 'Player name is missing from the save file.' };
+    }
+
+    const csvData = payload.csvData;
+    const hasStructuredCsv = Array.isArray(csvData) && csvData.length > 0;
+    const hasRawCsvString = typeof csvData === 'string' && csvData.trim().length > 0;
+
+    if (!hasStructuredCsv && !hasRawCsvString) {
+      return { valid: false, error: 'Grid data is missing from the save file.' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, error: 'Save file is not valid JSON.' };
+  }
+};
+
 const SaveLoadPanel = ({ 
   onSave,
   onLoad,
@@ -148,20 +215,25 @@ const SaveLoadPanel = ({
   };
 
   // Handle loading a specific save from modal
-  const handleLoadSave = (saveId) => {
+  const handleLoadSave = async (saveId) => {
     try {
       setIsLoading(true);
       const result = saveLoadManager.loadGame(saveId);
       
-      if (result.success) {
-        // Call the onLoad callback with the loaded game state
-        if (onLoad) {
-          onLoad(result.gameState);
-        }
-        showFeedback(`Loaded: ${result.metadata.saveName}`, 'success');
-        setShowLoadModal(false);
-      } else {
+      if (!result.success) {
         showFeedback(result.error || 'Failed to load game', 'error');
+        return;
+      }
+
+      if (onLoad) {
+        try {
+          await onLoad(result.gameState);
+          showFeedback(`Loaded: ${result.metadata.saveName}`, 'success');
+          setShowLoadModal(false);
+        } catch (loadError) {
+          console.error('Load handler rejected save:', loadError);
+          showFeedback(loadError.message || 'Save file is incompatible with this build.', 'error');
+        }
       }
     } catch (error) {
       console.error('Load error:', error);
@@ -234,27 +306,45 @@ const SaveLoadPanel = ({
   const processLoadFile = async (file) => {
     try {
       setIsLoading(true);
-      
-      if (file.type === 'application/json' || file.name.endsWith('.json')) {
-        // Check if it's a save file (import to localStorage) or direct load
+      const extension = file.name?.split('.').pop()?.toLowerCase() || '';
+      const isJson = file.type === 'application/json' || extension === 'json';
+      const isCsv = file.type === 'text/csv' || extension === 'csv';
+
+      if (isJson) {
+        const fileText = await file.text();
+        const validation = validateJsonSaveFile(fileText);
+
+        if (!validation.valid) {
+          showFeedback(`${validation.error} Please use a save exported from the File Manager.`, 'error');
+          return;
+        }
+
         await handleImportSave(file);
-      } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-        // Load CSV ore data
+        return;
+      }
+
+      if (isCsv) {
         const text = await file.text();
-        
+        const validation = validateCsvStructure(text);
+
+        if (!validation.valid) {
+          showFeedback(`${validation.error}. Ensure your CSV includes all standard columns.`, 'error');
+          return;
+        }
+
         if (onImport) {
-          onImport(text);
+          await onImport(text);
           showFeedback('CSV data imported successfully!', 'success');
         }
-      } else {
-        showFeedback('Unsupported file type. Use .json or .csv files.', 'error');
+        return;
       }
+
+      showFeedback('Unsupported file type. Please select a .json save or .csv ore grid.', 'error');
     } catch (error) {
       console.error('Load error:', error);
-      showFeedback('Failed to load file', 'error');
+      showFeedback('Failed to load file. Please verify the file and try again.', 'error');
     } finally {
       setIsLoading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }

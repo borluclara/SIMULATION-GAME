@@ -883,34 +883,81 @@ function App() {
     setSaveToast(prev => ({ ...prev, show: false }));
   };
 
+  const validateLoadedGameState = (data) => {
+    if (!data || typeof data !== 'object') {
+      return { valid: false, reason: 'Save data is empty or unreadable.' };
+    }
+
+    if (!data.playerName || typeof data.playerName !== 'string' || data.playerName.trim().length === 0) {
+      return { valid: false, reason: 'Player name is missing in the save file.' };
+    }
+
+    const csvData = data.csvData;
+    const hasArrayData = Array.isArray(csvData) && csvData.length > 0;
+    const hasStringData = typeof csvData === 'string' && csvData.trim().length > 0;
+
+    if (!hasArrayData && !hasStringData) {
+      return { valid: false, reason: 'Grid data is missing in the save file.' };
+    }
+
+    return { valid: true };
+  };
+
+  const normalizeCsvData = (csvData) => {
+    if (Array.isArray(csvData) && csvData.length > 0) {
+      return csvData;
+    }
+
+    if (typeof csvData === 'string') {
+      const parsed = Papa.parse(csvData, { header: true, skipEmptyLines: true });
+
+      if (parsed.errors && parsed.errors.length > 0) {
+        throw new Error(parsed.errors[0].message || 'CSV data could not be parsed from the save file.');
+      }
+
+      if (!Array.isArray(parsed.data) || parsed.data.length === 0) {
+        throw new Error('CSV data in the save file is empty.');
+      }
+
+      return parsed.data;
+    }
+
+    throw new Error('Save file is missing recognizable CSV data.');
+  };
+
   const handleLoad = async (loadedData) => {
     try {
       setIsLoadingGrid(true);
+      const validation = validateLoadedGameState(loadedData);
+
+      if (!validation.valid) {
+        throw new Error(validation.reason);
+      }
+      
+      const normalizedCsvData = normalizeCsvData(loadedData.csvData);
       
       // Restore player name and score
       if (loadedData.playerName) setPlayerName(loadedData.playerName);
       if (typeof loadedData.score === 'number') setScore(loadedData.score);
       
       // Restore CSV data and grid
-      if (loadedData.csvData) {
-        setOriginalCsvData(loadedData.csvData);
-        setCsvData(loadedData.csvData);
-        
-        // Parse the CSV data and create grid
-        const csvString = Papa.unparse(loadedData.csvData);
+      if (normalizedCsvData) {
+        setOriginalCsvData(normalizedCsvData);
+        setCsvData(normalizedCsvData);
+
+        const csvString = Papa.unparse(normalizedCsvData);
         const grid = await parseCSVToGrid(csvString);
-        
+
         setOreGrid(grid);
         setCsvReady(true);
-        
-        // Store in game state
+
         setCurrentScenario({
-          data: loadedData.csvData,
+          data: normalizedCsvData,
           grid: grid,
           fileName: loadedData.currentScenario?.fileName || 'Loaded Save',
           uploadedAt: new Date().toISOString()
         });
-        
+
         setGrid(grid.data || grid);
       }
       
@@ -952,10 +999,10 @@ function App() {
       setIsLoadingGrid(false);
       
       // Show error message
-      setResetMessage('❌ Failed to load game. Please try again.');
+      setResetMessage(`❌ Failed to load game: ${error.message || 'Please try again.'}`);
       setTimeout(() => setResetMessage(null), 5000);
       
-      throw new Error('Failed to load game state');
+      throw new Error(error.message || 'Failed to load game state');
     }
   };
 
