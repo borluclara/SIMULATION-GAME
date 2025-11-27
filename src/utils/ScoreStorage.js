@@ -1,3 +1,5 @@
+import { getAllOreTypes } from './OreClassification.js';
+
 /**
  * ScoreStorage.js
  * In-memory storage for blast evaluation scores and history
@@ -152,12 +154,10 @@ export function getPlayerStats(playerID) {
     totalOresLost: 0,
     totalWasteInZone: 0,
     totalValueRecovered: 0,
-    byOreType: {
-      gold: { recovered: 0, lost: 0, displaced: 0 },
-      chalcopyrite: { recovered: 0, lost: 0, displaced: 0 },
-      hematite: { recovered: 0, lost: 0, displaced: 0 },
-      magnetite: { recovered: 0, lost: 0, displaced: 0 }
-    }
+    byOreType: getAllOreTypes().reduce((acc, oreType) => {
+      acc[oreType] = { recovered: 0, lost: 0, displaced: 0 };
+      return acc;
+    }, {})
   };
 
   // Sum up ore data from all blasts (if available)
@@ -170,13 +170,15 @@ export function getPlayerStats(playerID) {
 
       // Aggregate by ore type
       if (entry.blastResult.oreBreakdown) {
-        for (const oreType in oreBreakdown.byOreType) {
+        for (const oreType of Object.keys(oreBreakdown.byOreType)) {
           const oreData = entry.blastResult.oreBreakdown[oreType];
-          if (oreData) {
-            oreBreakdown.byOreType[oreType].recovered += oreData.recovered || 0;
-            oreBreakdown.byOreType[oreType].lost += oreData.lost || 0;
-            oreBreakdown.byOreType[oreType].displaced += oreData.displaced || 0;
+          if (!oreData) {
+            continue;
           }
+
+          oreBreakdown.byOreType[oreType].recovered += oreData.recovered || 0;
+          oreBreakdown.byOreType[oreType].lost += oreData.lost || 0;
+          oreBreakdown.byOreType[oreType].displaced += oreData.displaced || 0;
         }
       }
     }
