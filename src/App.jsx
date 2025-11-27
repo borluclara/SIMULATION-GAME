@@ -21,6 +21,26 @@ import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
 
+const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
+
+const normalizeHeaderValue = (value = '') => value
+  .toLowerCase()
+  .replace(/(^"|"$)/g, '')
+  .replace(/[\s_-]/g, '')
+
+const assertRequiredHeaders = (records) => {
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new Error('No ore data rows found in the provided file.')
+  }
+
+  const normalizedHeaders = Object.keys(records[0] ?? {}).map(normalizeHeaderValue)
+  const missingHeaders = REQUIRED_CSV_HEADERS.filter((header) => !normalizedHeaders.includes(normalizeHeaderValue(header)))
+
+  if (missingHeaders.length > 0) {
+    throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`)
+  }
+}
+
 function App() {
   // Use global game state instead of individual state variables
   const {
@@ -905,7 +925,9 @@ function App() {
 
   const normalizeCsvData = (csvData) => {
     if (Array.isArray(csvData) && csvData.length > 0) {
-      return csvData;
+      const filteredRecords = csvData.filter((row) => row && typeof row === 'object');
+      assertRequiredHeaders(filteredRecords);
+      return filteredRecords;
     }
 
     if (typeof csvData === 'string') {
@@ -919,6 +941,7 @@ function App() {
         throw new Error('CSV data in the save file is empty.');
       }
 
+      assertRequiredHeaders(parsed.data);
       return parsed.data;
     }
 
@@ -983,7 +1006,7 @@ function App() {
       }
       
       // Switch to game view if we have player name and CSV data
-      if (loadedData.playerName && loadedData.csvData) {
+      if (loadedData.playerName && normalizedCsvData?.length > 0) {
         setCurrentView('game');
       }
       
