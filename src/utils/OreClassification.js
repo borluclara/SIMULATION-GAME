@@ -4,33 +4,67 @@
  * Used for blast evaluation and scoring calculations
  */
 
-// Ore type constants with material properties
-const ORE_TYPES = {
-  VALUABLE: {
-    gold: { value: 100, density: 19.3, hardness: 3 },
-    chalcopyrite: { value: 40, density: 4.2, hardness: 4 },
-    hematite: { value: 50, density: 5.3, hardness: 6 },
-    magnetite: { value: 45, density: 5.2, hardness: 6 }
-  },
-  WASTE: {
-    granite: { value: 0, density: 2.6, hardness: 0 },
-    limestone: { value: 0, density: 2.7, hardness: 3 },
-    sandstone: { value: 0, density: 2.5, hardness: 6 },
-    basalt: { value: 0, density: 2.9, hardness: 6 },
-    soil: { value: 0, density: 1.3, hardness: 1.3 }
-  }
+// Canonical material definitions (single source of truth for scoring logic)
+const CANONICAL_ORE_TYPES = {
+  gold: { value: 100, density: 19.3, hardness: 3 },
+  chalcopyrite: { value: 40, density: 4.2, hardness: 4 },
+  hematite: { value: 50, density: 5.3, hardness: 6 },
+  magnetite: { value: 45, density: 5.2, hardness: 6 }
 };
+
+const CANONICAL_WASTE_TYPES = {
+  granite: { value: 0, density: 2.6, hardness: 0 },
+  limestone: { value: 0, density: 2.7, hardness: 3 },
+  sandstone: { value: 0, density: 2.5, hardness: 6 },
+  basalt: { value: 0, density: 2.9, hardness: 6 },
+  'soil/overburden': { value: 0, density: 1.3, hardness: 1.3 }
+};
+
+const ORE_TYPES = {
+  VALUABLE: CANONICAL_ORE_TYPES,
+  WASTE: CANONICAL_WASTE_TYPES
+};
+
+// Helper to normalize arbitrary aliases (spaces, punctuation, case)
+const sanitizeMaterialKey = (value = '') => value
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9]/g, '');
+
+const MATERIAL_ALIAS_LOOKUP = (() => {
+  const lookup = {};
+  const register = (alias, canonical) => {
+    lookup[sanitizeMaterialKey(alias)] = canonical;
+  };
+
+  [...Object.keys(CANONICAL_ORE_TYPES), ...Object.keys(CANONICAL_WASTE_TYPES)].forEach(material => {
+    register(material, material);
+  });
+
+  // Historical CSV aliases
+  register('soil', 'soil/overburden');
+  register('overburden', 'soil/overburden');
+  register('soiloverburden', 'soil/overburden');
+
+  // Legacy ore labels used by early prototypes
+  register('iron', 'hematite');
+  register('copper', 'chalcopyrite');
+
+  return lookup;
+})();
 
 /**
  * Normalize material name for case-insensitive matching
  * @param {string} materialName - Raw material name
  * @returns {string} - Lowercase, trimmed material name
  */
-const normalizeMaterialName = (materialName) => {
+export const normalizeMaterialName = (materialName) => {
   if (typeof materialName !== 'string') {
     return '';
   }
-  return materialName.toLowerCase().trim();
+
+  const sanitized = sanitizeMaterialKey(materialName);
+  return MATERIAL_ALIAS_LOOKUP[sanitized] || materialName.toLowerCase().trim();
 };
 
 /**
@@ -174,6 +208,7 @@ export { ORE_TYPES };
  */
 export default {
   ORE_TYPES,
+  normalizeMaterialName,
   isOre,
   isWaste,
   getOreValue,

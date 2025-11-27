@@ -13,8 +13,19 @@ import {
   getOreValue,
   getAllOreTypes,
   getAllWasteTypes,
-  getMaterialProperties
+  getMaterialProperties,
+  normalizeMaterialName
 } from './OreClassification.js';
+
+const createOreBreakdown = () => getAllOreTypes().reduce((acc, oreType) => {
+  acc[oreType] = { recovered: 0, lost: 0, displaced: 0 };
+  return acc;
+}, {});
+
+const createWasteBreakdown = () => getAllWasteTypes().reduce((acc, wasteType) => {
+  acc[wasteType] = { inZone: 0, total: 0 };
+  return acc;
+}, {});
 
 /**
  * BlastResult Class
@@ -25,22 +36,9 @@ class BlastResult {
     this.timestamp = new Date();
     this.blastId = '';  // Will be set by hash function
     
-    // Ore breakdown - tracking recovered/lost/displaced for each valuable ore type
-    this.oreBreakdown = {
-      gold: { recovered: 0, lost: 0, displaced: 0 },
-      chalcopyrite: { recovered: 0, lost: 0, displaced: 0 },
-      hematite: { recovered: 0, lost: 0, displaced: 0 },
-      magnetite: { recovered: 0, lost: 0, displaced: 0 }
-    };
-    
-    // Waste breakdown - tracking inZone/total for each waste type
-    this.wasteBreakdown = {
-      granite: { inZone: 0, total: 0 },
-      limestone: { inZone: 0, total: 0 },
-      sandstone: { inZone: 0, total: 0 },
-      basalt: { inZone: 0, total: 0 },
-      soil: { inZone: 0, total: 0 }
-    };
+    // Ore and waste breakdowns mirror canonical classification lists
+    this.oreBreakdown = createOreBreakdown();
+    this.wasteBreakdown = createWasteBreakdown();
     
     // Aggregated totals across all material types
     this.totals = {
@@ -328,8 +326,12 @@ export function countAffectedOres(blastData) {
       continue;
     }
 
-    // Normalize material name (lowercase, trim)
-    const materialName = block.oreType.toLowerCase().trim();
+    // Normalize material name to canonical key (handles aliases)
+    const materialName = normalizeMaterialName(block.oreType);
+    if (!materialName) {
+      console.warn('countAffectedOres: Unable to normalize material name for block', block);
+      continue;
+    }
 
     // Check if this is a valuable ore
     if (isOre(materialName)) {
@@ -412,7 +414,7 @@ function calculateTotals(result) {
   // Sum waste in collection zone
   const wasteTypes = getAllWasteTypes();
   for (const wasteType of wasteTypes) {
-    const wasteData = result.wasteBreakdown[wasteType];
+    const wasteData = result.wasteBreakdown[wasteType] || { inZone: 0 };
     result.totals.totalWasteInZone += wasteData.inZone || 0;
   }
 }

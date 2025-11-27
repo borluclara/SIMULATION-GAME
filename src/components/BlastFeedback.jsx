@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import './BlastFeedback.css';
 import blastHistoryStore from '../utils/BlastHistoryStore';
+import { isOre, normalizeMaterialName, getOreValue } from '../utils/OreClassification';
 
 const BlastFeedback = ({ 
   blastResults,
@@ -58,46 +59,24 @@ const BlastFeedback = ({
     }
 
     const destroyedCells = blastResults.destroyedCells || [];
-    
-    // Classify materials as ores or waste
-    const oreMaterials = ['iron', 'gold', 'copper', 'silver', 'coal', 'diamond', 'emerald'];
-    const wasteMaterials = ['stone', 'dirt', 'gravel', 'sand'];
+    const classifiedCells = destroyedCells.map(cell => {
+      const normalized = normalizeMaterialName(cell.material || '');
+      const oreMaterial = isOre(normalized);
+      return { cell, normalized, oreMaterial };
+    });
 
-    const ores = destroyedCells.filter(cell => 
-      oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
-    );
-    const waste = destroyedCells.filter(cell => 
-      wasteMaterials.some(w => (cell.material || '').toLowerCase().includes(w)) ||
-      !oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
-    );
+    const ores = classifiedCells.filter(entry => entry.oreMaterial).map(entry => entry.cell);
+    const waste = classifiedCells.filter(entry => !entry.oreMaterial).map(entry => entry.cell);
 
     const totalDestroyed = destroyedCells.length;
     const oresRecovered = ores.length;
     const wasteRecovered = waste.length;
 
     // Calculate value based on material types
-    const materialValues = {
-      'gold': 100,
-      'diamond': 150,
-      'emerald': 120,
-      'silver': 80,
-      'iron': 50,
-      'copper': 60,
-      'coal': 30,
-      'stone': -5,
-      'dirt': -3,
-      'gravel': -4,
-      'sand': -2
-    };
-
     let totalValue = 0;
-    destroyedCells.forEach(cell => {
-      const material = (cell.material || '').toLowerCase();
-      for (const [key, value] of Object.entries(materialValues)) {
-        if (material.includes(key)) {
-          totalValue += value;
-          break;
-        }
+    classifiedCells.forEach(({ normalized, oreMaterial }) => {
+      if (oreMaterial && normalized) {
+        totalValue += getOreValue(normalized);
       }
     });
 

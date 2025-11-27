@@ -12,20 +12,20 @@ The complete blast evaluation system has been successfully implemented with mult
 
 ### Files Created
 
-1. **`src/utils/OreClassification.js`** (184 lines)
-   - 4 ore types with values: Gold (100), Chalcopyrite (40), Hematite (50), Magnetite (45)
-   - 5 waste types: Granite, Limestone, Sandstone, Basalt, Soil
-   - 12 helper functions for ore/waste classification
+- **`src/utils/OreClassification.js`** (184 lines)
+  - 4 ore types with values: Gold (100), Chalcopyrite (40), Hematite (50), Magnetite (45)
+  - 5 waste types: Granite, Limestone, Sandstone, Basalt, Soil/Overburden
+  - 12 helper functions for ore/waste classification
 
-2. **`src/utils/BlastEvaluator.js`** (432 lines)
-   - BlastResult and ScoreMetrics classes
-   - 6 core evaluation functions
-   - Performance monitoring
-   - Determinism verification
+- **`src/utils/BlastEvaluator.js`** (432 lines)
+  - BlastResult and ScoreMetrics classes
+  - 6 core evaluation functions
+  - Performance monitoring
+  - Determinism verification
 
-3. **`src/utils/BlastEvaluator.test.js`** (722 lines)
-   - 47 comprehensive unit and integration tests
-   - All tests passing ✅
+- **`src/utils/BlastEvaluator.test.js`** (722 lines)
+  - 47 comprehensive unit and integration tests
+  - All tests passing ✅
 
 ---
 

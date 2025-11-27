@@ -137,8 +137,9 @@ assert(isWaste('granite') === true, "isWaste('granite') returns true");
 // Test 1.4: getOreValue() for valuable ore
 assertEquals(getOreValue('gold'), 100, "getOreValue('gold') returns 100");
 
-// Test 1.5: getOreValue() for waste
+// Test 1.5: getOreValue() for waste (alias + canonical)
 assertEquals(getOreValue('soil'), 0, "getOreValue('soil') returns 0");
+assertEquals(getOreValue('soil/overburden'), 0, "getOreValue('soil/overburden') returns 0");
 
 // Test 1.6: Case-insensitive matching
 assert(
@@ -219,7 +220,7 @@ startSuite('2. Ore Counting Tests');
     { materialType: 'granite', action: 'displaced' },
     { materialType: 'limestone', action: 'displaced' },
     { materialType: 'sandstone', action: 'displaced' },
-    { materialType: 'soil', action: 'displaced' }
+    { materialType: 'soil/overburden', action: 'displaced' }
   ]);
   const result = countAffectedOres(wasteBlast);
   
@@ -227,7 +228,7 @@ startSuite('2. Ore Counting Tests');
     result.wasteBreakdown.granite.total === 2 &&
     result.wasteBreakdown.limestone.total === 1 &&
     result.wasteBreakdown.sandstone.total === 1 &&
-    result.wasteBreakdown.soil.total === 1 &&
+    result.wasteBreakdown['soil/overburden'].total === 1 &&
     result.totals.totalWasteInZone === 0, // displaced means not in collection zone
     "Waste materials tracked correctly"
   );

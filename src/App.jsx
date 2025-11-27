@@ -20,6 +20,7 @@ import { blastAnimationEngine } from './utils/BlastAnimationEngine'
 import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
+import { isOre, normalizeMaterialName, getOreValue } from './utils/OreClassification'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -401,40 +402,32 @@ function App() {
       const scoreIncrease = materialsDestroyed * 10; // 10 points per material destroyed
       addScore(scoreIncrease);
       
-      // Calculate highlighted cells for visual feedback
-      const oreMaterials = ['iron', 'gold', 'copper', 'silver', 'coal', 'diamond', 'emerald'];
-      const wasteMaterials = ['stone', 'dirt', 'gravel', 'sand'];
-      
-      const recoveredOres = result.destroyedCells.filter(cell => 
-        oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
-      );
-      
-      const lostWaste = result.destroyedCells.filter(cell => 
-        wasteMaterials.some(w => (cell.material || '').toLowerCase().includes(w)) ||
-        !oreMaterials.some(ore => (cell.material || '').toLowerCase().includes(ore))
-      );
+        const destroyedCells = result.destroyedCells || [];
+        const classifiedCells = destroyedCells.map(cell => {
+          const normalized = normalizeMaterialName(cell.material || '');
+          const oreMaterial = isOre(normalized);
+          return { cell, normalized, oreMaterial };
+        });
 
-      // Calculate material value
-      const materialValues = {
-        'gold': 100, 'diamond': 150, 'emerald': 120, 'silver': 80,
-        'iron': 50, 'copper': 60, 'coal': 30,
-        'stone': -5, 'dirt': -3, 'gravel': -4, 'sand': -2
-      };
-
-      let totalValue = 0;
-      const materialBreakdown = {};
-      
-      result.destroyedCells.forEach(cell => {
-        const material = (cell.material || '').toLowerCase();
-        materialBreakdown[material] = (materialBreakdown[material] || 0) + 1;
+        const recoveredOres = classifiedCells
+          .filter(({ oreMaterial }) => oreMaterial)
+          .map(({ cell }) => cell);
         
-        for (const [key, value] of Object.entries(materialValues)) {
-          if (material.includes(key)) {
-            totalValue += value;
-            break;
+        const lostWaste = classifiedCells
+          .filter(({ oreMaterial }) => !oreMaterial)
+          .map(({ cell }) => cell);
+        
+        let totalValue = 0;
+        const materialBreakdown = {};
+        
+        classifiedCells.forEach(({ normalized, oreMaterial }) => {
+          const key = normalized || 'unknown';
+          materialBreakdown[key] = (materialBreakdown[key] || 0) + 1;
+          
+          if (oreMaterial && normalized) {
+            totalValue += getOreValue(normalized);
           }
-        }
-      });
+        });
 
       // Calculate performance metrics
       const oresRecovered = recoveredOres.length;

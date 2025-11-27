@@ -41,7 +41,7 @@ const SCENARIOS = [
  */
 function generateBlastData(blockCount, oreRatio = 0.5) {
   const oreTypes = ['gold', 'chalcopyrite', 'hematite', 'magnetite'];
-  const wasteTypes = ['granite', 'limestone', 'sandstone', 'basalt', 'soil'];
+  const wasteTypes = ['granite', 'limestone', 'sandstone', 'basalt', 'soil/overburden'];
   
   const blocks = [];
   const gridSize = Math.ceil(Math.sqrt(blockCount));
