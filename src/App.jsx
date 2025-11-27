@@ -24,6 +24,26 @@ import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
 
+const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
+
+const normalizeHeaderValue = (value = '') => value
+  .toLowerCase()
+  .replace(/(^"|"$)/g, '')
+  .replace(/[\s_-]/g, '')
+
+const assertRequiredHeaders = (records) => {
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new Error('No ore data rows found in the provided file.')
+  }
+
+  const normalizedHeaders = Object.keys(records[0] ?? {}).map(normalizeHeaderValue)
+  const missingHeaders = REQUIRED_CSV_HEADERS.filter((header) => !normalizedHeaders.includes(normalizeHeaderValue(header)))
+
+  if (missingHeaders.length > 0) {
+    throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`)
+  }
+}
+
 function App() {
   // Use global game state instead of individual state variables
   const {
@@ -1059,6 +1079,51 @@ function App() {
     setSaveToast(prev => ({ ...prev, show: false }));
   };
 
+  const validateLoadedGameState = (data) => {
+    if (!data || typeof data !== 'object') {
+      return { valid: false, reason: 'Save data is empty or unreadable.' };
+    }
+
+    if (!data.playerName || typeof data.playerName !== 'string' || data.playerName.trim().length === 0) {
+      return { valid: false, reason: 'Player name is missing in the save file.' };
+    }
+
+    const csvData = data.csvData;
+    const hasArrayData = Array.isArray(csvData) && csvData.length > 0;
+    const hasStringData = typeof csvData === 'string' && csvData.trim().length > 0;
+
+    if (!hasArrayData && !hasStringData) {
+      return { valid: false, reason: 'Grid data is missing in the save file.' };
+    }
+
+    return { valid: true };
+  };
+
+  const normalizeCsvData = (csvData) => {
+    if (Array.isArray(csvData) && csvData.length > 0) {
+      const filteredRecords = csvData.filter((row) => row && typeof row === 'object');
+      assertRequiredHeaders(filteredRecords);
+      return filteredRecords;
+    }
+
+    if (typeof csvData === 'string') {
+      const parsed = Papa.parse(csvData, { header: true, skipEmptyLines: true });
+
+      if (parsed.errors && parsed.errors.length > 0) {
+        throw new Error(parsed.errors[0].message || 'CSV data could not be parsed from the save file.');
+      }
+
+      if (!Array.isArray(parsed.data) || parsed.data.length === 0) {
+        throw new Error('CSV data in the save file is empty.');
+      }
+
+      assertRequiredHeaders(parsed.data);
+      return parsed.data;
+    }
+
+    throw new Error('Save file is missing recognizable CSV data.');
+  };
+
   const handleLoad = async (loadedData) => {
     try {
       setIsLoadingGrid(true);
@@ -1066,31 +1131,36 @@ function App() {
       if (replayStatus !== 'idle') {
         stopReplay();
       }
+      const validation = validateLoadedGameState(loadedData);
+
+      if (!validation.valid) {
+        throw new Error(validation.reason);
+      }
+      
+      const normalizedCsvData = normalizeCsvData(loadedData.csvData);
       
       // Restore player name and score
       if (loadedData.playerName) setPlayerName(loadedData.playerName);
       if (typeof loadedData.score === 'number') setScore(loadedData.score);
       
       // Restore CSV data and grid
-      if (loadedData.csvData) {
-        setOriginalCsvData(loadedData.csvData);
-        setCsvData(loadedData.csvData);
-        
-        // Parse the CSV data and create grid
-        const csvString = Papa.unparse(loadedData.csvData);
+      if (normalizedCsvData) {
+        setOriginalCsvData(normalizedCsvData);
+        setCsvData(normalizedCsvData);
+
+        const csvString = Papa.unparse(normalizedCsvData);
         const grid = await parseCSVToGrid(csvString);
-        
+
         setOreGrid(grid);
         setCsvReady(true);
-        
-        // Store in game state
+
         setCurrentScenario({
-          data: loadedData.csvData,
+          data: normalizedCsvData,
           grid: grid,
           fileName: loadedData.currentScenario?.fileName || 'Loaded Save',
           uploadedAt: new Date().toISOString()
         });
-        
+
         setGrid(grid.data || grid);
         replayManager.startSession({
           playerName: loadedData.playerName || playerName || 'Loaded Player',
@@ -1121,7 +1191,7 @@ function App() {
       }
       
       // Switch to game view if we have player name and CSV data
-      if (loadedData.playerName && loadedData.csvData) {
+      if (loadedData.playerName && normalizedCsvData?.length > 0) {
         setCurrentView('game');
       }
       
@@ -1137,10 +1207,10 @@ function App() {
       setIsLoadingGrid(false);
       
       // Show error message
-      setResetMessage('❌ Failed to load game. Please try again.');
+      setResetMessage(`❌ Failed to load game: ${error.message || 'Please try again.'}`);
       setTimeout(() => setResetMessage(null), 5000);
       
-      throw new Error('Failed to load game state');
+      throw new Error(error.message || 'Failed to load game state');
     }
   };
 
