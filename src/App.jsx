@@ -676,7 +676,7 @@ function App() {
             }, 500);
 
             // Trigger immediate auto-save once the blast fully completes
-            handleAutoSave(roundNumberForAutoSave);
+            handleAutoSave(roundNumberForAutoSave, totalScoreAfterBlast);
 
             // If physics is not running, finalize replay immediately
             if (!result.destroyedCells?.length || !canvasRef.current) {
@@ -883,7 +883,8 @@ function App() {
       reason = 'manual',
       silent = false,
       autoSaveRound = null,
-      autoSaveLabel = customName
+      autoSaveLabel = customName,
+      scoreOverride = null
     } = options;
 
     try {
@@ -892,7 +893,7 @@ function App() {
       // Collect comprehensive game state
       const gameData = {
         playerName,
-        score,
+        score: typeof scoreOverride === 'number' ? scoreOverride : score,
         currentScenario,
         blasts,
         originalCsvData,
@@ -1047,7 +1048,7 @@ function App() {
   };
 
   // Auto-save functionality (can be called after significant game events)
-  const handleAutoSave = async (roundNumber = null) => {
+  const handleAutoSave = async (roundNumber = null, scoreOverride = null) => {
     if (csvReady && playerName && oreGrid) {
       const autoSaveLabel = roundNumber
         ? `Auto-Save – Round ${roundNumber}`
@@ -1058,7 +1059,8 @@ function App() {
           reason: 'auto',
           silent: true,
           autoSaveRound: roundNumber,
-          autoSaveLabel
+          autoSaveLabel,
+          scoreOverride
         });
       } catch (error) {
         // Auto-save failures should not interrupt gameplay
