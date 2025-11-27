@@ -23,6 +23,7 @@ import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
+import { storeScore, getRecentScores, initializeScoreStorage } from './utils/ScoreStorage'
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
 
@@ -71,6 +72,8 @@ function App() {
   const [oreGrid, setOreGrid] = useState(null) // Add grid state for canvas
   const [isLoadingGrid, setIsLoadingGrid] = useState(false)
   const [csvReady, setCsvReady] = useState(false) // Track if CSV is loaded and ready
+  const [leaderboardEntries, setLeaderboardEntries] = useState([])
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true)
   
   // Blast simulation state
   const [blastPower, setBlastPower] = useState(500)
@@ -181,6 +184,32 @@ function App() {
     setCameraShake
   });
   const isReplayActive = replayStatus !== 'idle';
+
+  useEffect(() => {
+    let isMounted = true;
+    initializeScoreStorage()
+      .then(() => {
+        if (isMounted) {
+          setLeaderboardEntries(getRecentScores(5));
+        }
+      })
+      .catch((error) => {
+        console.warn('Leaderboard initialization failed:', error);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingLeaderboard(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const refreshLeaderboardFromMemory = useCallback(() => {
+    setLeaderboardEntries(getRecentScores(5));
+  }, []);
 
   // Initialize blast history store when player name changes
   useEffect(() => {
@@ -486,6 +515,14 @@ function App() {
     ? activeReplayEvent.scoreBefore
     : previousScore
 
+  const formatLeaderboardTimestamp = (value) => {
+    if (!value) {
+      return 'Just now';
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Just now' : date.toLocaleString();
+  };
+
   const handleBlockClick = (block, position) => {
     if (isReplayActive) {
       console.warn('Replay in progress: grid interactions are disabled.');
@@ -576,6 +613,27 @@ function App() {
         cellsAffected: result.affectedCells?.length || 0,
         materialBreakdown
       });
+
+      const leaderboardPlayer = (playerName && playerName.trim()) || 'Anonymous Miner';
+      const blastHash = `blast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const scoreMetricsSnapshot = {
+        totalScore: totalScoreAfterBlast,
+        scoreDelta: scoreIncrease,
+        recoveryRate: recovery,
+        dilutionRate: dilution,
+        efficiency
+      };
+
+      storeScore(leaderboardPlayer, scoreMetricsSnapshot, blastHash, {
+        totals: {
+          totalOresRecovered: oresRecovered,
+          totalOresLost: wasteCollected,
+          totalWasteInZone: wasteCollected,
+          totalValueRecovered: Math.max(0, totalValue)
+        },
+        materialBreakdown
+      });
+      refreshLeaderboardFromMemory();
 
       const roundNumberForAutoSave = blastRecord?.round || blastHistoryStore.getCurrentRound();
 
@@ -1622,9 +1680,48 @@ function App() {
       {currentView === 'game' && renderGameView()}
       {currentView === 'leaderboard' && (
         <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Leaderboard</h2>
-            <p>Coming soon...</p>
+          <div className="bg-[rgba(0,0,0,0.55)] backdrop-blur-lg rounded-2xl p-6 w-full max-w-3xl mx-4 shadow-2xl border border-white/10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Leaderboard</h2>
+              <button
+                className="px-3 py-1 text-sm rounded-md border border-white/20 hover:border-white/40 transition"
+                onClick={refreshLeaderboardFromMemory}
+                disabled={isLoadingLeaderboard}
+              >
+                Refresh
+              </button>
+            </div>
+            {isLoadingLeaderboard ? (
+              <p className="text-sm text-gray-300">Loading saved scores…</p>
+            ) : leaderboardEntries.length === 0 ? (
+              <div className="text-center py-10 text-gray-300">
+                <p className="text-lg font-semibold">No blasts recorded yet.</p>
+                <p className="text-sm mt-2">Complete a blast to appear on this board.</p>
+              </div>
+            ) : (
+              <ol className="space-y-3">
+                {leaderboardEntries.map((entry, index) => (
+                  <li
+                    key={entry.blastHash || `${entry.playerID || 'anon'}-${index}`}
+                    className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/10"
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="text-xl font-bold text-blue-300">#{index + 1}</span>
+                      <div>
+                        <p className="font-semibold">{entry.playerID || 'Anonymous Miner'}</p>
+                        <p className="text-xs text-gray-300">{formatLeaderboardTimestamp(entry.timestamp)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold">{Math.round(entry.scoreMetrics?.totalScore ?? 0)} pts</p>
+                      <p className="text-xs text-gray-300">
+                        Δ {Math.round(entry.scoreMetrics?.scoreDelta ?? 0)} · Rec {entry.scoreMetrics?.recoveryRate ?? 0}% · Dil {entry.scoreMetrics?.dilutionRate ?? 0}%
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         </div>
       )}
