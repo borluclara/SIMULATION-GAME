@@ -4,8 +4,7 @@ import './LeaderboardPanel.css';
 
 const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   const { history, sessionStats, refresh, store } = useBlastHistory();
-  const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent'
-  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'mine' | 'recent'
+  const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent' | 'mine'
   const [allowSampleData, setAllowSampleData] = useState(true);
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -44,19 +43,19 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   }, [formattedEntries, sortMode]);
 
   const displayEntries = useMemo(() => {
-    if (filterMode === 'mine') {
+    if (sortMode === 'mine') {
       const mine = sortedEntries.filter((entry) =>
         entry.playerName.toLowerCase() === playerName.toLowerCase()
       );
       return mine.length > 0 ? mine : [];
     }
 
-    if (filterMode === 'recent') {
+    if (sortMode === 'recent') {
       return sortedEntries.slice(0, 10);
     }
 
     return sortedEntries;
-  }, [sortedEntries, filterMode, playerName]);
+  }, [sortedEntries, sortMode, playerName]);
 
   const medalMap = useMemo(() => {
     const podium = [...formattedEntries]
@@ -98,17 +97,7 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
               <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
                 <option value="score">Highest Score</option>
                 <option value="recent">Most Recent</option>
-              </select>
-              <span className="select-caret" aria-hidden="true">▼</span>
-            </div>
-          </label>
-
-          <label className="select-field" aria-label="Filter leaderboard">
-            <div className="select-wrapper">
-              <select value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
-                <option value="all">All Scores</option>
                 <option value="mine">My Scores Only</option>
-                <option value="recent">Recent 10</option>
               </select>
               <span className="select-caret" aria-hidden="true">▼</span>
             </div>
@@ -198,7 +187,7 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
               <button
                 type="button"
                 className="danger"
-                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setFilterMode, setSortMode })}
+                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setSortMode })}
                 disabled={isResetting}
               >
                 {isResetting ? 'Clearing…' : 'Confirm Reset'}
@@ -414,13 +403,12 @@ function buildAvatarSprites() {
   });
 }
 
-const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setFilterMode, setSortMode }) => {
+const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setSortMode }) => {
   setIsResetting(true);
   try {
     store?.clearHistory?.();
     refresh();
     setAllowSampleData(false);
-    setFilterMode('all');
     setSortMode('score');
   } finally {
     setIsResetting(false);
