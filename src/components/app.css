@@ -249,11 +249,18 @@
   align-items: center;
   justify-content: center;
   transition: border-color 0.2s ease, transform 0.15s ease;
+  margin-right: 170px;
 }
 
 .leaderboard-link-button:hover {
   border-color: #38e07b;
   transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .leaderboard-link-button {
+    margin-right: 0;
+  }
 }
 
 /* Material Icons */

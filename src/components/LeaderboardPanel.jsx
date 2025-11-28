@@ -5,7 +5,6 @@ import './LeaderboardPanel.css';
 const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   const { history, sessionStats, refresh, store } = useBlastHistory();
   const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent' | 'mine'
-  const [allowSampleData, setAllowSampleData] = useState(true);
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -15,23 +14,10 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
     return () => clearInterval(intervalId);
   }, [refresh]);
 
-  useEffect(() => {
-    if (history && history.length > 0 && allowSampleData) {
-      setAllowSampleData(false);
-    }
-  }, [history, allowSampleData]);
-
   const formattedEntries = useMemo(() => {
-    const hasHistory = history && history.length > 0;
-    const shouldUseSample = !hasHistory && allowSampleData;
-    const source = hasHistory
-      ? history
-      : shouldUseSample
-        ? buildSampleEntries(playerName)
-        : [];
-
+    const source = Array.isArray(history) ? history : [];
     return source.map((record, index) => formatRecord(record, index, playerName));
-  }, [history, playerName, allowSampleData]);
+  }, [history, playerName]);
   const sortedEntries = useMemo(() => {
     const entries = [...formattedEntries];
 
@@ -187,7 +173,7 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
               <button
                 type="button"
                 className="danger"
-                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setSortMode })}
+                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setSortMode })}
                 disabled={isResetting}
               >
                 {isResetting ? 'Clearing…' : 'Confirm Reset'}
@@ -300,73 +286,32 @@ const buildSummary = (sessionStats, entries) => {
   }
 
   const rounds = entries.length;
-  const averageRecovery = rounds > 0
-    ? Math.round(entries.reduce((sum, entry) => sum + entry.recoveryRate, 0) / rounds)
-    : 0;
-  const averageDilution = rounds > 0
-    ? Math.round(entries.reduce((sum, entry) => sum + entry.dilutionRate, 0) / rounds)
-    : 0;
-  const totalRecovered = entries.reduce((sum, entry) => sum + (Number(entry.recovered) || 0), 0);
+
+  if (rounds > 0) {
+    const averageRecovery = Math.round(entries.reduce((sum, entry) => sum + entry.recoveryRate, 0) / rounds);
+    const averageDilution = Math.round(entries.reduce((sum, entry) => sum + entry.dilutionRate, 0) / rounds);
+    const totalRecovered = entries.reduce((sum, entry) => sum + (Number(entry.recovered) || 0), 0);
+
+    return {
+      title: 'Recorded History',
+      subtitle: `${rounds} stored rounds`,
+      totalScore: entries[0]?.score || 0,
+      totalRounds: rounds,
+      averageRecovery,
+      averageDilution,
+      totalRecovered: totalRecovered.toLocaleString('en-US')
+    };
+  }
 
   return {
-    title: 'Sample Season',
-    subtitle: rounds > 0 ? `${rounds} exhibition rounds` : 'Play a round to populate data',
-    totalScore: entries[0]?.score || 0,
-    totalRounds: rounds,
-    averageRecovery,
-    averageDilution,
-    totalRecovered: totalRecovered.toLocaleString('en-US')
+    title: 'No Results Yet',
+    subtitle: 'Play a round to populate the leaderboard',
+    totalScore: 0,
+    totalRounds: 0,
+    averageRecovery: 0,
+    averageDilution: 0,
+    totalRecovered: '0'
   };
-};
-
-const buildSampleEntries = (activePlayerName) => {
-  const now = Date.now();
-  return [
-    {
-      playerName: activePlayerName || 'Avery Stone',
-      totalScore: 98000,
-      recovery: 94,
-      dilution: 4,
-      oresRecovered: 188,
-      wasteCollected: 8,
-      cellsDestroyed: 46,
-      grade: 'A',
-      timestamp: new Date(now - 6 * 60 * 60 * 1000)
-    },
-    {
-      playerName: 'Milo Quartz',
-      totalScore: 87500,
-      recovery: 90,
-      dilution: 6,
-      oresRecovered: 172,
-      wasteCollected: 12,
-      cellsDestroyed: 58,
-      grade: 'A',
-      timestamp: new Date(now - 32 * 60 * 60 * 1000)
-    },
-    {
-      playerName: 'Rhea Nova',
-      totalScore: 74100,
-      recovery: 82,
-      dilution: 9,
-      oresRecovered: 146,
-      wasteCollected: 18,
-      cellsDestroyed: 61,
-      grade: 'B',
-      timestamp: new Date(now - 3 * 24 * 60 * 60 * 1000)
-    },
-    {
-      playerName: 'Lena Forge',
-      totalScore: 68940,
-      recovery: 78,
-      dilution: 12,
-      oresRecovered: 129,
-      wasteCollected: 24,
-      cellsDestroyed: 58,
-      grade: 'B',
-      timestamp: new Date(now - 5 * 24 * 60 * 60 * 1000)
-    }
-  ];
 };
 
 const sumMaterialBreakdown = (breakdown) => {
@@ -403,12 +348,11 @@ function buildAvatarSprites() {
   });
 }
 
-const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setSortMode }) => {
+const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setSortMode }) => {
   setIsResetting(true);
   try {
     store?.clearHistory?.();
     refresh();
-    setAllowSampleData(false);
     setSortMode('score');
   } finally {
     setIsResetting(false);
