@@ -5,7 +5,7 @@
  * Provides easy access to blast records and session statistics
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import blastHistoryStore from '../utils/BlastHistoryStore';
 
 export const useBlastHistory = () => {
@@ -14,16 +14,16 @@ export const useBlastHistory = () => {
   const [currentRound, setCurrentRound] = useState(0);
 
   // Force update by creating a refresh function
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setHistory(blastHistoryStore.getAllRecords());
     setSessionStats(blastHistoryStore.getSessionStats());
     setCurrentRound(blastHistoryStore.getCurrentRound());
-  };
+  }, []);
 
   useEffect(() => {
     // Initial load
     refresh();
-  }, []);
+  }, [refresh]);
 
   return {
     // Data

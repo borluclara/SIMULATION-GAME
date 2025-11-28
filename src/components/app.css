@@ -202,6 +202,11 @@
   gap: 0.25rem;
   padding: 0.5rem;
   border-radius: 0.5rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -218,6 +223,12 @@
   color: #38e07b;
 }
 
+.nav-item:disabled,
+.nav-item[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .nav-icon {
   font-size: 1.5rem;
 }
@@ -225,6 +236,24 @@
 .nav-text {
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.leaderboard-link-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(56, 224, 123, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.leaderboard-link-button:hover {
+  border-color: #38e07b;
+  transform: translateY(-1px);
 }
 
 /* Material Icons */

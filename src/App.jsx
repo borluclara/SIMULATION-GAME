@@ -13,6 +13,7 @@ import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
 import SaveLoadPanel from './components/SaveLoadPanel'
 import SaveToast from './components/SaveToast'
+import LeaderboardPanel from './components/LeaderboardPanel'
 import { parseCSVToGrid, OreGrid as OreGridClass, OreBlock } from './utils/OreGrid'
 import { serializeGrid } from './utils/GridSerializer'
 import { useGameState } from './hooks/useGameState'
@@ -1440,6 +1441,14 @@ function App() {
               Start Simulation
             </button>
           )}
+
+          <button
+            className="blast-button secondary-button"
+            type="button"
+            onClick={() => setCurrentView('leaderboard')}
+          >
+            View Leaderboard
+          </button>
         </div>
 
         {csvReady && (
@@ -1470,7 +1479,14 @@ function App() {
               </svg>
             </button>
             <h1 className="text-xl font-bold text-white dark:text-white text-center">Blast Simulation</h1>
-            <div className="size-10"></div>
+            <button
+              type="button"
+              className="leaderboard-link-button"
+              onClick={() => setCurrentView('leaderboard')}
+              aria-label="Open leaderboard"
+            >
+              <span className="material-symbols-outlined">leaderboard</span>
+            </button>
           </div>
           <p className="text-lg font-medium text-white dark:text-white mt-4">
             Welcome, {playerName}! | Score: {displayScore}
@@ -1619,12 +1635,10 @@ function App() {
       {currentView === 'home' && renderHomeView()}
       {currentView === 'game' && renderGameView()}
       {currentView === 'leaderboard' && (
-        <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Leaderboard</h2>
-            <p>Coming soon...</p>
-          </div>
-        </div>
+        <LeaderboardPanel
+          playerName={playerName}
+          onBack={() => setCurrentView(csvReady ? 'game' : 'home')}
+        />
       )}
       {currentView === 'help' && (
         <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
