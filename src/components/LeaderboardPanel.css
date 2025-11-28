@@ -115,21 +115,21 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-.scores-toggle {
+.reset-button {
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  color: #fff;
+  background: rgba(244, 94, 94, 0.1);
+  color: #ffb5b5;
   font-weight: 600;
-  padding: 0.75rem 1.2rem;
-  min-width: 200px;
+  padding: 0.75rem 1.4rem;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  min-width: 180px;
 }
 
-.scores-toggle.active {
-  background: rgba(56, 224, 123, 0.18);
-  border-color: var(--lb-border);
+.reset-button:hover {
+  border-color: rgba(244, 94, 94, 0.6);
+  color: #ffd3d3;
 }
 
 .leaderboard-list {
@@ -303,7 +303,7 @@
     align-items: stretch;
   }
 
-  .scores-toggle {
+  .reset-button {
     width: 100%;
   }
 
@@ -321,4 +321,66 @@
     width: 100%;
     text-align: left;
   }
+}
+
+.leaderboard-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1.5rem;
+}
+
+.leaderboard-modal {
+  background: #0f1b16;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.leaderboard-modal h2 {
+  margin: 0 0 0.5rem;
+}
+
+.leaderboard-modal p {
+  margin: 0 0 1.5rem;
+  color: var(--lb-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.modal-actions button {
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.modal-actions .secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.modal-actions .danger {
+  background: rgba(244, 94, 94, 0.2);
+  border-color: rgba(244, 94, 94, 0.5);
+  color: #ffb5b5;
+}
+
+.modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

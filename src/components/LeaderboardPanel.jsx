@@ -3,9 +3,12 @@ import useBlastHistory from '../hooks/useBlastHistory';
 import './LeaderboardPanel.css';
 
 const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
-  const { history, sessionStats, refresh } = useBlastHistory();
-  const [showMineOnly, setShowMineOnly] = useState(false);
+  const { history, sessionStats, refresh, store } = useBlastHistory();
   const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent'
+  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'mine' | 'recent'
+  const [allowSampleData, setAllowSampleData] = useState(true);
+  const [isResetDialogOpen, setResetDialogOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     refresh();
@@ -13,13 +16,23 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
     return () => clearInterval(intervalId);
   }, [refresh]);
 
+  useEffect(() => {
+    if (history && history.length > 0 && allowSampleData) {
+      setAllowSampleData(false);
+    }
+  }, [history, allowSampleData]);
+
   const formattedEntries = useMemo(() => {
-    const source = history && history.length > 0
+    const hasHistory = history && history.length > 0;
+    const shouldUseSample = !hasHistory && allowSampleData;
+    const source = hasHistory
       ? history
-      : buildSampleEntries(playerName);
+      : shouldUseSample
+        ? buildSampleEntries(playerName)
+        : [];
 
     return source.map((record, index) => formatRecord(record, index, playerName));
-  }, [history, playerName]);
+  }, [history, playerName, allowSampleData]);
   const sortedEntries = useMemo(() => {
     const entries = [...formattedEntries];
 
@@ -31,15 +44,19 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   }, [formattedEntries, sortMode]);
 
   const displayEntries = useMemo(() => {
-    if (showMineOnly) {
+    if (filterMode === 'mine') {
       const mine = sortedEntries.filter((entry) =>
         entry.playerName.toLowerCase() === playerName.toLowerCase()
       );
-      return mine.length > 0 ? mine : sortedEntries;
+      return mine.length > 0 ? mine : [];
+    }
+
+    if (filterMode === 'recent') {
+      return sortedEntries.slice(0, 10);
     }
 
     return sortedEntries;
-  }, [sortedEntries, showMineOnly, playerName]);
+  }, [sortedEntries, filterMode, playerName]);
 
   const medalMap = useMemo(() => {
     const podium = [...formattedEntries]
@@ -86,13 +103,23 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
             </div>
           </label>
 
+          <label className="select-field" aria-label="Filter leaderboard">
+            <div className="select-wrapper">
+              <select value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
+                <option value="all">All Scores</option>
+                <option value="mine">My Scores Only</option>
+                <option value="recent">Recent 10</option>
+              </select>
+              <span className="select-caret" aria-hidden="true">▼</span>
+            </div>
+          </label>
+
           <button
             type="button"
-            className={`scores-toggle ${showMineOnly ? 'active' : ''}`}
-            onClick={() => setShowMineOnly((prev) => !prev)}
-            aria-pressed={showMineOnly}
+            className="reset-button"
+            onClick={() => setResetDialogOpen(true)}
           >
-            Show My Scores Only
+            Reset Leaderboard
           </button>
         </div>
       </section>
@@ -158,6 +185,28 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
           );})}
         </ul>
       </section>
+
+      {isResetDialogOpen && (
+        <div className="leaderboard-modal-overlay" role="dialog" aria-modal="true" aria-label="Confirm leaderboard reset">
+          <div className="leaderboard-modal">
+            <h2>Reset Leaderboard?</h2>
+            <p>This will remove all locally stored scores. This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setResetDialogOpen(false)} disabled={isResetting}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setFilterMode, setSortMode })}
+                disabled={isResetting}
+              >
+                {isResetting ? 'Clearing…' : 'Confirm Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -364,6 +413,20 @@ function buildAvatarSprites() {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   });
 }
+
+const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setAllowSampleData, setFilterMode, setSortMode }) => {
+  setIsResetting(true);
+  try {
+    store?.clearHistory?.();
+    refresh();
+    setAllowSampleData(false);
+    setFilterMode('all');
+    setSortMode('score');
+  } finally {
+    setIsResetting(false);
+    setResetDialogOpen(false);
+  }
+};
 
 function buildMedalImages() {
   const encode = (svg) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
