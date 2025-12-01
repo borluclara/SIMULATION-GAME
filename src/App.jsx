@@ -24,6 +24,7 @@ import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
+import { storeScore } from './utils/ScoreStorage'
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
 
@@ -576,6 +577,37 @@ function App() {
         cellsDestroyed: materialsDestroyed,
         cellsAffected: result.affectedCells?.length || 0,
         materialBreakdown
+      });
+
+      const leaderboardPlayer = playerName?.trim() || 'Anonymous Miner';
+      const leaderboardEntryId = `blast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const grade = totalScoreAfterBlast >= 90
+        ? 'A'
+        : totalScoreAfterBlast >= 75
+          ? 'B'
+          : totalScoreAfterBlast >= 60
+            ? 'C'
+            : totalScoreAfterBlast >= 50
+              ? 'D'
+              : 'F';
+
+      storeScore(leaderboardPlayer, {
+        totalScore: totalScoreAfterBlast,
+        scoreDelta: scoreIncrease,
+        recoveryRate: recovery,
+        dilutionRate: dilution,
+        efficiency,
+        grade
+      }, leaderboardEntryId, {
+        totals: {
+          totalOresRecovered: oresRecovered,
+          totalOresLost: wasteCollected,
+          totalWasteInZone: wasteCollected,
+          totalValueRecovered: Math.max(0, totalValue)
+        },
+        materialBreakdown,
+        cellsDestroyed: materialsDestroyed,
+        cellsAffected: result.affectedCells?.length || 0
       });
 
       const roundNumberForAutoSave = blastRecord?.round || blastHistoryStore.getCurrentRound();

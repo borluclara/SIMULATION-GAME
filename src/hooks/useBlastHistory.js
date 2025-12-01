@@ -7,6 +7,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import blastHistoryStore from '../utils/BlastHistoryStore';
+import {
+  getRecentScores,
+  initializeScoreStorage,
+  clearPersistentScoreStorage
+} from '../utils/ScoreStorage';
 
 export const useBlastHistory = () => {
   const [history, setHistory] = useState([]);
@@ -15,10 +20,25 @@ export const useBlastHistory = () => {
 
   // Force update by creating a refresh function
   const refresh = useCallback(() => {
-    setHistory(blastHistoryStore.getAllRecords());
+    initializeScoreStorage()
+      .then(() => {
+        setHistory(getRecentScores(50));
+      })
+      .catch((error) => {
+        console.warn('Leaderboard: failed to load persisted scores, using in-memory snapshot.', error);
+        setHistory(getRecentScores(50));
+      });
+
     setSessionStats(blastHistoryStore.getSessionStats());
     setCurrentRound(blastHistoryStore.getCurrentRound());
   }, []);
+
+  const clearLeaderboardStorage = useCallback(async () => {
+    blastHistoryStore.clearHistory();
+    await clearPersistentScoreStorage();
+    setHistory([]);
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     // Initial load
@@ -42,7 +62,11 @@ export const useBlastHistory = () => {
     exportSessionData: () => blastHistoryStore.exportSessionData(),
     
     // Store instance (for advanced usage)
-    store: blastHistoryStore
+    store: {
+      ...blastHistoryStore,
+      clearHistory: clearLeaderboardStorage
+    },
+    clearLeaderboardStorage
   };
 };
 

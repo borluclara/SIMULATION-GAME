@@ -1,5 +1,16 @@
 import { getAllOreTypes } from './OreClassification.js';
 
+const hasWindow = typeof window !== 'undefined';
+const hasIndexedDB = hasWindow && typeof window.indexedDB !== 'undefined';
+const hasLocalStorage = hasWindow && typeof window.localStorage !== 'undefined';
+
+const DB_NAME = 'BlastLeaderboard';
+const DB_VERSION = 1;
+const STORE_NAME = 'scoreHistory';
+const STORE_KEY = 'scores';
+const LOCAL_STORAGE_KEY = 'blastScoreHistory';
+const PERSISTED_SCORE_LIMIT = 50;
+
 /**
  * ScoreStorage.js
  * In-memory storage for blast evaluation scores and history
@@ -18,11 +29,224 @@ import { getAllOreTypes } from './OreClassification.js';
  * - blastResult: Optional BlastResult object with detailed ore/waste breakdown
  */
 const scoreHistory = [];
+const persistenceLayer = createPersistenceLayer();
+let initializationPromise = loadFromPersistence();
 
 /**
  * Maximum number of scores to keep in memory
  */
 const MAX_HISTORY_SIZE = 100;
+
+function createPersistenceLayer() {
+  if (hasIndexedDB) {
+    return createIndexedDBLayer();
+  }
+
+  if (hasLocalStorage) {
+    return createLocalStorageLayer();
+  }
+
+  return null;
+}
+
+function createIndexedDBLayer() {
+  const openDatabase = () => new Promise((resolve, reject) => {
+    try {
+      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    } catch (error) {
+      reject(error);
+    }
+  });
+
+  const loadScoresSafe = async () => {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(STORE_KEY);
+
+      request.onsuccess = () => {
+        resolve(request.result?.entries || []);
+      };
+
+      request.onerror = () => reject(request.error);
+
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error('IndexedDB read failed'));
+      };
+    });
+  };
+
+  const saveScoresSafe = async (entries) => {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put({ entries }, STORE_KEY);
+
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error('IndexedDB write failed'));
+      };
+    });
+  };
+
+  const clearScoresSafe = async () => {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(STORE_KEY);
+
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error('IndexedDB delete failed'));
+      };
+    });
+  };
+
+  return {
+    type: 'indexedDB',
+    loadScoresSafe,
+    saveScoresSafe,
+    clearScoresSafe
+  };
+}
+
+function createLocalStorageLayer() {
+  return {
+    type: 'localStorage',
+    async loadScoresSafe() {
+      try {
+        const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!raw) {
+          return [];
+        }
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.warn('ScoreStorage: failed to parse localStorage payload, clearing it.', error);
+        window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+        return [];
+      }
+    },
+    async saveScoresSafe(entries) {
+      try {
+        window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+      } catch (error) {
+        console.warn('ScoreStorage: localStorage write failed, continuing in-memory only.', error);
+      }
+    },
+    async clearScoresSafe() {
+      try {
+        window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+      } catch (error) {
+        console.warn('ScoreStorage: unable to clear localStorage payload.', error);
+      }
+    }
+  };
+}
+
+async function loadFromPersistence() {
+  if (!persistenceLayer) {
+    return scoreHistory;
+  }
+
+  try {
+    const persistedEntries = await persistenceLayer.loadScoresSafe();
+    if (Array.isArray(persistedEntries) && persistedEntries.length > 0) {
+      mergePersistedEntries(persistedEntries);
+    }
+  } catch (error) {
+    console.warn('ScoreStorage: Failed to load persisted scores.', error);
+  }
+
+  return scoreHistory;
+}
+
+function mergePersistedEntries(entries) {
+  const hydrated = entries.map((entry) => ({
+    ...entry,
+    timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date()
+  }));
+
+  const existingKeys = new Set(scoreHistory.map((entry) => entry.blastHash || entry.timestamp?.toISOString()));
+  const combined = [...scoreHistory];
+
+  hydrated.forEach((entry) => {
+    const key = entry.blastHash || entry.timestamp?.toISOString();
+    if (!existingKeys.has(key)) {
+      existingKeys.add(key);
+      combined.push(entry);
+    }
+  });
+
+  combined.sort((a, b) => a.timestamp - b.timestamp);
+
+  scoreHistory.length = 0;
+  combined.slice(-MAX_HISTORY_SIZE).forEach((entry) => scoreHistory.push(entry));
+}
+
+function persistScoreHistory() {
+  if (!persistenceLayer) {
+    return Promise.resolve();
+  }
+
+  const sorted = [...scoreHistory].sort((a, b) => b.timestamp - a.timestamp);
+  const trimmed = sorted.slice(0, PERSISTED_SCORE_LIMIT).map((entry) => ({
+    ...entry,
+    timestamp: entry.timestamp instanceof Date ? entry.timestamp.toISOString() : entry.timestamp
+  }));
+
+  return initializationPromise
+    .catch(() => undefined)
+    .then(() => persistenceLayer.saveScoresSafe(trimmed));
+}
+
+export function initializeScoreStorage() {
+  return initializationPromise;
+}
+
+export function refreshScoreStorage() {
+  initializationPromise = loadFromPersistence();
+  return initializationPromise;
+}
+
+export async function clearPersistentScoreStorage() {
+  scoreHistory.length = 0;
+  if (persistenceLayer?.clearScoresSafe) {
+    try {
+      await persistenceLayer.clearScoresSafe();
+    } catch (error) {
+      console.warn('ScoreStorage: Failed to clear persisted data.', error);
+    }
+  }
+}
 
 /**
  * Store Score
@@ -51,6 +275,8 @@ export function storeScore(playerID, scoreMetrics, blastHash, blastResult = null
     const removeCount = scoreHistory.length - MAX_HISTORY_SIZE;
     scoreHistory.splice(0, removeCount);
   }
+
+  persistScoreHistory();
 
   // Return index of stored entry
   return scoreHistory.length - 1;
@@ -104,6 +330,7 @@ export function getTopScores(limit = 10) {
 export function clearScores() {
   const count = scoreHistory.length;
   scoreHistory.length = 0;  // Clear array efficiently
+  persistScoreHistory();
   return count;
 }
 

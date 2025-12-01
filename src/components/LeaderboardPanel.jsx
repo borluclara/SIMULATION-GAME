@@ -3,7 +3,7 @@ import useBlastHistory from '../hooks/useBlastHistory';
 import './LeaderboardPanel.css';
 
 const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
-  const { history, sessionStats, refresh, store } = useBlastHistory();
+  const { history, sessionStats, refresh, store, clearLeaderboardStorage } = useBlastHistory();
   const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent' | 'mine'
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -16,7 +16,9 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
 
   const formattedEntries = useMemo(() => {
     const source = Array.isArray(history) ? history : [];
-    return source.map((record, index) => formatRecord(record, index, playerName));
+    return source
+      .filter(isValidScoreEntry)
+      .map((record, index) => formatRecord(record, index, playerName));
   }, [history, playerName]);
   const sortedEntries = useMemo(() => {
     const entries = [...formattedEntries];
@@ -173,7 +175,14 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
               <button
                 type="button"
                 className="danger"
-                onClick={() => handleResetConfirm({ store, refresh, setResetDialogOpen, setIsResetting, setSortMode })}
+                onClick={() => handleResetConfirm({
+                  resetLeaderboard: clearLeaderboardStorage,
+                  store,
+                  refresh,
+                  setResetDialogOpen,
+                  setIsResetting,
+                  setSortMode
+                })}
                 disabled={isResetting}
               >
                 {isResetting ? 'Clearing…' : 'Confirm Reset'}
@@ -188,15 +197,19 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
 
 const formatRecord = (record, index, fallbackPlayer) => {
   const timestamp = record.timestamp ? new Date(record.timestamp) : new Date(Date.now() - index * 3600000);
+  const metricsScore = typeof record.scoreMetrics?.totalScore === 'number' ? record.scoreMetrics.totalScore : undefined;
   const score = typeof record.totalScore === 'number'
     ? record.totalScore
     : typeof record.score === 'number'
       ? record.score
-      : 0;
+      : typeof metricsScore === 'number'
+        ? metricsScore
+        : 0;
 
   const recoveryRate = Number(
     record.recovery ??
     record.recoveryRate ??
+    record.scoreMetrics?.recoveryRate ??
     record.performance?.recovery ??
     0
   );
@@ -204,25 +217,41 @@ const formatRecord = (record, index, fallbackPlayer) => {
   const dilutionRate = Number(
     record.dilution ??
     record.dilutionRate ??
+    record.scoreMetrics?.dilutionRate ??
     record.performance?.dilution ??
     0
   );
 
+  const blastTotals = record.blastResult?.totals || {};
+  const destroyedFromTotals = [
+    blastTotals.totalOresRecovered,
+    blastTotals.totalOresLost,
+    blastTotals.totalWasteInZone
+  ].reduce((sum, value) => sum + (Number(value) || 0), 0);
+
   const destroyed = record.cellsDestroyed
     ?? record.cellsAffected
+    ?? (destroyedFromTotals > 0 ? destroyedFromTotals : undefined)
     ?? sumMaterialBreakdown(record.materialBreakdown)
+    ?? sumMaterialBreakdown(record.blastResult?.materialBreakdown)
     ?? Math.max(1, Math.round(score / 1200));
 
   const recovered = record.oresRecovered
+    ?? blastTotals.totalOresRecovered
     ?? Math.max(1, Math.round((recoveryRate / 100) * destroyed));
 
   const diluted = record.wasteCollected
+    ?? blastTotals.totalOresLost
+    ?? blastTotals.totalWasteInZone
     ?? Math.max(0, Math.round((dilutionRate / 100) * destroyed));
-  const grade = record.grade || calculateGrade(score);
+
+  const grade = record.grade || record.scoreMetrics?.grade || calculateGrade(score);
+  const entryId = record.blastHash || record.sessionId || `session-${index + 1}`;
+  const playerLabel = record.playerID || record.playerName || fallbackPlayer || 'Anonymous Miner';
 
   return {
-    id: `${record.sessionId || 'session'}-${record.round || index + 1}`,
-    playerName: record.playerName || fallbackPlayer || 'Anonymous Miner',
+    id: entryId,
+    playerName: playerLabel,
     round: record.round || index + 1,
     score: Math.round(score),
     recovered,
@@ -319,6 +348,14 @@ const sumMaterialBreakdown = (breakdown) => {
   return Object.values(breakdown).reduce((sum, value) => sum + (Number(value) || 0), 0);
 };
 
+const isValidScoreEntry = (entry) => {
+  if (!entry) {
+    return false;
+  }
+  const score = entry.scoreMetrics?.totalScore ?? entry.totalScore ?? entry.score;
+  return typeof score === 'number' && !Number.isNaN(score);
+};
+
 function getAvatarForName(name = '') {
   if (avatarSprites.length === 0) return '';
   const hash = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -348,10 +385,14 @@ function buildAvatarSprites() {
   });
 }
 
-const handleResetConfirm = ({ store, refresh, setResetDialogOpen, setIsResetting, setSortMode }) => {
+const handleResetConfirm = async ({ resetLeaderboard, store, refresh, setResetDialogOpen, setIsResetting, setSortMode }) => {
   setIsResetting(true);
   try {
-    store?.clearHistory?.();
+    if (typeof resetLeaderboard === 'function') {
+      await resetLeaderboard();
+    } else {
+      await store?.clearHistory?.();
+    }
     refresh();
     setSortMode('score');
   } finally {
