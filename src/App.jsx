@@ -7,7 +7,6 @@ import OreGridCanvas from './components/OreGridCanvas'
 import CSVErrorUI from './components/csvErrorUI'
 import BlastToolPanel from './components/BlastToolPanel'
 import BlastPlacementPanel from './components/BlastPlacementPanel'
-import BlastSummaryPanel from './components/BlastSummaryPanel'
 import ScoreFeedback from './components/ScoreFeedback'
 import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
@@ -90,7 +89,6 @@ function App() {
   const [cameraShake, setCameraShake] = useState({ x: 0, y: 0 }) // Camera shake effect
   
   // Blast summary panel state
-  const [showBlastSummary, setShowBlastSummary] = useState(false)
   const [blastResults, setBlastResults] = useState(null)
   const [previousScore, setPreviousScore] = useState(0)
   
@@ -506,11 +504,6 @@ function App() {
       console.warn('Replay in progress: grid interactions are disabled.');
       return;
     }
-    // Close blast summary panel when new action begins
-    if (showBlastSummary) {
-      handleCloseBlastSummary();
-    }
-    
     if (placementMode) {
       // Place blast marker with current direction
       const success = addBlast(position.x, position.y, blastDirection)
@@ -637,7 +630,6 @@ function App() {
       
       // Show blast summary panel
       setBlastResults(result);
-      setShowBlastSummary(true);
 
       const highlightSnapshot = {
         recovered: recoveredOres.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' })),
@@ -878,11 +870,6 @@ function App() {
     }
   }
 
-  const handleCloseBlastSummary = () => {
-    setShowBlastSummary(false);
-    setBlastResults(null);
-  };
-
   const handleCloseFeedback = () => {
     setShowBlastFeedback(false);
     setFeedbackResults(null);
@@ -1058,7 +1045,6 @@ function App() {
       // Restore progress-driven UI state
       setSimulationResults(simulation.progress?.simulationResults || null);
       setBlastResults(simulation.progress?.simulationResults || null);
-      setShowBlastSummary(false);
       setShowBlastFeedback(false);
       setFeedbackResults(null);
       setHighlightedCells({ recovered: [], lost: [] });
@@ -1695,16 +1681,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Blast Summary Panel */}
-      <BlastSummaryPanel 
-        blastResults={blastResults}
-        isVisible={showBlastSummary}
-        onClose={handleCloseBlastSummary}
-        playerScore={displayScore}
-        previousScore={displayPreviousScore}
-        grid={oreGrid}
-      />
 
       {/* Blast Feedback Modal */}
       <BlastFeedback 
