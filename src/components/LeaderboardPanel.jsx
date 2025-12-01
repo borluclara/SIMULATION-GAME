@@ -4,7 +4,7 @@ import './LeaderboardPanel.css';
 
 const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   const { history, sessionStats, refresh, store, clearLeaderboardStorage } = useBlastHistory();
-  const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent' | 'mine'
+  const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent'
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -31,13 +31,6 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   }, [formattedEntries, sortMode]);
 
   const displayEntries = useMemo(() => {
-    if (sortMode === 'mine') {
-      const mine = sortedEntries.filter((entry) =>
-        entry.playerName.toLowerCase() === playerName.toLowerCase()
-      );
-      return mine.length > 0 ? mine : [];
-    }
-
     if (sortMode === 'recent') {
       return sortedEntries.slice(0, 10);
     }
@@ -85,7 +78,6 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
               <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
                 <option value="score">Highest Score</option>
                 <option value="recent">Most Recent</option>
-                <option value="mine">My Scores Only</option>
               </select>
               <span className="select-caret" aria-hidden="true">▼</span>
             </div>
