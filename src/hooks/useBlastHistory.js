@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import blastHistoryStore from '../utils/BlastHistoryStore';
 import {
   getRecentScores,
-  initializeScoreStorage,
+  refreshScoreStorage,
   clearPersistentScoreStorage
 } from '../utils/ScoreStorage';
 
@@ -19,18 +19,16 @@ export const useBlastHistory = () => {
   const [currentRound, setCurrentRound] = useState(0);
 
   // Force update by creating a refresh function
-  const refresh = useCallback(() => {
-    initializeScoreStorage()
-      .then(() => {
-        setHistory(getRecentScores(50));
-      })
-      .catch((error) => {
-        console.warn('Leaderboard: failed to load persisted scores, using in-memory snapshot.', error);
-        setHistory(getRecentScores(50));
-      });
-
-    setSessionStats(blastHistoryStore.getSessionStats());
-    setCurrentRound(blastHistoryStore.getCurrentRound());
+  const refresh = useCallback(async () => {
+    try {
+      await refreshScoreStorage();
+    } catch (error) {
+      console.warn('Leaderboard: failed to load persisted scores, using in-memory snapshot.', error);
+    } finally {
+      setHistory(getRecentScores(50));
+      setSessionStats(blastHistoryStore.getSessionStats());
+      setCurrentRound(blastHistoryStore.getCurrentRound());
+    }
   }, []);
 
   const clearLeaderboardStorage = useCallback(async () => {

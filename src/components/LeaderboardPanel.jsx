@@ -7,12 +7,15 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   const [sortMode, setSortMode] = useState('score'); // 'score' | 'recent'
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    refresh();
-    const intervalId = setInterval(refresh, 8000);
-    return () => clearInterval(intervalId);
-  }, [refresh]);
+    useEffect(() => {
+      refresh();
+      const intervalId = setInterval(() => {
+        refresh();
+      }, 8000);
+      return () => clearInterval(intervalId);
+    }, [refresh]);
 
   const formattedEntries = useMemo(() => {
     const source = Array.isArray(history) ? history : [];
@@ -55,6 +58,18 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
 
   const summary = useMemo(() => buildSummary(sessionStats, formattedEntries), [sessionStats, formattedEntries]);
 
+  const handleManualRefresh = async () => {
+    if (isRefreshing) {
+      return;
+    }
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="leaderboard-screen blast-sim-container">
       <header className="leaderboard-header">
@@ -66,8 +81,16 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
           <h1>Leaderboard</h1>
         </div>
 
-        <button className="icon-button" type="button" onClick={refresh} aria-label="Refresh leaderboard">
-          <span className="material-symbols-outlined">refresh</span>
+        <button
+          className={`icon-button ${isRefreshing ? 'refreshing' : ''}`}
+          type="button"
+          onClick={handleManualRefresh}
+          aria-label="Refresh leaderboard"
+          disabled={isRefreshing}
+        >
+          <span className="material-symbols-outlined" aria-live="polite">
+            {isRefreshing ? 'progress_activity' : 'refresh'}
+          </span>
         </button>
       </header>
 
