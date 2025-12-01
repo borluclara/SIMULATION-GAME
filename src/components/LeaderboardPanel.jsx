@@ -8,6 +8,7 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [renderedEntries, setRenderedEntries] = useState([]);
 
     useEffect(() => {
       refresh();
@@ -57,6 +58,62 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
   )?.id;
 
   const summary = useMemo(() => buildSummary(sessionStats, formattedEntries), [sessionStats, formattedEntries]);
+
+  useEffect(() => {
+    setRenderedEntries((prev) => {
+      const prevMap = new Map(prev.map((entry) => [entry.id, entry]));
+      const nextEntries = displayEntries.map((entry, index) => {
+        const prevEntry = prevMap.get(entry.id);
+        const rankPosition = index + 1;
+        const motion = !prevEntry
+          ? 'enter'
+          : prevEntry.score !== entry.score
+            ? 'updated'
+            : prevEntry.rankPosition !== rankPosition
+              ? 'reordered'
+              : 'stable';
+
+        return {
+          ...entry,
+          rankPosition,
+          _motion: motion,
+          _order: rankPosition
+        };
+      });
+
+      const nextIds = new Set(displayEntries.map((entry) => entry.id));
+
+      const exitingEntries = prev
+        .filter((entry) => !nextIds.has(entry.id) && entry._motion !== 'exit')
+        .map((entry) => ({
+          ...entry,
+          _motion: 'exit',
+          _order: entry.rankPosition ?? entry._order ?? Number.MAX_SAFE_INTEGER
+        }));
+
+      return [...nextEntries, ...exitingEntries]
+        .sort((a, b) => (a._order ?? Number.MAX_SAFE_INTEGER) - (b._order ?? Number.MAX_SAFE_INTEGER));
+    });
+  }, [displayEntries]);
+
+  const handleRowAnimationEnd = (entryId, motion, event) => {
+    if (event?.target !== event?.currentTarget) {
+      return;
+    }
+
+    if (motion === 'exit') {
+      setRenderedEntries((prev) => prev.filter((entry) => !(entry.id === entryId && entry._motion === 'exit')));
+      return;
+    }
+
+    if (motion !== 'stable') {
+      setRenderedEntries((prev) => prev.map((entry) => (
+        entry.id === entryId
+          ? { ...entry, _motion: 'stable' }
+          : entry
+      )));
+    }
+  };
 
   const handleManualRefresh = async () => {
     if (isRefreshing) {
@@ -124,16 +181,20 @@ const LeaderboardPanel = ({ onBack, playerName = 'Anonymous Miner' }) => {
         )}
 
         <ul>
-          {displayEntries.map((entry, index) => {
-            const medal = medalMap.get(entry.id);
+          {renderedEntries.map((entry, index) => {
+            const medal = entry._motion === 'exit' ? null : medalMap.get(entry.id);
+            const rankValue = entry.rankPosition ?? entry._order ?? index + 1;
+            const motionClass = getMotionClass(entry._motion);
+            const isActiveRow = entry._motion !== 'exit' && highlightId === entry.id;
             return (
             <li
-              key={entry.id}
-              className={`leaderboard-row ${highlightId === entry.id ? 'is-active' : ''}`}
+              key={`${entry.id}-${entry._motion === 'exit' ? 'exit' : 'live'}`}
+              className={`leaderboard-row ${isActiveRow ? 'is-active' : ''} ${motionClass}`}
+              onAnimationEnd={(event) => handleRowAnimationEnd(entry.id, entry._motion, event)}
             >
               <div className="row-main">
                 <div className="row-left">
-                  <span className="rank">{index + 1}</span>
+                  <span className="rank">{rankValue}</span>
                   {medal && (
                     <span className={`medal-badge medal-${medal}`} aria-label={`${medal} medal`}>
                       <img src={medalImages[medal]} alt={`${medal} medal`} loading="lazy" />
@@ -283,6 +344,15 @@ const formatRecord = (record, index, fallbackPlayer) => {
 
 const avatarSprites = buildAvatarSprites();
 const medalImages = buildMedalImages();
+
+const MOTION_CLASS_MAP = {
+  enter: 'is-entering',
+  updated: 'is-updated',
+  reordered: 'is-reordered',
+  exit: 'is-exiting'
+};
+
+const getMotionClass = (motion) => MOTION_CLASS_MAP[motion] || '';
 
 const formatScore = (value = 0) => Number(value || 0).toLocaleString('en-US');
 
