@@ -99,6 +99,7 @@ class BlastHistoryStore {
       
       // Material breakdown (optional)
       materialBreakdown: blastData.materialBreakdown || null,
+      scoreMetrics: blastData.scoreMetrics || null,
       
       // Session metadata
       sessionId: this.sessionId,

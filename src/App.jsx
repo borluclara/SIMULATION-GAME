@@ -25,6 +25,7 @@ import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
 import { isOre, normalizeMaterialName, getOreValue } from './utils/OreClassification'
 import { storeScore, initializeScoreStorage } from './utils/ScoreStorage'
+import { evaluateBlast } from './utils/BlastEvaluator'
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
 
@@ -53,6 +54,7 @@ function App() {
     score,
     currentScenario,
     blasts,
+    blastRadius,
     setPlayerName,
     setScore,
     addScore,
@@ -526,93 +528,157 @@ function App() {
       setPreviousScore(score);
       
       console.log('🎆 Starting blast animation and physics');
-      
-      // Calculate score increase based on materials destroyed
-      const materialsDestroyed = result.destroyedCells?.length || 0;
-      const scoreIncrease = materialsDestroyed * 10; // 10 points per material destroyed
-      const totalScoreAfterBlast = score + scoreIncrease;
-      addScore(scoreIncrease);
-      
-        const destroyedCells = result.destroyedCells || [];
-        const classifiedCells = destroyedCells.map(cell => {
-          const normalized = normalizeMaterialName(cell.material || '');
-          const oreMaterial = isOre(normalized);
-          return { cell, normalized, oreMaterial };
-        });
 
-        const recoveredOres = classifiedCells
-          .filter(({ oreMaterial }) => oreMaterial)
-          .map(({ cell }) => cell);
-        
-        const lostWaste = classifiedCells
-          .filter(({ oreMaterial }) => !oreMaterial)
-          .map(({ cell }) => cell);
-        
-        let totalValue = 0;
-        const materialBreakdown = {};
-        
-        classifiedCells.forEach(({ normalized, oreMaterial }) => {
-          const key = normalized || 'unknown';
-          materialBreakdown[key] = (materialBreakdown[key] || 0) + 1;
-          
-          if (oreMaterial && normalized) {
-            totalValue += getOreValue(normalized);
+      const materialsDestroyed = result.destroyedCells?.length || 0;
+      const fallbackBlastRadius = result.blastRadius || blastRadius || 1;
+
+      const computeDistanceForCell = (cell) => {
+        if (typeof cell?.distance === 'number') {
+          return cell.distance;
+        }
+        if (!Array.isArray(result.blasts) || result.blasts.length === 0) {
+          return null;
+        }
+        const targetX = typeof cell?.x === 'number' ? cell.x : 0;
+        const targetY = typeof cell?.y === 'number' ? cell.y : 0;
+        let minDistance = null;
+        result.blasts.forEach((blastPoint) => {
+          const dx = targetX - blastPoint.x;
+          const dy = targetY - blastPoint.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (minDistance === null || distance < minDistance) {
+            minDistance = distance;
           }
         });
+        return minDistance;
+      };
 
-      // Calculate performance metrics
-      const oresRecovered = recoveredOres.length;
-      const wasteCollected = lostWaste.length;
-      const totalDestroyed = materialsDestroyed;
-      const recovery = totalDestroyed > 0 ? Math.round((oresRecovered / totalDestroyed) * 100) : 0;
-      const dilution = totalDestroyed > 0 ? Math.round((wasteCollected / totalDestroyed) * 100) : 0;
-      const efficiency = Math.max(0, recovery - dilution);
+      const deriveCollectionFlags = (cell, normalizedMaterial) => {
+        if (typeof cell?.isInCollectionZone === 'boolean' && typeof cell?.isDisplaced === 'boolean') {
+          return {
+            isInCollectionZone: cell.isInCollectionZone,
+            isDisplaced: cell.isDisplaced
+          };
+        }
+        const distance = computeDistanceForCell(cell);
+        if (typeof distance !== 'number' || !fallbackBlastRadius) {
+          return { isInCollectionZone: false, isDisplaced: false };
+        }
+        const ratio = Math.min(1, fallbackBlastRadius > 0 ? distance / fallbackBlastRadius : 1);
+        const threshold = isOre(normalizedMaterial) ? 0.65 : 0.5;
+        const isInCollectionZone = ratio <= threshold;
+        return {
+          isInCollectionZone,
+          isDisplaced: !isInCollectionZone && ratio <= 1
+        };
+      };
+
+      const scoringBlocks = (result.affectedCells || []).map((cell) => {
+        const normalizedMaterial = normalizeMaterialName(
+          cell.oreType || cell.originalMaterial || cell.material || ''
+        ) || 'unknown';
+
+        const collectionFlags = deriveCollectionFlags(cell, normalizedMaterial);
+
+        return {
+          x: cell.x ?? 0,
+          y: cell.y ?? 0,
+          oreType: normalizedMaterial,
+          isInCollectionZone: collectionFlags.isInCollectionZone,
+          isDisplaced: collectionFlags.isDisplaced
+        };
+      });
+
+      const scoreMetrics = evaluateBlast({ affectedBlocks: scoringBlocks });
+      const roundedRecovery = Math.round(scoreMetrics.recoveryRate);
+      const roundedDilution = Math.round(scoreMetrics.dilutionRate);
+      const efficiency = Math.max(0, roundedRecovery - roundedDilution);
+
+      setMineralRecovery(roundedRecovery);
+      setDilution(roundedDilution);
+
+      const scoreIncrease = Math.max(0, Math.round(scoreMetrics.totalScore));
+      const totalScoreAfterBlast = score + scoreIncrease;
+      addScore(scoreIncrease);
+
+      const destroyedCells = result.destroyedCells || [];
+      const classifiedCells = destroyedCells.map(cell => {
+        const normalized = normalizeMaterialName(cell.material || cell.oreType || '') || 'unknown';
+        const oreMaterial = isOre(normalized);
+        const flags = deriveCollectionFlags(cell, normalized);
+        return { cell, normalized, oreMaterial, flags };
+      });
+
+      const recoveredOres = classifiedCells
+        .filter(({ oreMaterial, flags }) => oreMaterial && flags.isInCollectionZone)
+        .map(({ cell }) => cell);
+
+      const wasteCollectedCells = classifiedCells
+        .filter(({ oreMaterial, flags }) => !oreMaterial && flags.isInCollectionZone)
+        .map(({ cell }) => cell);
+
+      let totalValue = 0;
+      const materialBreakdown = {};
+
+      classifiedCells.forEach(({ normalized, oreMaterial, flags }) => {
+        const key = normalized || 'unknown';
+        materialBreakdown[key] = (materialBreakdown[key] || 0) + 1;
+
+        if (oreMaterial && normalized && flags.isInCollectionZone) {
+          totalValue += getOreValue(normalized);
+        }
+      });
+
+      const breakdownTotals = scoreMetrics.breakdown?.totals || {};
+      const oresRecovered = breakdownTotals.totalOresRecovered ?? recoveredOres.length;
+      const wasteCollected = breakdownTotals.totalWasteInZone ?? wasteCollectedCells.length;
+      const totalValueRecovered = breakdownTotals.totalValueRecovered ?? Math.max(0, totalValue);
 
       // Save to blast history store
       const blastRecord = blastHistoryStore.addBlastRecord({
-        recovery,
-        dilution,
+        recovery: roundedRecovery,
+        dilution: roundedDilution,
         efficiency,
         oresRecovered,
-        wasteCollected: wasteCollected,
-        totalValue: Math.max(0, totalValue),
-        score: scoreIncrease,
+        wasteCollected,
+        totalValue: totalValueRecovered,
+        score: scoreMetrics.totalScore,
         totalScore: totalScoreAfterBlast,
         blastsUsed: result.blasts.length,
         blastRadius: result.blastRadius || 0,
         cellsDestroyed: materialsDestroyed,
         cellsAffected: result.affectedCells?.length || 0,
-        materialBreakdown
+        materialBreakdown,
+        scoreMetrics
       });
 
       const leaderboardPlayer = playerName?.trim() || 'Anonymous Miner';
       const blastHash = `blast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-      const grade = totalScoreAfterBlast >= 90
-        ? 'A'
-        : totalScoreAfterBlast >= 75
-          ? 'B'
-          : totalScoreAfterBlast >= 60
-            ? 'C'
-            : totalScoreAfterBlast >= 50
-              ? 'D'
-              : 'F';
-
-      const scoreMetricsSnapshot = {
-        totalScore: totalScoreAfterBlast,
+      const leaderboardMetrics = {
+        recoveryRate: scoreMetrics.recoveryRate,
+        dilutionRate: scoreMetrics.dilutionRate,
+        valueRecoveryRate: scoreMetrics.valueRecoveryRate,
+        totalScore: scoreMetrics.totalScore,
+        grade: scoreMetrics.grade,
+        performanceTime: scoreMetrics.performanceTime,
+        blastId: scoreMetrics.blastId,
+        timestamp: scoreMetrics.timestamp || new Date(),
+        breakdown: scoreMetrics.breakdown,
         scoreDelta: scoreIncrease,
-        recoveryRate: recovery,
-        dilutionRate: dilution,
-        efficiency,
-        grade
+        cumulativeScore: totalScoreAfterBlast
       };
 
-      storeScore(leaderboardPlayer, scoreMetricsSnapshot, blastHash, {
-        totals: {
-          totalOresRecovered: oresRecovered,
-          totalOresLost: wasteCollected,
-          totalWasteInZone: wasteCollected,
-          totalValueRecovered: Math.max(0, totalValue)
-        },
+      const breakdownSnapshot = scoreMetrics.breakdown
+        ? {
+            ...scoreMetrics.breakdown,
+            totals: scoreMetrics.breakdown.totals,
+            oreBreakdown: scoreMetrics.breakdown.oreBreakdown,
+            wasteBreakdown: scoreMetrics.breakdown.wasteBreakdown
+          }
+        : null;
+
+      storeScore(leaderboardPlayer, leaderboardMetrics, blastHash, {
+        ...(breakdownSnapshot || {}),
         materialBreakdown,
         cellsDestroyed: materialsDestroyed,
         cellsAffected: result.affectedCells?.length || 0
@@ -620,20 +686,28 @@ function App() {
 
       const roundNumberForAutoSave = blastRecord?.round || blastHistoryStore.getCurrentRound();
 
-      console.log('📊 Blast record saved:', blastRecord);
+      console.log('📊 Blast record saved:', {
+        recovery: roundedRecovery,
+        dilution: roundedDilution,
+        efficiency,
+        totalScoreAfterBlast,
+        scoreIncrease
+      });
       
+      const blastDataForUi = { ...result, scoreMetrics };
+
       // Set highlighted cells for canvas rendering
       setHighlightedCells({
         recovered: recoveredOres,
-        lost: lostWaste
+        lost: wasteCollectedCells
       });
       
       // Show blast summary panel
-      setBlastResults(result);
+      setBlastResults(blastDataForUi);
 
       const highlightSnapshot = {
         recovered: recoveredOres.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' })),
-        lost: lostWaste.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' }))
+        lost: wasteCollectedCells.map(cell => ({ x: cell.x, y: cell.y, material: cell.material || '' }))
       };
 
       const replayEvent = replayManager.beginEvent({
@@ -643,9 +717,10 @@ function App() {
         scoreBefore: score,
         gridSnapshotBefore: result.gridBeforeSnapshot || (oreGrid ? serializeGrid(oreGrid) : null),
         blastResultSummary: {
-          recovery,
-          dilution,
+          recovery: roundedRecovery,
+          dilution: roundedDilution,
           efficiency,
+          score: scoreMetrics.totalScore,
           materialsDestroyed
         },
         highlights: highlightSnapshot,
@@ -662,7 +737,7 @@ function App() {
           gridSnapshotAfter: result.gridAfterSnapshot || (oreGrid ? serializeGrid(oreGrid) : null),
           summary: {
             blastRecord,
-            totalValue,
+            totalValue: totalValueRecovered,
             highlightSnapshot
           },
           autoSaveReference: roundNumberForAutoSave
@@ -711,7 +786,7 @@ function App() {
               setAnimationState(null);
               
               // Show blast feedback modal after animations complete
-              setFeedbackResults(result);
+              setFeedbackResults(blastDataForUi);
               setShowBlastFeedback(true);
             }, 500);
 

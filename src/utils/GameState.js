@@ -1,8 +1,34 @@
 import { serializeGrid } from './GridSerializer';
+import { normalizeMaterialName, isOre } from './OreClassification.js';
 /**
  * Global Game State Management - FIXED
  * Properly handles OreGrid object structure
  */
+
+const ORE_COLLECTION_RATIO = 0.65;
+const WASTE_COLLECTION_RATIO = 0.5;
+
+const buildScoringMetadata = (block, blast, radius) => {
+  const rawMaterial = block?.oreType || block?.material || 'unknown';
+  const material = normalizeMaterialName(rawMaterial) || 'unknown';
+  const dx = (block?.x ?? 0) - (blast?.x ?? 0);
+  const dy = (block?.y ?? 0) - (blast?.y ?? 0);
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const radiusValue = typeof radius === 'number' && radius > 0 ? radius : 1;
+  const distanceRatio = Math.min(1, radiusValue > 0 ? distance / radiusValue : 1);
+  const oreFlag = isOre(material);
+  const collectionThreshold = oreFlag ? ORE_COLLECTION_RATIO : WASTE_COLLECTION_RATIO;
+  const isInCollectionZone = distanceRatio <= collectionThreshold;
+  const isDisplaced = !isInCollectionZone && distanceRatio <= 1;
+
+  return {
+    material,
+    distance,
+    oreFlag,
+    isInCollectionZone,
+    isDisplaced
+  };
+};
 
 export class GameState {
   constructor() {
@@ -139,23 +165,40 @@ export class GameState {
       // Use OreGrid's applyBlast method with direction support
       const blastResult = grid.applyBlast(blast.x, blast.y, radius, power, blast.direction);
       
-      // Convert affected blocks to the format expected by physics engine
-      const affectedCells = blastResult.affectedBlocks.map(block => ({
-        x: block.x,
-        y: block.y,
-        distance: Math.sqrt((block.x - blast.x) ** 2 + (block.y - blast.y) ** 2),
-        blastId: blast.id,
-        blastDirection: blast.direction, // Include direction for physics
-        originalMaterial: block.oreType || block.material || 'unknown'
-      }));
+      // Convert affected blocks to the format expected by physics engine and scoring pipeline
+      const affectedCells = blastResult.affectedBlocks.map(block => {
+        const scoringMeta = buildScoringMetadata(block, blast, radius);
+        return {
+          x: block.x,
+          y: block.y,
+          distance: scoringMeta.distance,
+          blastId: blast.id,
+          blastDirection: blast.direction, // Include direction for physics
+          originalMaterial: scoringMeta.material,
+          oreType: scoringMeta.material,
+          isOre: scoringMeta.oreFlag,
+          isInCollectionZone: scoringMeta.isInCollectionZone,
+          isDisplaced: scoringMeta.isDisplaced,
+          value: typeof block.value === 'number' ? block.value : undefined,
+          blastRadius: radius
+        };
+      });
 
-      // Convert destroyed blocks
-      const destroyedCells = blastResult.destroyedBlocks.map(block => ({
-        x: block.x,
-        y: block.y,
-        material: block.oreType || block.material || 'unknown',
-        blastDirection: blast.direction // Include direction for physics
-      }));
+      // Convert destroyed blocks with scoring metadata for highlights
+      const destroyedCells = blastResult.destroyedBlocks.map(block => {
+        const scoringMeta = buildScoringMetadata(block, blast, radius);
+        return {
+          x: block.x,
+          y: block.y,
+          material: scoringMeta.material,
+          oreType: scoringMeta.material,
+          blastDirection: blast.direction, // Include direction for physics
+          distance: scoringMeta.distance,
+          isInCollectionZone: scoringMeta.isInCollectionZone,
+          isDisplaced: scoringMeta.isDisplaced,
+          blastRadius: radius
+        };
+      });
 
       allAffectedCells.push(...affectedCells);
       allDestroyedCells.push(...destroyedCells);

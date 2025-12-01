@@ -46,7 +46,39 @@ const BlastFeedback = ({
 
   // Calculate metrics from blast results
   const calculateMetrics = () => {
-    if (!blastResults || !blastResults.destroyedCells) {
+    if (!blastResults) {
+      return {
+        oresRecovered: 0,
+        wasteRecovered: 0,
+        totalDestroyed: 0,
+        oreValue: 0,
+        efficiency: 0,
+        recovery: 0,
+        dilution: 0
+      };
+    }
+
+    const scoringSnapshot = blastResults.scoreMetrics;
+    const scoringTotals = scoringSnapshot?.breakdown?.totals;
+
+    if (scoringSnapshot && scoringTotals) {
+      const totalDestroyed =
+        (scoringTotals.totalOresRecovered || 0) +
+        (scoringTotals.totalOresLost || 0) +
+        (scoringTotals.totalWasteInZone || 0);
+
+      return {
+        oresRecovered: scoringTotals.totalOresRecovered || 0,
+        wasteRecovered: scoringTotals.totalWasteInZone || 0,
+        totalDestroyed,
+        oreValue: Math.max(0, scoringTotals.totalValueRecovered || 0),
+        efficiency: Math.round(Math.max(0, scoringSnapshot.recoveryRate - scoringSnapshot.dilutionRate)),
+        recovery: Math.round(scoringSnapshot.recoveryRate || 0),
+        dilution: Math.round(scoringSnapshot.dilutionRate || 0)
+      };
+    }
+
+    if (!blastResults.destroyedCells) {
       return {
         oresRecovered: 0,
         wasteRecovered: 0,
@@ -65,8 +97,12 @@ const BlastFeedback = ({
       return { cell, normalized, oreMaterial };
     });
 
-    const ores = classifiedCells.filter(entry => entry.oreMaterial).map(entry => entry.cell);
-    const waste = classifiedCells.filter(entry => !entry.oreMaterial).map(entry => entry.cell);
+    const ores = classifiedCells.filter(({ oreMaterial, cell }) => (
+      oreMaterial && (typeof cell?.isInCollectionZone === 'boolean' ? cell.isInCollectionZone : true)
+    )).map(entry => entry.cell);
+    const waste = classifiedCells.filter(({ oreMaterial, cell }) => (
+      !oreMaterial && (typeof cell?.isInCollectionZone === 'boolean' ? cell.isInCollectionZone : true)
+    )).map(entry => entry.cell);
 
     const totalDestroyed = destroyedCells.length;
     const oresRecovered = ores.length;
@@ -74,8 +110,9 @@ const BlastFeedback = ({
 
     // Calculate value based on material types
     let totalValue = 0;
-    classifiedCells.forEach(({ normalized, oreMaterial }) => {
-      if (oreMaterial && normalized) {
+    classifiedCells.forEach(({ normalized, oreMaterial, cell }) => {
+      const counted = typeof cell?.isInCollectionZone === 'boolean' ? cell.isInCollectionZone : true;
+      if (oreMaterial && normalized && counted) {
         totalValue += getOreValue(normalized);
       }
     });
