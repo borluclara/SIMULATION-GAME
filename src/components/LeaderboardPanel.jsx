@@ -298,7 +298,8 @@ const formatRecord = (record, index, fallbackPlayer) => {
     0
   );
 
-  const blastTotals = record.blastResult?.totals || {};
+  const scoringTotals = record.scoreMetrics?.breakdown?.totals || null;
+  const blastTotals = scoringTotals || record.blastResult?.totals || {};
   const destroyedFromTotals = [
     blastTotals.totalOresRecovered,
     blastTotals.totalOresLost,
@@ -317,8 +318,8 @@ const formatRecord = (record, index, fallbackPlayer) => {
     ?? Math.max(1, Math.round((recoveryRate / 100) * destroyed));
 
   const diluted = record.wasteCollected
-    ?? blastTotals.totalOresLost
     ?? blastTotals.totalWasteInZone
+    ?? blastTotals.totalOresLost
     ?? Math.max(0, Math.round((dilutionRate / 100) * destroyed));
 
   const grade = record.grade || record.scoreMetrics?.grade || calculateGrade(score);
