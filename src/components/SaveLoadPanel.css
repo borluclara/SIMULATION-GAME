@@ -23,8 +23,8 @@
 
 /* Position Variants */
 .save-load-panel.right {
-  top: 20px;
-  right: 20px;
+  top: 18px;
+  right: 18px;
   transform-origin: top right;
 }
 
@@ -43,9 +43,13 @@
 
 /* Collapsed State */
 .save-load-panel.collapsed {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  border-radius: 0.75rem;
   background: rgba(30, 58, 95, 0.9);
   border: 1px solid rgba(100, 150, 255, 0.4);
   display: flex;
@@ -86,12 +90,12 @@
 /* Panel Toggle Button */
 .panel-toggle {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 32px;
-  height: 32px;
+  top: 4px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
   border: none;
-  border-radius: 8px;
+  border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
   cursor: pointer;
@@ -120,7 +124,7 @@
 .panel-content {
   padding: 4px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding-top: 28px; /* Space for toggle button */
+  padding-top: 44px; /* accommodate larger toggle */
 }
 
 /* Panel Header */

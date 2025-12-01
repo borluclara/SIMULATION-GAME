@@ -249,7 +249,7 @@
   align-items: center;
   justify-content: center;
   transition: border-color 0.2s ease, transform 0.15s ease;
-  margin-right: 170px;
+  margin-right: 56px;
 }
 
 .leaderboard-link-button:hover {
