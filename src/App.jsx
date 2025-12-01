@@ -13,6 +13,7 @@ import BlastFeedback from './components/BlastFeedback'
 import MaterialLegend from './components/MaterialLegend'
 import SaveLoadPanel from './components/SaveLoadPanel'
 import SaveToast from './components/SaveToast'
+import LeaderboardPanel from './components/LeaderboardPanel'
 import { parseCSVToGrid, OreGrid as OreGridClass, OreBlock } from './utils/OreGrid'
 import { serializeGrid } from './utils/GridSerializer'
 import { useGameState } from './hooks/useGameState'
@@ -23,6 +24,7 @@ import { materialPropertyHandler } from './utils/MaterialPropertyHandler'
 import blastHistoryStore from './utils/BlastHistoryStore'
 import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
+import { isOre, normalizeMaterialName, getOreValue } from './utils/OreClassification'
 import { storeScore, getRecentScores, initializeScoreStorage } from './utils/ScoreStorage'
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
@@ -44,7 +46,6 @@ const assertRequiredHeaders = (records) => {
     throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`)
   }
 }
-import { isOre, normalizeMaterialName, getOreValue } from './utils/OreClassification'
 
 function App() {
   // Use global game state instead of individual state variables
@@ -614,14 +615,25 @@ function App() {
         materialBreakdown
       });
 
-      const leaderboardPlayer = (playerName && playerName.trim()) || 'Anonymous Miner';
+      const leaderboardPlayer = playerName?.trim() || 'Anonymous Miner';
       const blastHash = `blast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const grade = totalScoreAfterBlast >= 90
+        ? 'A'
+        : totalScoreAfterBlast >= 75
+          ? 'B'
+          : totalScoreAfterBlast >= 60
+            ? 'C'
+            : totalScoreAfterBlast >= 50
+              ? 'D'
+              : 'F';
+
       const scoreMetricsSnapshot = {
         totalScore: totalScoreAfterBlast,
         scoreDelta: scoreIncrease,
         recoveryRate: recovery,
         dilutionRate: dilution,
-        efficiency
+        efficiency,
+        grade
       };
 
       storeScore(leaderboardPlayer, scoreMetricsSnapshot, blastHash, {
@@ -631,7 +643,9 @@ function App() {
           totalWasteInZone: wasteCollected,
           totalValueRecovered: Math.max(0, totalValue)
         },
-        materialBreakdown
+        materialBreakdown,
+        cellsDestroyed: materialsDestroyed,
+        cellsAffected: result.affectedCells?.length || 0
       });
       refreshLeaderboardFromMemory();
 
@@ -1500,6 +1514,14 @@ function App() {
               Start Simulation
             </button>
           )}
+
+          <button
+            className="blast-button secondary-button"
+            type="button"
+            onClick={() => setCurrentView('leaderboard')}
+          >
+            View Leaderboard
+          </button>
         </div>
 
         {csvReady && (
@@ -1530,7 +1552,14 @@ function App() {
               </svg>
             </button>
             <h1 className="text-xl font-bold text-white dark:text-white text-center">Blast Simulation</h1>
-            <div className="size-10"></div>
+            <button
+              type="button"
+              className="leaderboard-link-button"
+              onClick={() => setCurrentView('leaderboard')}
+              aria-label="Open leaderboard"
+            >
+              <span className="material-symbols-outlined">leaderboard</span>
+            </button>
           </div>
           <p className="text-lg font-medium text-white dark:text-white mt-4">
             Welcome, {playerName}! | Score: {displayScore}
@@ -1672,6 +1701,54 @@ function App() {
     </div>
   )
 
+  const renderLegacyLeaderboard = () => (
+    <div className="flex items-center justify-center min-h-screen text-white blast-sim-container legacy-leaderboard-wrapper">
+      <div className="bg-[rgba(0,0,0,0.55)] backdrop-blur-lg rounded-2xl p-6 w-full max-w-3xl mx-4 shadow-2xl border border-white/10">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Leaderboard</h2>
+          <button
+            className="px-3 py-1 text-sm rounded-md border border-white/20 hover:border-white/40 transition"
+            onClick={refreshLeaderboardFromMemory}
+            disabled={isLoadingLeaderboard}
+          >
+            Refresh
+          </button>
+        </div>
+        {isLoadingLeaderboard ? (
+          <p className="text-sm text-gray-300">Loading saved scores…</p>
+        ) : leaderboardEntries.length === 0 ? (
+          <div className="text-center py-10 text-gray-300">
+            <p className="text-lg font-semibold">No blasts recorded yet.</p>
+            <p className="text-sm mt-2">Complete a blast to appear on this board.</p>
+          </div>
+        ) : (
+          <ol className="space-y-3">
+            {leaderboardEntries.map((entry, index) => (
+              <li
+                key={entry.blastHash || `${entry.playerID || 'anon'}-${index}`}
+                className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/10"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-xl font-bold text-blue-300">#{index + 1}</span>
+                  <div>
+                    <p className="font-semibold">{entry.playerID || 'Anonymous Miner'}</p>
+                    <p className="text-xs text-gray-300">{formatLeaderboardTimestamp(entry.timestamp)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold">{Math.round(entry.scoreMetrics?.totalScore ?? 0)} pts</p>
+                  <p className="text-xs text-gray-300">
+                    Δ {Math.round(entry.scoreMetrics?.scoreDelta ?? 0)} · Rec {entry.scoreMetrics?.recoveryRate ?? 0}% · Dil {entry.scoreMetrics?.dilutionRate ?? 0}%
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  )
+
 
 
   return (
@@ -1679,50 +1756,12 @@ function App() {
       {currentView === 'home' && renderHomeView()}
       {currentView === 'game' && renderGameView()}
       {currentView === 'leaderboard' && (
-        <div className="flex items-center justify-center min-h-screen text-white blast-sim-container">
-          <div className="bg-[rgba(0,0,0,0.55)] backdrop-blur-lg rounded-2xl p-6 w-full max-w-3xl mx-4 shadow-2xl border border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Leaderboard</h2>
-              <button
-                className="px-3 py-1 text-sm rounded-md border border-white/20 hover:border-white/40 transition"
-                onClick={refreshLeaderboardFromMemory}
-                disabled={isLoadingLeaderboard}
-              >
-                Refresh
-              </button>
-            </div>
-            {isLoadingLeaderboard ? (
-              <p className="text-sm text-gray-300">Loading saved scores…</p>
-            ) : leaderboardEntries.length === 0 ? (
-              <div className="text-center py-10 text-gray-300">
-                <p className="text-lg font-semibold">No blasts recorded yet.</p>
-                <p className="text-sm mt-2">Complete a blast to appear on this board.</p>
-              </div>
-            ) : (
-              <ol className="space-y-3">
-                {leaderboardEntries.map((entry, index) => (
-                  <li
-                    key={entry.blastHash || `${entry.playerID || 'anon'}-${index}`}
-                    className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/10"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-xl font-bold text-blue-300">#{index + 1}</span>
-                      <div>
-                        <p className="font-semibold">{entry.playerID || 'Anonymous Miner'}</p>
-                        <p className="text-xs text-gray-300">{formatLeaderboardTimestamp(entry.timestamp)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold">{Math.round(entry.scoreMetrics?.totalScore ?? 0)} pts</p>
-                      <p className="text-xs text-gray-300">
-                        Δ {Math.round(entry.scoreMetrics?.scoreDelta ?? 0)} · Rec {entry.scoreMetrics?.recoveryRate ?? 0}% · Dil {entry.scoreMetrics?.dilutionRate ?? 0}%
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
+        <div className="leaderboard-view-stack">
+          <LeaderboardPanel
+            playerName={playerName}
+            onBack={() => setCurrentView(csvReady ? 'game' : 'home')}
+          />
+          {renderLegacyLeaderboard()}
         </div>
       )}
       {currentView === 'help' && (
