@@ -175,6 +175,14 @@
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
+.leaderboard-row:nth-child(odd):not(.is-active) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.leaderboard-row:nth-child(even):not(.is-active) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .leaderboard-row.is-active {
   background: var(--lb-highlight);
   border-color: var(--lb-border);
