@@ -1111,14 +1111,8 @@ function App() {
         setBlastDirection(simulation.blasts.currentDirection || blastDirection);
       }
 
-      // Restore blasts via game state
+      // Clear any previously placed explosives so they don't persist after loading
       clearBlasts();
-      const savedBlasts = (simulation.blasts?.placements?.length ? simulation.blasts.placements : simulation.blasts?.history) || [];
-      savedBlasts.forEach((blast) => {
-        if (typeof blast?.x === 'number' && typeof blast?.y === 'number') {
-          addBlast(blast.x, blast.y, blast.direction ?? simulation.blasts?.currentDirection ?? 180);
-        }
-      });
 
       // Restore progress-driven UI state
       setSimulationResults(simulation.progress?.simulationResults || null);
@@ -1285,17 +1279,8 @@ function App() {
         if (typeof settings.dilution === 'number') setDilution(settings.dilution);
       }
       
-      // Restore blasts (if any were saved)
-      // Note: The blasts are managed by useGameState, but we can restore them via addBlast
-      // Clear existing blasts first
-      if (loadedData.blasts && Array.isArray(loadedData.blasts)) {
-        clearBlasts();
-        loadedData.blasts.forEach(blast => {
-          if (blast.x !== undefined && blast.y !== undefined) {
-            addBlast(blast.x, blast.y, blast.direction || 90);
-          }
-        });
-      }
+      // Clear any lingering explosives from the previous session
+      clearBlasts();
       
       // Switch to game view if we have player name and CSV data
       if (loadedData.playerName && normalizedCsvData?.length > 0) {
