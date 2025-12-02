@@ -28,6 +28,7 @@ import {
   countAffectedOres,
   calculateRecoveryRate,
   calculateDilutionRate,
+  calculateOverallMiningEfficiency,
   calculateFinalScore,
   hashBlastData,
   verifyDeterminism,
@@ -414,6 +415,18 @@ startSuite('4. Dilution Rate Tests');
   const dilution = calculateDilutionRate(mixedDilution);
   
   assertApprox(dilution, 50.0, 0.01, "50/50 ore/waste mix → 50% dilution");
+}
+
+// Overall mining efficiency uses recovery × (1 - dilution)
+{
+  const efficiency = calculateOverallMiningEfficiency(69, 10);
+  assertEquals(efficiency, 62, '69% recovery & 10% dilution → 62% efficiency');
+}
+
+// Efficiency inputs clamp to 0-100
+{
+  const efficiency = calculateOverallMiningEfficiency(120, -5);
+  assertEquals(efficiency, 100, 'Inputs clamp before efficiency calculation');
 }
 
 // ============================================================================

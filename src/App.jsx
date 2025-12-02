@@ -25,7 +25,7 @@ import simulationStorage from './utils/SimulationStorage'
 import replayManager from './utils/ReplayManager'
 import { isOre, normalizeMaterialName, getOreValue } from './utils/OreClassification'
 import { storeScore, initializeScoreStorage } from './utils/ScoreStorage'
-import { evaluateBlast } from './utils/BlastEvaluator'
+import { evaluateBlast, calculateOverallMiningEfficiency } from './utils/BlastEvaluator'
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole']
 
@@ -592,7 +592,10 @@ function App() {
       const scoreMetrics = evaluateBlast({ affectedBlocks: scoringBlocks });
       const roundedRecovery = Math.round(scoreMetrics.recoveryRate);
       const roundedDilution = Math.round(scoreMetrics.dilutionRate);
-      const efficiency = Math.max(0, roundedRecovery - roundedDilution);
+      const calculatedEfficiency = Number.isFinite(scoreMetrics.overallEfficiency)
+        ? scoreMetrics.overallEfficiency
+        : calculateOverallMiningEfficiency(scoreMetrics.recoveryRate, scoreMetrics.dilutionRate);
+      const efficiency = Math.max(0, Math.round(calculatedEfficiency));
 
       setMineralRecovery(roundedRecovery);
       setDilution(roundedDilution);
@@ -1588,7 +1591,7 @@ function App() {
                 <polyline points="12 19 5 12 12 5"></polyline>
               </svg>
             </button>
-            <h1 className="text-xl font-bold text-white dark:text-white text-center">Blast Simulation</h1>
+            <h1 className="text-xl font-bold text-white dark:text-white text-center blast-game-title">Blast Simulation</h1>
             <button
               type="button"
               className="leaderboard-link-button"

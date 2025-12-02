@@ -487,6 +487,26 @@ export function calculateDilutionRate(blastResult) {
 }
 
 /**
+ * Calculate Overall Mining Efficiency using recovery & dilution percentages
+ * overallEfficiency = recovery * (1 - dilution)
+ * @param {number} recoveryPercent
+ * @param {number} dilutionPercent
+ * @returns {number} Rounded efficiency percentage
+ */
+export function calculateOverallMiningEfficiency(recoveryPercent, dilutionPercent) {
+  const clampPercent = (value) => {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(100, value));
+  };
+
+  const recoveryRatio = clampPercent(recoveryPercent) / 100;
+  const dilutionRatio = clampPercent(dilutionPercent) / 100;
+
+  const efficiencyRatio = recoveryRatio * (1 - dilutionRatio);
+  return Math.round(efficiencyRatio * 100);
+}
+
+/**
  * Default scoring configuration
  */
 export const DEFAULT_SCORING_CONFIG = {
@@ -562,6 +582,9 @@ export function evaluateBlast(blastData, config = DEFAULT_SCORING_CONFIG) {
   // Step 4: Calculate dilution rate
   const dilutionRate = calculateDilutionRate(blastResult);
 
+  // Step 4b: Calculate overall efficiency from recovery/dilution
+  const overallEfficiency = calculateOverallMiningEfficiency(recoveryRate, dilutionRate);
+
   // Step 5: Calculate final weighted score and grade
   const { totalScore, grade } = calculateFinalScore(
     recoveryRate,
@@ -587,6 +610,8 @@ export function evaluateBlast(blastData, config = DEFAULT_SCORING_CONFIG) {
     recoveryRate,
     dilutionRate,
     valueRecoveryRate,
+    overallEfficiency,
+    efficiency: overallEfficiency,
     totalScore,
     grade,
     performanceTime,
@@ -607,6 +632,7 @@ export function evaluateBlast(blastData, config = DEFAULT_SCORING_CONFIG) {
         recoveryRate: `${this.recoveryRate.toFixed(2)}%`,
         valueRecoveryRate: `${this.valueRecoveryRate.toFixed(2)}%`,
         dilutionRate: `${this.dilutionRate.toFixed(2)}%`,
+        overallEfficiency: `${this.overallEfficiency.toFixed(2)}%`,
         performanceTime: `${this.performanceTime}ms`,
         oresRecovered: this.breakdown.totals.totalOresRecovered,
         oresLost: this.breakdown.totals.totalOresLost,

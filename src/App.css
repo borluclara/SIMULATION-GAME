@@ -385,6 +385,10 @@
   backdrop-filter: blur(10px);
 }
 
+.blast-game-title {
+  font-size: 2.4rem;
+}
+
 /* Responsive design for blast simulation */
 @media (min-width: 768px) {
   .blast-simulation-container {

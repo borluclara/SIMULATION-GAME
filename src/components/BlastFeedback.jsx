@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import './BlastFeedback.css';
 import blastHistoryStore from '../utils/BlastHistoryStore';
 import { isOre, normalizeMaterialName, getOreValue } from '../utils/OreClassification';
+import { calculateOverallMiningEfficiency } from '../utils/BlastEvaluator';
 
 const BlastFeedback = ({ 
   blastResults,
@@ -67,12 +68,16 @@ const BlastFeedback = ({
         (scoringTotals.totalOresLost || 0) +
         (scoringTotals.totalWasteInZone || 0);
 
+      const snapshotEfficiency = Number.isFinite(scoringSnapshot.overallEfficiency)
+        ? scoringSnapshot.overallEfficiency
+        : calculateOverallMiningEfficiency(scoringSnapshot.recoveryRate || 0, scoringSnapshot.dilutionRate || 0);
+
       return {
         oresRecovered: scoringTotals.totalOresRecovered || 0,
         wasteRecovered: scoringTotals.totalWasteInZone || 0,
         totalDestroyed,
         oreValue: Math.max(0, scoringTotals.totalValueRecovered || 0),
-        efficiency: Math.round(Math.max(0, scoringSnapshot.recoveryRate - scoringSnapshot.dilutionRate)),
+        efficiency: Math.round(Math.max(0, snapshotEfficiency)),
         recovery: Math.round(scoringSnapshot.recoveryRate || 0),
         dilution: Math.round(scoringSnapshot.dilutionRate || 0)
       };
@@ -120,14 +125,14 @@ const BlastFeedback = ({
     // Calculate percentages
     const recovery = totalDestroyed > 0 ? (oresRecovered / totalDestroyed) * 100 : 0;
     const dilution = totalDestroyed > 0 ? (wasteRecovered / totalDestroyed) * 100 : 0;
-    const efficiency = totalDestroyed > 0 ? Math.max(0, (recovery - dilution)) : 0;
+    const efficiency = calculateOverallMiningEfficiency(recovery, dilution);
 
     return {
       oresRecovered,
       wasteRecovered,
       totalDestroyed,
       oreValue: Math.max(0, totalValue),
-      efficiency: Math.round(efficiency),
+      efficiency: Math.round(Math.max(0, efficiency)),
       recovery: Math.round(recovery),
       dilution: Math.round(dilution)
     };
@@ -136,19 +141,20 @@ const BlastFeedback = ({
   const metrics = calculateMetrics();
   const scoreGained = Math.max(0, (playerScore || 0) - (previousScore || 0));
 
-  // Performance rating based on efficiency
+  // Performance rating bands driven purely by overall efficiency
   const getPerformanceRating = () => {
-    const { efficiency, recovery, dilution } = metrics;
-    
-    if (efficiency >= 80 && recovery >= 90 && dilution <= 10) {
+    const { efficiency } = metrics;
+
+    if (efficiency >= 85) {
       return { rating: 'Excellent', color: '#00ff88', icon: '🏆' };
-    } else if (efficiency >= 60 && recovery >= 70 && dilution <= 20) {
-      return { rating: 'Great', color: '#4CAF50', icon: '⭐' };
-    } else if (efficiency >= 40 && recovery >= 50 && dilution <= 35) {
-      return { rating: 'Good', color: '#FFC107', icon: '👍' };
-    } else {
-      return { rating: 'Poor', color: '#ff6b6b', icon: '⚠️' };
     }
+    if (efficiency >= 65) {
+      return { rating: 'Good', color: '#4CAF50', icon: '⭐' };
+    }
+    if (efficiency >= 45) {
+      return { rating: 'Fair', color: '#FFC107', icon: '👍' };
+    }
+    return { rating: 'Poor', color: '#ff6b6b', icon: '⚠️' };
   };
 
   const performance = getPerformanceRating();
