@@ -42,7 +42,7 @@ const validateCsvStructure = (fileText) => {
   return { valid: true };
 };
 
-const validateJsonSaveFile = (rawText) => {
+const analyzeJsonSaveFile = (rawText) => {
   if (!rawText || typeof rawText !== 'string') {
     return { valid: false, error: 'The JSON file is empty.' };
   }
@@ -54,26 +54,63 @@ const validateJsonSaveFile = (rawText) => {
     }
 
     const payload = parsed.gameState || parsed;
-    if (!payload || typeof payload !== 'object') {
-      return { valid: false, error: 'Missing gameState information in save file.' };
-    }
-
-    if (!payload.playerName || typeof payload.playerName !== 'string') {
-      return { valid: false, error: 'Player name is missing from the save file.' };
-    }
-
-    const csvData = payload.csvData;
+    const hasPlayerName = payload && typeof payload.playerName === 'string' && payload.playerName.trim().length > 0;
+    const csvData = payload && payload.csvData;
     const hasStructuredCsv = Array.isArray(csvData) && csvData.length > 0;
     const hasRawCsvString = typeof csvData === 'string' && csvData.trim().length > 0;
 
-    if (!hasStructuredCsv && !hasRawCsvString) {
-      return { valid: false, error: 'Grid data is missing from the save file.' };
+    if (hasPlayerName && (hasStructuredCsv || hasRawCsvString)) {
+      return { valid: true, type: 'standard-save', parsed };
     }
 
-    return { valid: true };
+    const sessionMeta = parsed.metadata;
+    const sessionCsv = parsed.rawData?.csvData;
+    const sessionHasCsv = Array.isArray(sessionCsv) ? sessionCsv.length > 0 : typeof sessionCsv === 'string' && sessionCsv?.trim().length > 0;
+    const sessionPlayer = sessionMeta?.playerName || parsed.scores?.playerName || ''; 
+
+    if (sessionMeta && sessionHasCsv && sessionPlayer) {
+      return { valid: true, type: 'session-export', parsed };
+    }
+
+    if (!hasPlayerName) {
+      return { valid: false, error: 'Player name is missing from the save file.' };
+    }
+
+    return { valid: false, error: 'Unrecognized save file format.' };
   } catch (error) {
     return { valid: false, error: 'Save file is not valid JSON.' };
   }
+};
+
+const convertSessionExportToGameState = (sessionData) => {
+  if (!sessionData || typeof sessionData !== 'object') {
+    return null;
+  }
+
+  const playerName = sessionData.metadata?.playerName || sessionData.scores?.playerName || 'Imported Player';
+  const csvData = sessionData.rawData?.csvData;
+  const hasCsv = Array.isArray(csvData) ? csvData.length > 0 : typeof csvData === 'string' && csvData?.trim().length > 0;
+
+  if (!hasCsv) {
+    return null;
+  }
+
+  const simulationSettings = {
+    blastPower: sessionData.simulationSettings?.blastPower,
+    blastDirection: sessionData.simulationSettings?.blastDirection,
+    mineralRecovery: sessionData.simulationSettings?.mineralRecovery ?? sessionData.scores?.mineralRecovery,
+    dilution: sessionData.simulationSettings?.dilution ?? sessionData.scores?.dilution
+  };
+
+  return {
+    playerName,
+    score: sessionData.scores?.currentScore ?? 0,
+    blasts: sessionData.blasts?.activeBlasts || [],
+    csvData,
+    currentScenario: sessionData.scenario || null,
+    simulationSettings,
+    timestamp: sessionData.metadata?.exportedAt || new Date().toISOString()
+  };
 };
 
 const SaveLoadPanel = ({ 
@@ -312,10 +349,32 @@ const SaveLoadPanel = ({
 
       if (isJson) {
         const fileText = await file.text();
-        const validation = validateJsonSaveFile(fileText);
+        const analysis = analyzeJsonSaveFile(fileText);
 
-        if (!validation.valid) {
-          showFeedback(`${validation.error} Please use a save exported from the File Manager.`, 'error');
+        if (!analysis.valid) {
+          showFeedback(`${analysis.error} Supported files include File Manager saves and Session exports.`, 'error');
+          return;
+        }
+
+        if (analysis.type === 'session-export') {
+          const converted = convertSessionExportToGameState(analysis.parsed);
+          if (!converted) {
+            showFeedback('Session export is missing required data.', 'error');
+            return;
+          }
+
+          if (!onLoad) {
+            showFeedback('Session files cannot be loaded in this context.', 'error');
+            return;
+          }
+
+          try {
+            await onLoad(converted);
+            showFeedback('Session file loaded successfully!', 'success');
+          } catch (loadError) {
+            console.error('Session load error:', loadError);
+            showFeedback(loadError.message || 'Failed to load session file.', 'error');
+          }
           return;
         }
 
