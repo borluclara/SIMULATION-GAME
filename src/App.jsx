@@ -970,11 +970,7 @@ function App() {
       currentScenario,
       blasts,
       csvData: originalCsvData,
-      gridState: oreGrid ? {
-        width: oreGrid.width,
-        height: oreGrid.height,
-        blocks: oreGrid.getAllBlocks()
-      } : null,
+      gridState: oreGrid ? serializeGrid(oreGrid) : null,
       simulationSettings: {
         blastPower,
         blastDirection,
@@ -1192,8 +1188,9 @@ function App() {
     const csvData = data.csvData;
     const hasArrayData = Array.isArray(csvData) && csvData.length > 0;
     const hasStringData = typeof csvData === 'string' && csvData.trim().length > 0;
+    const hasGridSnapshot = data.gridState && Array.isArray(data.gridState.blocks) && data.gridState.blocks.length > 0;
 
-    if (!hasArrayData && !hasStringData) {
+    if (!hasArrayData && !hasStringData && !hasGridSnapshot) {
       return { valid: false, reason: 'Grid data is missing in the save file.' };
     }
 
@@ -1201,6 +1198,8 @@ function App() {
   };
 
   const normalizeCsvData = (csvData) => {
+    if (!csvData) return null;
+    
     if (Array.isArray(csvData) && csvData.length > 0) {
       const filteredRecords = csvData.filter((row) => row && typeof row === 'object');
       assertRequiredHeaders(filteredRecords);
@@ -1239,36 +1238,55 @@ function App() {
       }
       
       const normalizedCsvData = normalizeCsvData(loadedData.csvData);
-      
+
       // Restore player name and score
       if (loadedData.playerName) setPlayerName(loadedData.playerName);
       if (typeof loadedData.score === 'number') setScore(loadedData.score);
-      
-      // Restore CSV data and grid
+
+      // Rebuild grid from snapshot or CSV
+      let restoredGrid = null;
+      if (loadedData.gridState) {
+        try {
+          restoredGrid = await rebuildGridFromSnapshot({
+            grid: loadedData.gridState,
+            data: normalizedCsvData || loadedData.csvData,
+            originalCsvData: normalizedCsvData || loadedData.csvData
+          });
+        } catch (error) {
+          console.warn('Grid snapshot failed to rebuild, falling back to CSV:', error);
+        }
+      }
+
+      if (!restoredGrid) {
+        if (normalizedCsvData) {
+          const csvString = Papa.unparse(normalizedCsvData);
+          restoredGrid = await parseCSVToGrid(csvString);
+        } else {
+          throw new Error('Save file is missing usable grid data.');
+        }
+      }
+
       if (normalizedCsvData) {
         setOriginalCsvData(normalizedCsvData);
         setCsvData(normalizedCsvData);
-
-        const csvString = Papa.unparse(normalizedCsvData);
-        const grid = await parseCSVToGrid(csvString);
-
-        setOreGrid(grid);
-        setCsvReady(true);
-
-        setCurrentScenario({
-          data: normalizedCsvData,
-          grid: grid,
-          fileName: loadedData.currentScenario?.fileName || 'Loaded Save',
-          uploadedAt: new Date().toISOString()
-        });
-
-        setGrid(grid.data || grid);
-        replayManager.startSession({
-          playerName: loadedData.playerName || playerName || 'Loaded Player',
-          sessionId: `manual_${Date.now()}`
-        });
-        replayManager.setInitialGrid(grid);
       }
+
+      setOreGrid(restoredGrid);
+      setCsvReady(true);
+
+      setCurrentScenario({
+        data: normalizedCsvData || loadedData.currentScenario?.data || originalCsvData,
+        grid: restoredGrid,
+        fileName: loadedData.currentScenario?.fileName || 'Loaded Save',
+        uploadedAt: new Date().toISOString()
+      });
+
+      setGrid(restoredGrid.data || restoredGrid);
+      replayManager.startSession({
+        playerName: loadedData.playerName || playerName || 'Loaded Player',
+        sessionId: `manual_${Date.now()}`
+      });
+      replayManager.setInitialGrid(restoredGrid);
       
       // Restore simulation settings
       if (loadedData.simulationSettings) {

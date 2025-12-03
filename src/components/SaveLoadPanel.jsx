@@ -107,6 +107,7 @@ const convertSessionExportToGameState = (sessionData) => {
     score: sessionData.scores?.currentScore ?? 0,
     blasts: sessionData.blasts?.activeBlasts || [],
     csvData,
+    gridState: sessionData.grid || null,
     currentScenario: sessionData.scenario || null,
     simulationSettings,
     timestamp: sessionData.metadata?.exportedAt || new Date().toISOString()
@@ -171,6 +172,25 @@ const SaveLoadPanel = ({
     }
   };
 
+  const buildSerializableGameState = () => {
+    if (typeof onSave === 'function') {
+      try {
+        const enrichedState = onSave(gameState);
+        if (enrichedState && typeof enrichedState === 'object') {
+          return enrichedState;
+        }
+      } catch (error) {
+        console.warn('onSave handler did not return a serializable state:', error);
+      }
+    }
+
+    return {
+      ...gameState,
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    };
+  };
+
   // Handle save functionality - now supports both file download and persistent storage
   const handleSave = async (saveType = 'persistent') => {
     if (!gameState) {
@@ -180,16 +200,16 @@ const SaveLoadPanel = ({
 
     try {
       setIsLoading(true);
-      
+
+      const serializableState = buildSerializableGameState();
+      const saveName = `${serializableState.playerName || 'Player'} - ${new Date().toLocaleString()}`;
+
       // Save to localStorage using SaveLoadManager
-      const saveName = `${gameState.playerName || 'Player'} - ${new Date().toLocaleString()}`;
-      const result = saveLoadManager.saveGame(gameState, saveName);
+      const result = saveLoadManager.saveGame(serializableState, saveName);
       
       if (result.success) {
         showFeedback('Game saved to browser storage!', 'success');
         loadSavedSessions(); // Refresh the list
-        
-        if (onSave) onSave(gameState);
       } else {
         showFeedback(result.error || 'Failed to save game', 'error');
       }
@@ -198,14 +218,12 @@ const SaveLoadPanel = ({
         // Save to persistent storage (new functionality)
         await handleSaveSimulation();
       } else if (saveType === 'download') {
-        // Original file download functionality
-        const saveData = {
-          ...gameState,
-          timestamp: new Date().toISOString(),
-          version: '1.0.0'
-        };
+        // File download functionality using enriched state
+        const downloadPayload = serializableState.timestamp
+          ? serializableState
+          : { ...serializableState, timestamp: new Date().toISOString(), version: '1.0.0' };
 
-        const dataStr = JSON.stringify(saveData, null, 2);
+        const dataStr = JSON.stringify(downloadPayload, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
         
         const exportFileDefaultName = `blastsim-save-${Date.now()}.json`;
@@ -216,8 +234,6 @@ const SaveLoadPanel = ({
         linkElement.click();
 
         showFeedback('Game file downloaded!', 'success');
-        
-        if (onSave) onSave(saveData);
       }
     } catch (error) {
       console.error('Save error:', error);
@@ -421,8 +437,8 @@ const SaveLoadPanel = ({
       setIsLoading(true);
       
       // Export as CSV if grid data exists
-      if (gameState.grid || gameState.csvData) {
-        const csvData = gameState.csvData || generateCSVFromGrid(gameState.grid);
+      if (gameState.grid || gameState.gridState || gameState.csvData) {
+        const csvData = gameState.csvData || generateCSVFromGrid(gameState.grid, gameState.gridState);
         const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
         
         const exportFileDefaultName = `blastsim-export-${Date.now()}.csv`;
@@ -465,10 +481,14 @@ const SaveLoadPanel = ({
   };
 
   // Generate CSV from grid data (fallback)
-  const generateCSVFromGrid = (grid) => {
-    if (!grid || !grid.getAllBlocks) return '';
-    
-    const blocks = grid.getAllBlocks();
+  const generateCSVFromGrid = (grid, gridSnapshot) => {
+    const blocks = grid && typeof grid.getAllBlocks === 'function'
+      ? grid.getAllBlocks()
+      : (gridSnapshot?.blocks || []);
+
+    if (!blocks || blocks.length === 0) {
+      return '';
+    }
     const csvRows = ['x,y,ore_type,hardness,value'];
     
     blocks.forEach(block => {
