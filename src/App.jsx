@@ -1445,6 +1445,51 @@ function App() {
           }
           
           try {
+            const metadataRow = results.data.find(row =>
+              row && (
+                row.player_name || row.player || row.player_score !== undefined ||
+                row.mineral_recovery !== undefined || row.blast_power !== undefined
+              )
+            ) || null;
+
+            if (metadataRow) {
+              const toNumber = (value) => {
+                if (value === null || value === undefined || value === '') return null;
+                const num = Number(value);
+                return Number.isNaN(num) ? null : num;
+              };
+
+              const extractedPlayerName = metadataRow.player_name || metadataRow.player || metadataRow.playername;
+              if (extractedPlayerName) {
+                setPlayerName(extractedPlayerName);
+              }
+
+              const extractedScore = toNumber(metadataRow.player_score);
+              if (extractedScore !== null) {
+                setScore(extractedScore);
+              }
+
+              const extractedMineralRecovery = toNumber(metadataRow.mineral_recovery);
+              if (extractedMineralRecovery !== null) {
+                setMineralRecovery(extractedMineralRecovery);
+              }
+
+              const extractedDilution = toNumber(metadataRow.dilution);
+              if (extractedDilution !== null) {
+                setDilution(extractedDilution);
+              }
+
+              const extractedBlastPower = toNumber(metadataRow.blast_power);
+              if (extractedBlastPower !== null) {
+                setBlastPower(extractedBlastPower);
+              }
+
+              const extractedBlastDirection = toNumber(metadataRow.blast_direction);
+              if (extractedBlastDirection !== null) {
+                setBlastDirection(extractedBlastDirection);
+              }
+            }
+
             // Create grid from the parsed data
             const grid = await parseCSVToGrid(csvData);
             

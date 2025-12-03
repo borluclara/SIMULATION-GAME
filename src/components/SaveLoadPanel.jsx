@@ -12,6 +12,23 @@ import { saveLoadManager } from '../utils/SaveLoadManager';
 import { materialPropertyHandler } from '../utils/MaterialPropertyHandler';
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole'];
+const EXPORT_CSV_COLUMNS = [
+  ...REQUIRED_CSV_HEADERS,
+  'health',
+  'max_health',
+  'damage',
+  'is_destroyed',
+  'recently_displaced',
+  'animated_x',
+  'animated_y',
+  'player_name',
+  'player_score',
+  'mineral_recovery',
+  'dilution',
+  'blast_power',
+  'blast_direction',
+  'game_timestamp'
+];
 
 const normalizeHeaderValue = (value = '') => value
   .toLowerCase()
@@ -441,7 +458,12 @@ const SaveLoadPanel = ({
       // Export as CSV if grid data exists
       if (gameState.grid || gameState.gridState || gameState.csvData) {
         const csvString = (() => {
-          const { csvData, grid, gridState } = gameState;
+          const { grid, gridState, csvData } = gameState;
+
+          const gridSnapshotCsv = generateCSVFromGrid(grid, gridState, gameState);
+          if (gridSnapshotCsv && gridSnapshotCsv.trim().length > 0) {
+            return gridSnapshotCsv;
+          }
 
           if (typeof csvData === 'string' && csvData.trim().length > 0) {
             return csvData;
@@ -451,11 +473,11 @@ const SaveLoadPanel = ({
             try {
               return Papa.unparse(csvData, { columns: REQUIRED_CSV_HEADERS });
             } catch (error) {
-              console.warn('Failed to unparse structured CSV data, falling back to grid snapshot.', error);
+              console.warn('Failed to unparse structured CSV data, fallback unavailable.', error);
             }
           }
 
-          return generateCSVFromGrid(grid, gridState);
+          return '';
         })();
 
         if (!csvString || csvString.trim().length === 0) {
@@ -506,7 +528,7 @@ const SaveLoadPanel = ({
   };
 
   // Generate CSV from grid data (fallback)
-  const generateCSVFromGrid = (grid, gridSnapshot) => {
+  const generateCSVFromGrid = (grid, gridSnapshot, fullGameState) => {
     const blockList = grid && typeof grid.getAllBlocks === 'function'
       ? grid.getAllBlocks()
       : (gridSnapshot?.blocks || []);
@@ -515,24 +537,46 @@ const SaveLoadPanel = ({
       return '';
     }
 
+    const sharedMetadata = {
+      player_name: fullGameState?.playerName || '',
+      player_score: fullGameState?.score ?? 0,
+      mineral_recovery: fullGameState?.simulationSettings?.mineralRecovery ?? fullGameState?.mineralRecovery ?? 0,
+      dilution: fullGameState?.simulationSettings?.dilution ?? fullGameState?.dilution ?? 0,
+      blast_power: fullGameState?.simulationSettings?.blastPower ?? 0,
+      blast_direction: fullGameState?.simulationSettings?.blastDirection ?? 0,
+      game_timestamp: new Date().toISOString()
+    };
+
     const rows = blockList
       .filter(Boolean)
       .map(block => {
         const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
+        const hardness = materialProps?.hardness ?? block.hardness ?? block.maxHealth ?? 5;
+        const maxHealth = block.maxHealth ?? hardness;
+        const currentHealth = typeof block.health === 'number' ? block.health : maxHealth;
+        const damage = typeof block.damage === 'number' ? block.damage : Math.max(0, maxHealth - currentHealth);
         return {
           x: block.x,
           y: block.y,
           material: block.oreType,
           type: materialProps?.type || 'ore',
           density_g_cm3: materialProps?.density ?? materialProps?.density_g_cm3 ?? 2.5,
-          hardness_mohs: materialProps?.hardness ?? block.hardness ?? block.maxHealth ?? 5,
+          hardness_mohs: hardness,
           game_value: block.value ?? materialProps?.game_value ?? 0,
-          blast_hole: block.blastHole ?? block.blast_hole ?? 0
+          blast_hole: block.blastHole ?? block.blast_hole ?? 0,
+          health: currentHealth,
+          max_health: maxHealth,
+          damage,
+          is_destroyed: block.isDestroyed ? 1 : 0,
+          recently_displaced: block.recentlyDisplaced ? 1 : 0,
+          animated_x: typeof block.animatedX === 'number' ? block.animatedX : block.x,
+          animated_y: typeof block.animatedY === 'number' ? block.animatedY : block.y,
+          ...sharedMetadata
         };
       });
 
     try {
-      return Papa.unparse(rows, { columns: REQUIRED_CSV_HEADERS });
+      return Papa.unparse(rows, { columns: EXPORT_CSV_COLUMNS });
     } catch (error) {
       console.error('Failed to generate CSV from grid data:', error);
       return '';

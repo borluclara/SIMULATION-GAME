@@ -424,11 +424,20 @@ export class OreGrid {
     materialPropertyHandler.loadFromCSV(csvData);
     
     // Find required columns
-    const xIndex = headers.findIndex(h => h.toLowerCase().includes('x'));
-    const yIndex = headers.findIndex(h => h.toLowerCase().includes('y'));
-    const oreIndex = headers.findIndex(h => h.toLowerCase().includes('ore') || h.toLowerCase().includes('type'));
-    const hardnessIndex = headers.findIndex(h => h.toLowerCase().includes('hardness'));
-    const valueIndex = headers.findIndex(h => h.toLowerCase().includes('value'));
+    const loweredHeaders = headers.map(h => h.toLowerCase());
+    const xIndex = loweredHeaders.findIndex(h => h.includes('x'));
+    const yIndex = loweredHeaders.findIndex(h => h.includes('y'));
+    const oreIndex = loweredHeaders.findIndex(h => h.includes('ore') || h.includes('material') || h.includes('type'));
+    const hardnessIndex = loweredHeaders.findIndex(h => h.includes('hardness'));
+    const valueIndex = loweredHeaders.findIndex(h => h.includes('value'));
+    const healthIndex = loweredHeaders.findIndex(h => h === 'health' || h.includes('current_health'));
+    const maxHealthIndex = loweredHeaders.findIndex(h => h.includes('max_health'));
+    const damageIndex = loweredHeaders.findIndex(h => h.includes('damage'));
+    const destroyedIndex = loweredHeaders.findIndex(h => h.includes('destroy'));
+    const displacementIndex = loweredHeaders.findIndex(h => h.includes('recently_displaced') || h.includes('displaced'));
+    const blastHoleIndex = loweredHeaders.findIndex(h => h.includes('blast_hole'));
+    const animatedXIndex = loweredHeaders.findIndex(h => h.includes('animated_x'));
+    const animatedYIndex = loweredHeaders.findIndex(h => h.includes('animated_y'));
 
     if (xIndex === -1 || yIndex === -1 || oreIndex === -1) {
       throw new Error('CSV must contain x, y, and ore_type columns');
@@ -451,7 +460,77 @@ export class OreGrid {
       if (!isNaN(x) && !isNaN(y) && oreType) {
         // Get material properties for this block
         const materialProperties = materialPropertyHandler.getMaterialProperties(oreType);
-        blocks.push(new OreBlock(x, y, oreType, hardness, value, materialProperties));
+        const block = new OreBlock(x, y, oreType, hardness, value, materialProperties);
+
+        const parseNumber = (val) => {
+          if (val === undefined || val === null || val === '') return null;
+          const num = Number(val);
+          return Number.isNaN(num) ? null : num;
+        };
+
+        const parseBoolean = (val) => {
+          if (typeof val === 'string') {
+            const normalized = val.trim().toLowerCase();
+            if (['true', 'yes', '1'].includes(normalized)) return true;
+            if (['false', 'no', '0', ''].includes(normalized)) return false;
+          }
+          if (typeof val === 'number') return val !== 0;
+          return Boolean(val);
+        };
+
+        const maxHealthValue = maxHealthIndex !== -1 ? parseNumber(row[maxHealthIndex]) : null;
+        if (maxHealthValue !== null) {
+          block.maxHealth = maxHealthValue;
+          block.health = Math.min(block.health, block.maxHealth);
+        }
+
+        const healthValue = healthIndex !== -1 ? parseNumber(row[healthIndex]) : null;
+        if (healthValue !== null) {
+          block.health = Math.max(0, Math.min(block.maxHealth, healthValue));
+        }
+
+        const damageValue = damageIndex !== -1 ? parseNumber(row[damageIndex]) : null;
+        if (damageValue !== null) {
+          block.damage = Math.max(0, damageValue);
+          block.health = Math.max(0, block.maxHealth - block.damage);
+        } else {
+          block.damage = block.maxHealth - block.health;
+        }
+
+        const destroyedValue = destroyedIndex !== -1 ? row[destroyedIndex] : null;
+        if (destroyedValue !== null) {
+          block.isDestroyed = parseBoolean(destroyedValue);
+          if (block.isDestroyed) {
+            block.health = 0;
+            block.damage = block.maxHealth;
+          }
+        }
+
+        if (displacementIndex !== -1) {
+          block.recentlyDisplaced = parseBoolean(row[displacementIndex]);
+        }
+
+        if (blastHoleIndex !== -1) {
+          block.blastHole = parseNumber(row[blastHoleIndex]) ?? 0;
+        }
+
+        if (animatedXIndex !== -1) {
+          const animX = parseNumber(row[animatedXIndex]);
+          if (animX !== null) {
+            block.animatedX = animX;
+            block.targetX = animX;
+          }
+        }
+
+        if (animatedYIndex !== -1) {
+          const animY = parseNumber(row[animatedYIndex]);
+          if (animY !== null) {
+            block.animatedY = animY;
+            block.targetY = animY;
+          }
+        }
+
+        blocks.push(block);
         maxX = Math.max(maxX, x);
         maxY = Math.max(maxY, y);
       }
