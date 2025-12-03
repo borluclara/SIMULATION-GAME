@@ -841,6 +841,13 @@ const OreGridCanvas = forwardRef(({
     }
   };
 
+  const formatHealthValue = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return value ?? '--';
+    }
+    return value.toFixed(2);
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -900,7 +907,7 @@ const OreGridCanvas = forwardRef(({
               Position: ({hoveredBlock.x}, {hoveredBlock.y})
             </div>
             <div className="tooltip-info">
-              Health: {hoveredBlock.health}/{hoveredBlock.maxHealth} | Value: {hoveredBlock.value}
+              Health: {formatHealthValue(hoveredBlock.health)}/{formatHealthValue(hoveredBlock.maxHealth)} | Value: {hoveredBlock.value}
             </div>
             {hoveredBlock.damage > 0 && (
               <div className="tooltip-damage">Damage: {hoveredBlock.damage}</div>
