@@ -295,18 +295,6 @@ const SavedSessionsModal = ({
                   </button>
 
                   <button
-                    className="action-btn export-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleExportClick(session);
-                    }}
-                    disabled={session.isCorrupted || (session.source === 'simulation' && !onExportSimulation)}
-                    title="Export save to file"
-                  >
-                    <span className="material-symbols-outlined">file_download</span>
-                  </button>
-
-                  <button
                     className="action-btn delete-btn"
                     onClick={(e) => {
                       e.stopPropagation();
