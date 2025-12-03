@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import Papa from 'papaparse';
 import './SaveLoadPanel.css';
 import simulationStorage from '../utils/SimulationStorage';
 import SavedSessionsModal from './SavedSessionsModal';
 import { saveLoadManager } from '../utils/SaveLoadManager';
+import { materialPropertyHandler } from '../utils/MaterialPropertyHandler';
 
 const REQUIRED_CSV_HEADERS = ['x', 'y', 'material', 'type', 'density_g_cm3', 'hardness_mohs', 'game_value', 'blast_hole'];
 
@@ -438,8 +440,31 @@ const SaveLoadPanel = ({
       
       // Export as CSV if grid data exists
       if (gameState.grid || gameState.gridState || gameState.csvData) {
-        const csvData = gameState.csvData || generateCSVFromGrid(gameState.grid, gameState.gridState);
-        const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+        const csvString = (() => {
+          const { csvData, grid, gridState } = gameState;
+
+          if (typeof csvData === 'string' && csvData.trim().length > 0) {
+            return csvData;
+          }
+
+          if (Array.isArray(csvData) && csvData.length > 0) {
+            try {
+              return Papa.unparse(csvData, { columns: REQUIRED_CSV_HEADERS });
+            } catch (error) {
+              console.warn('Failed to unparse structured CSV data, falling back to grid snapshot.', error);
+            }
+          }
+
+          return generateCSVFromGrid(grid, gridState);
+        })();
+
+        if (!csvString || csvString.trim().length === 0) {
+          showFeedback('No grid data to export', 'error');
+          setIsLoading(false);
+          return;
+        }
+
+        const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvString);
         
         const exportFileDefaultName = `blastsim-export-${Date.now()}.csv`;
         
@@ -450,7 +475,7 @@ const SaveLoadPanel = ({
         
         showFeedback('Data exported successfully!', 'success');
         
-        if (onExport) onExport(csvData);
+        if (onExport) onExport(csvString);
       } else {
         showFeedback('No grid data to export', 'error');
       }
@@ -482,22 +507,36 @@ const SaveLoadPanel = ({
 
   // Generate CSV from grid data (fallback)
   const generateCSVFromGrid = (grid, gridSnapshot) => {
-    const blocks = grid && typeof grid.getAllBlocks === 'function'
+    const blockList = grid && typeof grid.getAllBlocks === 'function'
       ? grid.getAllBlocks()
       : (gridSnapshot?.blocks || []);
 
-    if (!blocks || blocks.length === 0) {
+    if (!blockList || blockList.length === 0) {
       return '';
     }
-    const csvRows = ['x,y,ore_type,hardness,value'];
-    
-    blocks.forEach(block => {
-      if (block) {
-        csvRows.push(`${block.x},${block.y},${block.oreType},${block.hardness},${block.value}`);
-      }
-    });
-    
-    return csvRows.join('\n');
+
+    const rows = blockList
+      .filter(Boolean)
+      .map(block => {
+        const materialProps = block.materialProperties || materialPropertyHandler.getMaterialProperties(block.oreType);
+        return {
+          x: block.x,
+          y: block.y,
+          material: block.oreType,
+          type: materialProps?.type || 'ore',
+          density_g_cm3: materialProps?.density ?? materialProps?.density_g_cm3 ?? 2.5,
+          hardness_mohs: materialProps?.hardness ?? block.hardness ?? block.maxHealth ?? 5,
+          game_value: block.value ?? materialProps?.game_value ?? 0,
+          blast_hole: block.blastHole ?? block.blast_hole ?? 0
+        };
+      });
+
+    try {
+      return Papa.unparse(rows, { columns: REQUIRED_CSV_HEADERS });
+    } catch (error) {
+      console.error('Failed to generate CSV from grid data:', error);
+      return '';
+    }
   };
 
   // Handle save simulation to persistent storage
