@@ -449,11 +449,6 @@ function App() {
     }
   }
 
-  // Blast simulation handlers
-  const handlePowerChange = (power) => {
-    setBlastPower(power)
-  }
-
   const handleDirectionChange = (direction) => {
     setBlastDirection(direction)
   }
@@ -1607,9 +1602,6 @@ function App() {
       <header className="blast-header">
         <div style={{ width: '24px' }}></div>
         <h1 className="blast-title">BlastSim</h1>
-        <span className="material-symbols-outlined settings-icon">
-          settings
-        </span>
       </header>
 
       <main className="blast-main">
@@ -1738,8 +1730,6 @@ function App() {
                   {/* Top Row: Two panels side by side */}
                   <div className="controls-top-row">
                     <BlastToolPanel
-                      blastPower={blastPower}
-                      setBlastPower={setBlastPower}
                       blastDirection={blastDirection}
                       setBlastDirection={setBlastDirection}
                       onSimulate={handleRunSimulation}

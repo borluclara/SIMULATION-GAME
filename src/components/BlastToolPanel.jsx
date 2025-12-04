@@ -2,8 +2,6 @@ import React from 'react'
 import './BlastToolPanel.css'
 
 const BlastToolPanel = ({ 
-  blastPower, 
-  setBlastPower, 
   blastDirection, 
   setBlastDirection, 
   onSimulate, 
@@ -61,22 +59,6 @@ const BlastToolPanel = ({
     <div className="blast-tool-panel">
       <h3 className="panel-title">Blast Tool Panel</h3>
       
-      <div className="slider-container">
-        <div className="slider-label">
-          <span>Blast Power</span>
-          <span className="slider-value">{blastPower}</span>
-        </div>
-        <input
-          id="blast-power"
-          type="range"
-          min="100"
-          max="1000"
-          value={blastPower}
-          onChange={(e) => setBlastPower(Number(e.target.value))}
-          className="slider"
-        />
-      </div>
-
       <div className="direction-container">
         <div className="slider-label">
           <span>Blast Direction</span>

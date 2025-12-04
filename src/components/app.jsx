@@ -219,8 +219,6 @@ function App() {
               />
               
               <BlastToolPanel
-                blastPower={blastPower}
-                setBlastPower={setBlastPower}
                 blastDirection={blastDirection}
                 setBlastDirection={setBlastDirection}
                 onSimulate={handleSimulate}
