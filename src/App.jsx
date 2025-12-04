@@ -102,6 +102,7 @@ function App() {
   const [replayBlastMarkers, setReplayBlastMarkers] = useState(null);
   const preReplayHighlightRef = React.useRef(highlightedCells);
   const replayOverlayActiveRef = React.useRef(false);
+  const sessionInitSkipRef = React.useRef(false);
   
   // Reset feedback state
   const [resetMessage, setResetMessage] = useState(null)
@@ -200,14 +201,21 @@ function App() {
   // Initialize blast history store when player name changes
   useEffect(() => {
     const trimmedName = playerName?.trim();
-    if (trimmedName && trimmedName.length > 0) {
-      blastHistoryStore.initializeSession(trimmedName);
-      if (!replayManager.hasLoadedReplay()) {
-        replayManager.startSession({
-          playerName: trimmedName,
-          sessionId: blastHistoryStore.sessionId
-        });
-      }
+    if (!trimmedName) {
+      return;
+    }
+
+    if (sessionInitSkipRef.current) {
+      sessionInitSkipRef.current = false;
+      return;
+    }
+
+    blastHistoryStore.initializeSession(trimmedName);
+    if (!replayManager.hasLoadedReplay()) {
+      replayManager.startSession({
+        playerName: trimmedName,
+        sessionId: blastHistoryStore.sessionId
+      });
     }
   }, [playerName]);
 
@@ -745,6 +753,8 @@ function App() {
           },
           autoSaveReference: roundNumberForAutoSave
         });
+
+        handleAutoSave(roundNumberForAutoSave, totalScoreAfterBlast);
       };
 
       // *** START GSAP ANIMATION SEQUENCE ***
@@ -792,9 +802,6 @@ function App() {
               setFeedbackResults(blastDataForUi);
               setShowBlastFeedback(true);
             }, 500);
-
-            // Trigger immediate auto-save once the blast fully completes
-            handleAutoSave(roundNumberForAutoSave, totalScoreAfterBlast);
 
             // If physics is not running, finalize replay immediately
             if (!result.destroyedCells?.length || !canvasRef.current) {
@@ -978,7 +985,8 @@ function App() {
         dilution
       },
       timestamp: new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
+      sessionHistory: blastHistoryStore.exportSessionData()
     };
     
     console.log('Game state saved:', gameStateData);
@@ -1017,7 +1025,8 @@ function App() {
         saveReason: reason,
         autoSaveRound,
         autoSaveLabel,
-        replay: replayManager.exportReplayData()
+        replay: replayManager.exportReplayData(),
+        sessionHistory: blastHistoryStore.exportSessionData()
       };
 
       // Save to persistent storage
@@ -1065,11 +1074,21 @@ function App() {
       
       const simulation = await simulationStorage.loadSimulation(simulationId);
       const restoredGrid = await rebuildGridFromSnapshot(simulation.scenario);
+      const loadedPlayerName = simulation.player?.name || playerName || 'Loaded Player';
+
+      if (simulation.sessionHistory) {
+        const imported = blastHistoryStore.importSessionData(simulation.sessionHistory);
+        if (!imported && loadedPlayerName) {
+          blastHistoryStore.initializeSession(loadedPlayerName);
+        }
+      } else if (loadedPlayerName) {
+        blastHistoryStore.initializeSession(loadedPlayerName);
+      }
       
       // Restore game state
       if (simulation.player?.name) {
+        sessionInitSkipRef.current = true;
         setPlayerName(simulation.player.name);
-        blastHistoryStore.initializeSession(simulation.player.name);
       }
       setScore(simulation.player?.score ?? 0);
 
@@ -1086,9 +1105,12 @@ function App() {
       });
       setOreGrid(restoredGrid);
       setGrid(restoredGrid);
+      setReplayGrid(null);
+      setReplayBlastMarkers(null);
 
       if (simulation.replay) {
         replayManager.loadReplay(simulation.replay);
+        stopReplay();
       } else {
         replayManager.startSession({
           playerName: simulation.player?.name || playerName || 'Loaded Player',
@@ -1119,6 +1141,7 @@ function App() {
       setCameraShake({ x: 0, y: 0 });
       setAnimationState(null);
       setPhysicsDebris([]);
+      replayOverlayActiveRef.current = false;
       setPlacementMode(false);
       setExplosionAnimations([]);
       setResetMessage(null);
@@ -1152,15 +1175,20 @@ function App() {
   // Auto-save functionality (can be called after significant game events)
   const handleAutoSave = async (roundNumber = null, scoreOverride = null) => {
     if (csvReady && playerName && oreGrid) {
-      const autoSaveLabel = roundNumber
-        ? `Auto-Save – Round ${roundNumber}`
+      const sessionStats = blastHistoryStore.getSessionStats();
+      const currentRound = sessionStats?.totalRounds || blastHistoryStore.getCurrentRound();
+      const resolvedRound = typeof roundNumber === 'number' && roundNumber > 0
+        ? roundNumber
+        : (currentRound > 0 ? currentRound : null);
+      const autoSaveLabel = resolvedRound
+        ? `Auto-Save – Round ${resolvedRound}`
         : `Auto-Save – ${new Date().toLocaleTimeString()}`;
 
       try {
         await handleSaveSimulation(autoSaveLabel, {
           reason: 'auto',
           silent: true,
-          autoSaveRound: roundNumber,
+          autoSaveRound: resolvedRound,
           autoSaveLabel,
           scoreOverride
         });
@@ -1239,8 +1267,22 @@ function App() {
       
       const normalizedCsvData = normalizeCsvData(loadedData.csvData);
 
+      if (loadedData.sessionHistory) {
+        const imported = blastHistoryStore.importSessionData(loadedData.sessionHistory);
+        if (!imported && loadedData.playerName) {
+          blastHistoryStore.initializeSession(loadedData.playerName);
+        }
+      } else if (loadedData.playerName) {
+        blastHistoryStore.initializeSession(loadedData.playerName);
+      }
+
       // Restore player name and score
-      if (loadedData.playerName) setPlayerName(loadedData.playerName);
+      if (loadedData.playerName) {
+        if (loadedData.playerName !== playerName) {
+          sessionInitSkipRef.current = true;
+        }
+        setPlayerName(loadedData.playerName);
+      }
       if (typeof loadedData.score === 'number') setScore(loadedData.score);
 
       // Rebuild grid from snapshot or CSV

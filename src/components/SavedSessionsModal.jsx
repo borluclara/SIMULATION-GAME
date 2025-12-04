@@ -24,8 +24,10 @@ const SavedSessionsModal = ({
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  const hasSimulationSessions = Array.isArray(simulationSessions) && simulationSessions.length > 0;
-  const baseSessions = hasSimulationSessions ? simulationSessions : (savedSessions || []);
+  const baseSessions = [
+    ...(Array.isArray(simulationSessions) ? simulationSessions : []),
+    ...(Array.isArray(savedSessions) ? savedSessions : [])
+  ];
   
   // Close modal on escape key
   useEffect(() => {

@@ -11,7 +11,7 @@ class SimulationStorage {
     this.dbName = 'BlastSimDB';
     this.dbVersion = 1;
     this.storeName = 'simulations';
-    this.maxSaves = 10; // Maximum number of saves to retain
+    this.maxSaves = Infinity; // Maximum number of saves to retain (Infinity = keep all)
     this.db = null;
     this.schemaVersion = SIMULATION_SCHEMA_VERSION;
     this.isIndexedDBSupported = this.checkIndexedDBSupport();
@@ -77,6 +77,9 @@ class SimulationStorage {
   createSimulationState(gameData) {
     const timestamp = Date.now();
     const simulationId = `sim_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalRounds = gameData.sessionHistory?.totalRounds
+      ?? gameData.autoSaveRound
+      ?? (gameData.blasts || []).length;
 
     return {
       id: simulationId,
@@ -123,14 +126,18 @@ class SimulationStorage {
       // Metadata
       metadata: {
         gridSize: this.calculateGridSize(gameData.oreGrid),
-        totalBlasts: (gameData.blasts || []).length,
+        totalBlasts: totalRounds ?? (gameData.blasts || []).length,
         saveReason: gameData.saveReason || 'manual',
-        autoSaveRound: gameData.autoSaveRound || null,
-        autoSaveLabel: gameData.autoSaveLabel || null
+        autoSaveRound: gameData.autoSaveRound ?? totalRounds ?? null,
+        autoSaveLabel: gameData.autoSaveLabel || null,
+        lastCompletedRound: totalRounds ?? null
       },
 
       // Deterministic replay payload
-      replay: gameData.replay || null
+      replay: gameData.replay || null,
+
+      // Session history snapshot
+      sessionHistory: gameData.sessionHistory || null
     };
   }
 
@@ -250,8 +257,11 @@ class SimulationStorage {
   /**
    * Ensure only the most recent auto-saves are retained
    */
-  async pruneAutoSaves(limit = 3) {
+  async pruneAutoSaves(limit = Infinity) {
     try {
+      if (!Number.isFinite(limit)) {
+        return;
+      }
       const allSimulations = await this.getAllSimulations();
       const autoSaves = allSimulations.filter(sim => sim.metadata?.saveReason === 'auto');
 
@@ -486,6 +496,9 @@ class SimulationStorage {
    */
   async cleanupOldSaves() {
     try {
+      if (!Number.isFinite(this.maxSaves)) {
+        return;
+      }
       const allSimulations = await this.getAllSimulations();
       
       if (allSimulations.length > this.maxSaves) {
@@ -556,7 +569,14 @@ class SimulationStorage {
   buildSimulationSummary(simulation) {
     try {
       const score = simulation?.player?.score ?? 0;
-      const blasts = simulation?.blastCount
+      const historyRounds = Array.isArray(simulation?.sessionHistory?.blastHistory)
+        ? simulation.sessionHistory.blastHistory.length
+        : null;
+      const blasts = simulation?.sessionHistory?.totalRounds
+        ?? historyRounds
+        ?? simulation?.metadata?.autoSaveRound
+        ?? simulation?.metadata?.lastCompletedRound
+        ?? simulation?.blastCount
         ?? simulation?.metadata?.totalBlasts
         ?? simulation?.blasts?.history?.length
         ?? 0;

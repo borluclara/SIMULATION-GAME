@@ -124,6 +124,18 @@ export class SaveLoadManager {
           const saveDataStr = localStorage.getItem(saveId);
           if (saveDataStr) {
             const saveData = JSON.parse(saveDataStr);
+            const sessionHistory = saveData.gameState?.sessionHistory;
+            const historyRounds = Array.isArray(sessionHistory?.blastHistory)
+              ? sessionHistory.blastHistory.length
+              : null;
+            const totalRounds = sessionHistory?.totalRounds
+              ?? historyRounds
+              ?? saveData.gameState?.metadata?.autoSaveRound
+              ?? saveData.gameState?.metadata?.lastCompletedRound
+              ?? saveData.gameState?.metadata?.totalBlasts
+              ?? saveData.gameState?.blasts?.length
+              ?? 0;
+
             saves.push({
               id: saveId,
               saveName: saveData.saveName,
@@ -131,7 +143,7 @@ export class SaveLoadManager {
               version: saveData.version,
               playerName: saveData.gameState?.playerName || 'Unknown',
               score: saveData.gameState?.score || 0,
-              blastCount: saveData.gameState?.blasts?.length || 0,
+              blastCount: totalRounds,
               isCompatible: this._isCompatibleVersion(saveData.version)
             });
           }

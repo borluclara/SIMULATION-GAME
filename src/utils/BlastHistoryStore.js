@@ -236,11 +236,11 @@ class BlastHistoryStore {
     return {
       sessionId: this.sessionId,
       playerName: this.playerName,
-      startTime: this.startTime,
-      endTime: new Date(),
+      startTime: this.startTime instanceof Date ? this.startTime.toISOString() : this.startTime,
+      endTime: new Date().toISOString(),
       totalRounds: this.currentRound,
-      blastHistory: this.getAllRecords(),
-      sessionStats: this.getSessionStats()
+      blastHistory: this.serializeForStorage(this.getAllRecords(), []),
+      sessionStats: this.serializeForStorage(this.getSessionStats(), null)
     };
   }
 
@@ -283,6 +283,30 @@ class BlastHistoryStore {
       sessionDuration: new Date() - this.startTime,
       timestamp: new Date()
     };
+  }
+
+  /**
+   * Convert complex objects into JSON-safe snapshots
+   */
+  serializeForStorage(value, fallback = null) {
+    if (value === undefined) {
+      return fallback;
+    }
+
+    try {
+      return JSON.parse(JSON.stringify(value, (key, currentValue) => {
+        if (typeof currentValue === 'function') {
+          return undefined;
+        }
+        if (currentValue instanceof Date) {
+          return currentValue.toISOString();
+        }
+        return currentValue;
+      }));
+    } catch (error) {
+      console.warn('⚠️ BlastHistoryStore: Failed to serialize value for storage', error);
+      return fallback;
+    }
   }
 
   /**

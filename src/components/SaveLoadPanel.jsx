@@ -221,7 +221,15 @@ const SaveLoadPanel = ({
       setIsLoading(true);
 
       const serializableState = buildSerializableGameState();
-      const saveName = `${serializableState.playerName || 'Player'} - ${new Date().toLocaleString()}`;
+      const historyRounds = Array.isArray(serializableState.sessionHistory?.blastHistory)
+        ? serializableState.sessionHistory.blastHistory.length
+        : null;
+      const totalRounds = serializableState.sessionHistory?.totalRounds
+        ?? historyRounds
+        ?? serializableState.blasts?.length
+        ?? 0;
+      const roundLabel = Math.max(1, totalRounds || 0);
+      const saveName = `${serializableState.playerName || 'Player'} - Round ${roundLabel}`;
 
       // Save to localStorage using SaveLoadManager
       const result = saveLoadManager.saveGame(serializableState, saveName);
@@ -264,19 +272,39 @@ const SaveLoadPanel = ({
 
   // Create simulation entries formatted for modal display
   const simulationSessions = useMemo(() => {
-    return (savedSimulations || []).map((sim) => ({
-      id: sim.id,
-      saveName: sim.customName || sim.scenario?.name || 'Saved Simulation',
-      playerName: sim.player?.name || sim.player?.playerName || 'Unknown Miner',
-      timestamp: sim.timestamp,
-      score: sim.player?.score ?? 0,
-      blastCount: sim.metadata?.totalBlasts ?? sim.blasts?.history?.length ?? 0,
-      isCorrupted: sim.isCorrupted,
-      isCompatible: sim.isCompatible,
-      version: sim.version,
-      summary: sim.summary,
-      source: 'simulation'
-    }));
+    return (savedSimulations || []).map((sim) => {
+      const historyRounds = Array.isArray(sim.sessionHistory?.blastHistory)
+        ? sim.sessionHistory.blastHistory.length
+        : null;
+      const totalRounds = sim.sessionHistory?.totalRounds
+        ?? historyRounds
+        ?? sim.metadata?.autoSaveRound
+        ?? sim.metadata?.lastCompletedRound
+        ?? sim.metadata?.totalBlasts
+        ?? sim.blasts?.history?.length
+        ?? 0;
+
+      const saveName = (() => {
+        if (sim.metadata?.saveReason === 'auto' && totalRounds > 0) {
+          return `Auto-Save – Round ${totalRounds}`;
+        }
+        return sim.customName || sim.metadata?.autoSaveLabel || sim.scenario?.name || 'Saved Simulation';
+      })();
+
+      return {
+        id: sim.id,
+        saveName,
+        playerName: sim.player?.name || sim.player?.playerName || 'Unknown Miner',
+        timestamp: sim.timestamp,
+        score: sim.player?.score ?? 0,
+        blastCount: totalRounds,
+        isCorrupted: sim.isCorrupted,
+        isCompatible: sim.isCompatible,
+        version: sim.version,
+        summary: sim.summary,
+        source: 'simulation'
+      };
+    });
   }, [savedSimulations]);
 
   // Handle load functionality - Show saved sessions modal
